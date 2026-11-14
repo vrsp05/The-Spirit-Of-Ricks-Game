@@ -1,0 +1,101 @@
+import * as THREE from 'three';
+import { GAME_CONFIG } from '../config/game.config';
+import type { ActionState } from '../input/actions';
+import { Avatar } from './Avatar';
+import type { GolfCart } from './GolfCart';
+
+/** Where the player currently is (exterior campus or an interior). */
+export interface Space {
+  id: string;
+  blocked(x: number, z: number, r: number): boolean;
+  groundY(x: number, z: number): number;
+  /** Absolute height of solid geometry at x,z (for camera occlusion); 0/undefined = open. */
+  occluderTop?(x: number, z: number): number;
+  interior: boolean;
+}
+
+export class PlayerController {
+  readonly avatar = new Avatar({ shirt: '#f2efe6', pants: '#3a4252', skin: '#e2b893', hair: '#4a3324', tie: '#3b5b8c' });
+  readonly position = new THREE.Vector3();
+  yaw = 0;              // facing, radians (0 = +z/south)
+  speed = 0;
+  vy = 0;
+  grounded = true;
+  space!: Space;
+  noclip = false;
+  vehicle: GolfCart | null = null;
+
+  constructor(scene: THREE.Scene) { scene.add(this.avatar.root); }
+
+  place(space: Space, x: number, z: number, yaw = this.yaw) {
+    this.space = space; this.position.set(x, space.groundY(x, z), z); this.yaw = yaw; this.vy = 0; this.grounded = true; this.sync();
+  }
+
+  update(dt: number, input: ActionState, cameraYaw: number, enabled: boolean) {
+    if (this.vehicle) { this.drive(dt, input, enabled); return; }
+    let mx = 0, my = 0;
+    if (enabled) { mx = input.axes.moveX; my = input.axes.moveY; }
+    const mag = Math.min(1, Math.hypot(mx, my));
+    const P = GAME_CONFIG.player;
+    const target = mag > 0.05 ? (input.running ? P.runSpeed : P.walkSpeed) * mag * (this.noclip ? 3 : 1) : 0;
+    this.speed += (target - this.speed) * Math.min(1, dt * (this.grounded ? 10 : 3));
+    if (mag > 0.05) {
+      // camera-relative: forward = away from camera
+      const fx = -Math.sin(cameraYaw), fz = -Math.cos(cameraYaw);
+      const rx = -fz, rz = fx;
+      const dx = (fx * my + rx * mx) / (mag || 1), dz = (fz * my + rz * mx) / (mag || 1);
+      const want = Math.atan2(dx, dz);
+      let d = want - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.yaw += d * Math.min(1, dt * 12);
+      this.move(dx * this.speed * dt, dz * this.speed * dt, P.radius);
+    } else if (this.speed > 0.05) {
+      this.move(Math.sin(this.yaw) * this.speed * dt, Math.cos(this.yaw) * this.speed * dt, P.radius);
+    }
+    // jump + gravity
+    const gy = this.space.groundY(this.position.x, this.position.z);
+    if (enabled && this.grounded && input.pressed('jump')) { this.vy = P.jumpSpeed; this.grounded = false; }
+    if (!this.grounded) {
+      this.vy -= P.gravity * dt; this.position.y += this.vy * dt;
+      if (this.position.y <= gy) { this.position.y = gy; this.vy = 0; this.grounded = true; }
+    } else {
+      this.position.y += (gy - this.position.y) * Math.min(1, dt * 20);
+    }
+    this.avatar.animate(dt, this.grounded ? this.speed : 0);
+    this.sync();
+  }
+
+  /** Golf cart: W/S throttle & brake/reverse, A/D steer (relative to the cart). */
+  private drive(dt: number, input: ActionState, enabled: boolean) {
+    const C = GAME_CONFIG.cart, cart = this.vehicle!;
+    const throttle = enabled ? input.axes.moveY : 0, steer = enabled ? input.axes.moveX : 0;
+    const max = throttle >= 0 ? C.maxSpeed : -C.reverseSpeed;
+    const tgt = Math.abs(throttle) > 0.05 ? max * Math.abs(throttle) : 0, step = C.accel * dt;
+    cart.speed += Math.max(-step * 1.6, Math.min(step, tgt - cart.speed));
+    this.yaw -= steer * C.turnRate * dt * Math.max(-1, Math.min(1, cart.speed / 4));
+    const dx = Math.sin(this.yaw) * cart.speed * dt, dz = Math.cos(this.yaw) * cart.speed * dt;
+    const before = this.position.clone();
+    this.move(dx, dz, C.radius);
+    const moved = this.position.distanceTo(before);
+    if (moved < Math.hypot(dx, dz) * 0.5) cart.speed *= -0.25; // bump
+    this.position.y = this.space.groundY(this.position.x, this.position.z);
+    this.speed = Math.abs(cart.speed);
+    cart.root.position.copy(this.position); cart.root.rotation.y = this.yaw;
+    cart.animate(dt);
+    // seated on the bench: hips (0.8 above feet) on the seat top (1.22), shifted toward the left seat
+    const sx = Math.cos(this.yaw) * 0.35, sz = -Math.sin(this.yaw) * 0.35;
+    const bx = -Math.sin(this.yaw) * 0.05, bz = -Math.cos(this.yaw) * 0.05;
+    this.avatar.root.position.set(this.position.x + sx + bx, this.position.y + 0.42, this.position.z + sz + bz);
+    this.avatar.root.rotation.y = this.yaw;
+  }
+
+  private move(dx: number, dz: number, r: number) {
+    const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dz)) / 0.3) || 1;
+    for (let s = 0; s < steps; s++) {
+      const nx = this.position.x + dx / steps;
+      if (this.noclip || !this.space.blocked(nx, this.position.z, r)) this.position.x = nx;
+      const nz = this.position.z + dz / steps;
+      if (this.noclip || !this.space.blocked(this.position.x, nz, r)) this.position.z = nz;
+    }
+  }
+  private sync() { this.avatar.root.position.copy(this.position); this.avatar.root.rotation.y = this.yaw; }
+}

@@ -5,7 +5,7 @@ import { CLASSROOM } from '../src/quests/q1/classroom';
 import { GAME_CONFIG } from '../src/config/game.config';
 import { ART, floodFill, refGrid, scoreDrawing, type Grid } from '../src/quests/q1/art';
 import { CIRCUIT, parseLevel, scramble, simulate, sides, stepsToSolved, testBoard } from '../src/quests/q1/circuit';
-import { ENGLISH, preparePassage } from '../src/quests/q1/english';
+import { ENGLISH, layoutLines, preparePassage, sentenceOf } from '../src/quests/q1/english';
 
 const V = (name: string) => MATH.reference.find(r => r.gold === name || r.silver === name)!.value;
 
@@ -164,7 +164,14 @@ describe('english answer keys', () => {
       expect(text).toContain('named for President Kimball'); expect(text).toContain('Gordon B. Hinckley dedicated'); expect(text).toContain('Ricks College');
     }
   });
-  it('wrong-stamp allowance: Easy unlimited, Hard 2; Hard press is faster', () => { expect(ENGLISH.modes.easy.wrongAllowance).toBe(-1); expect(ENGLISH.modes.hard.wrongAllowance).toBe(2); expect(ENGLISH.modes.hard.speed).toBeGreaterThan(ENGLISH.modes.easy.speed); });
+  it('wrong-mark allowance: Easy unlimited, Hard 2', () => { expect(ENGLISH.modes.easy.wrongAllowance).toBe(-1); expect(ENGLISH.modes.hard.wrongAllowance).toBe(2); });
+  it('the whole page wraps into lines that fit and keep every word in order', () => {
+    const { tokens } = preparePassage('hard');
+    const lines = layoutLines(tokens, t => t.length * 10, 400, 10);
+    expect(lines.flat()).toEqual(tokens.map((_, i) => i));
+    for (const l of lines) expect(l.reduce((w, i, k) => w + tokens[i].length * 10 + (k ? 10 : 0), 0)).toBeLessThanOrEqual(400);
+    const s = sentenceOf(tokens); expect(s[0]).toBe(0); expect(Math.max(...s)).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe('art subjects', () => {

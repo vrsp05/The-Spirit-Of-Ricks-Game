@@ -1,17 +1,18 @@
 // 1D. English — "Editing for accuracy" (Smith Building): Brother Price's summary of the
-// Kimball Building dedication (Sept 7, 1999) scrolls up the overhead projector. Stamp each
-// planted mistake with the red marker as it crosses the lamp line, then pick the right
-// correction. Data: data/english.json (fictional student summary; facts from Church News 1999).
+// Kimball Building dedication (Sept 7, 1999) is projected as a whole page on the
+// whiteboard. Move along the words, mark a mistake, and pick the correction — it is
+// written in red ink right on the page. Data: data/english.json (fictional student
+// summary; facts from the Church News, Sept 11, 1999).
 import data from './data/english.json';
 import type { ChallengeBody } from '../shared/frame';
-import { btn, h, loop } from '../shared/frame';
+import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
-import { text } from './room3d';
+import { text, type Surface } from './room3d';
 
 export interface EnglishError { word: string; correct: string; options: string[]; why: string }
 export const ENGLISH = data as unknown as {
   label: string; facts: string[]; passages: Record<string, { text: string; errors: EnglishError[] }>;
-  modes: Record<string, { wrongAllowance: number; hints: number; hintStyle: 'glow' | 'count'; speed: number }>;
+  modes: Record<string, { wrongAllowance: number; hints: number; hintStyle: 'glow' | 'count'; speed?: number }>;
 };
 
 /** Tokenise and map each planted error to its token index (validated in tests). */
@@ -27,158 +28,162 @@ export function preparePassage(diff: string) {
   return { tokens, errorAt };
 }
 
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+/** Greedy word wrap: returns lines of token indices that fit in maxW. */
+export function layoutLines(tokens: string[], measure: (t: string) => number, maxW: number, space: number): number[][] {
+  const lines: number[][] = [[]]; let w = 0;
+  tokens.forEach((t, i) => {
+    const tw = measure(t), need = lines[lines.length - 1].length ? space + tw : tw;
+    if (w + need > maxW && lines[lines.length - 1].length) { lines.push([i]); w = tw; } else { lines[lines.length - 1].push(i); w += need; }
+  });
+  return lines;
+}
+/** Sentence number for each token (a token ending in . ! ? closes a sentence). */
+export const sentenceOf = (tokens: string[]) => { let s = 0; return tokens.map(t => { const id = s; if (/[.!?]$/.test(t)) s++; return id; }); };
 
 export const englishChallenge: ChallengeBody = (root, api) => {
   const mode = ENGLISH.modes[api.difficulty];
   const { tokens, errorAt } = preparePassage(api.difficulty);
-  const fixed = new Set<number>(), escapedThisPass = new Set<number>();
-  let x = 0, speedIdx = 2, paused = false, wrong = 0, escaped = 0, points = 0, hintsLeft = mode.hints, passes = 1;
-  let choosing: { i: number; opts: string[]; sel: number } | null = null, over = false, pulse = 0;
-
-  const strip = h('div', { class: 'rp-strip' });
-  const spans = tokens.map(t => h('span', { class: 'rp-tok', text: t }));
-  strip.append(h('span', { class: 'rp-mast', text: '▤ TRANSPARENCY · Brother Price ▤' }), ...spans, h('span', { class: 'rp-mast', text: '— end —' }));
-  const line = h('div', { class: 'rp-line' }, h('span', { text: 'LAMP' }));
-  const press = h('div', { class: 'rp-press' }, h('div', { class: 'rp-roller top' }), strip, line, h('div', { class: 'rp-roller bottom' }));
-  const choice = h('div', { class: 'rp-choice hidden' });
-  const hud = h('div', { class: 'rp-hud' });
-  const toast = h('div', { class: 'rp-toast' });
-  const facts = h('div', { class: 'eng-facts rp-facts' }, h('div', { class: 'ref-title', text: 'Fact sheet (Church News, 1999)' }), h('ul', {}, ...ENGLISH.facts.map(f => h('li', { text: f }))));
+  const sent = sentenceOf(tokens);
   const room = classroom()?.room ?? null;
-  if (room) {
-    // In the classroom: the paper strip is mirrored onto the 3D projector screen; the DOM strip
-    // stays laid out (invisible) for timing and hit-testing. Choices and the HUD sit in the bottom strip.
-    const stampBtn = btn('✒ Stamp the word on the lamp line (E)', () => stamp(), 'primary'); stampBtn.removeAttribute('data-focus');
-    root.append(hud, h('div', { class: 'rp-stage q1-measure' }, press), stampBtn, choice, toast);
-  } else root.append(h('div', { class: 'eng-label', text: ENGLISH.label.split(' Facts')[0] }), hud, h('div', { class: 'rp-stage' }, press, choice, toast), facts);
-  const drawClipping = () => {
-    const p = room?.get('poster'); if (!p) return;
-    const g = p.g; g.fillStyle = '#f4efe2'; g.fillRect(0, 0, p.w, p.h); g.fillStyle = '#c0392b'; g.beginPath(); g.arc(p.w / 2, 30, 14, 0, 7); g.fill();
-    let y = text(p, 'CHURCH NEWS · Sept. 11, 1999', p.w / 2, 60, 30, '#222', 'center', 'Georgia, serif');
-    y = text(p, 'Fact sheet', p.w / 2, y + 4, 40, '#222', 'center', 'Georgia, serif') + 10;
-    for (const f of ENGLISH.facts) y = text(p, '• ' + f, 40, y + 8, 27, '#222', 'left', 'Georgia, serif', p.w - 80);
+  const fixed = new Map<number, string>();               // token → correction written in red
+  let cur = 0, wrong = 0, hintsLeft = mode.hints, over = false, flashBad = -1, flashT = 0, glow = new Set<number>();
+  let choosing: { i: number; opts: string[]; sel: number } | null = null;
+
+  // ---- the page (projected on the whiteboard, or a local canvas without a room) ----
+  const local = room ? null : (() => { const c = h('canvas', { class: 'q1-page', width: 1400, height: 480 }) as HTMLCanvasElement; return { canvas: c, g: c.getContext('2d')!, w: 1400, h: 480, refresh: () => {} } as Surface; })();
+  const page = () => room?.get('board') ?? local;
+  const FONT = 42, LH = 70, MX = 70, TOP = 96, SERIF = 'Georgia, serif';
+  let lines: number[][] = [], pos: { x: number; y: number; w: number }[] = [];
+  const layout = () => {
+    const p = page(); if (!p) return;
+    p.g.font = `${FONT}px ${SERIF}`;
+    const space = p.g.measureText(' ').width * 1.6;
+    lines = layoutLines(tokens, t => p.g.measureText(t).width, p.w - MX * 2, space);
+    pos = [];
+    lines.forEach((ln, li) => { let x = MX; for (const i of ln) { const w = p.g.measureText(tokens[i]).width; pos[i] = { x, y: TOP + li * LH, w }; x += w + space; } });
+  };
+  const draw = () => {
+    const p = page(); if (!p) return; const g = p.g;
+    g.fillStyle = '#fbfaf5'; g.fillRect(0, 0, p.w, p.h);
+    g.fillStyle = 'rgba(0,0,0,.05)'; g.fillRect(24, 20, p.w - 48, p.h - 40);
+    text(p, 'The Kimball Building — summary by Brother Price', MX, 26, 30, '#555', 'left', SERIF);
+    g.font = `${FONT}px ${SERIF}`; g.textBaseline = 'top'; g.textAlign = 'left';
+    tokens.forEach((t, i) => {
+      const q = pos[i]; if (!q) return;
+      if (glow.has(sent[i])) { g.fillStyle = 'rgba(255,214,80,.35)'; g.fillRect(q.x - 6, q.y - 4, q.w + 12, FONT + 12); }
+      if (i === cur && !over) { g.fillStyle = choosing ? 'rgba(220,60,40,.25)' : 'rgba(255,200,40,.55)'; g.fillRect(q.x - 6, q.y - 4, q.w + 12, FONT + 12); }
+      const fx = fixed.get(i);
+      g.fillStyle = fx ? '#777' : i === flashBad && flashT > 0 ? '#c0392b' : '#1a1a1a';
+      g.fillText(t, q.x, q.y);
+      if (fx) {
+        g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.moveTo(q.x - 4, q.y + FONT * 0.55); g.lineTo(q.x + q.w + 4, q.y + FONT * 0.55); g.stroke();
+        g.fillStyle = '#c0392b'; g.font = `italic ${Math.round(FONT * 0.62)}px ${SERIF}`; g.fillText(fx, q.x, q.y - FONT * 0.62); g.font = `${FONT}px ${SERIF}`;
+      }
+      if (i === flashBad && flashT > 0) { g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.ellipse(q.x + q.w / 2, q.y + FONT / 2, q.w / 2 + 12, FONT * 0.8, 0, 0, 7); g.stroke(); }
+    });
     p.refresh();
   };
-  const drawScreen = () => {
-    const sc = room?.get('board'); if (!sc || !stripW) return;
-    const g = sc.g, k = (sc.w / Math.max(1, press.clientWidth)) * 2.2, lineDom = lineX(), lineCv = sc.w * 0.32;
-    const X = (domX: number) => lineCv + (domX - lineDom) * k;   // zoomed around the lamp line
-    g.fillStyle = '#f7f5ee'; g.fillRect(0, 0, sc.w, sc.h);
-    g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, sc.h * 0.25, sc.w, sc.h * 0.5);
-    const fs = parseFloat(getComputedStyle(spans[0]).fontSize) * k, cy = sc.h / 2;
-    g.font = `${fs}px Georgia, serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
-    spans.forEach((sp, i) => {
-      const x0 = X(x + offsets[i]); if (x0 > sc.w || x0 + widths[i] * k < 0) return;
-      const fixedW = sp.classList.contains('rp-fixed'), stamped = sp.classList.contains('rp-stamped'), glow = sp.classList.contains('rp-glow');
-      if (glow) { g.fillStyle = 'rgba(255,220,80,.55)'; g.fillRect(x0 - 4, cy - fs * 0.7, widths[i] * k + 8, fs * 1.4); }
-      g.fillStyle = fixedW ? '#1f7a2e' : stamped ? '#c0392b' : '#1a1a1a'; g.fillText(sp.textContent ?? '', x0, cy);
-      if (fixedW) { g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.ellipse(x0 + widths[i] * k / 2, cy, widths[i] * k / 2 + 10, fs * 0.75, 0, 0, 7); g.stroke(); }
-    });
-    const lx = lineCv; g.fillStyle = 'rgba(220,40,30,.85)'; g.fillRect(lx - 3, 0, 6, sc.h);
-    g.font = `bold ${Math.round(fs * 0.5)}px monospace`; g.fillText('LAMP', lx + 10, 30);
-    sc.refresh();
-  };
-  api.setControls([['1', 'STAMP / choose'], ['L', 'pick correction'], ['2', 'cancel'], ['R', 'scroll speed'], ['RU', 'pause scrolling'], ['3', 'hint'], ['4', 'tools']]);
 
-  let offsets: number[] = [], widths: number[] = [], stripW = 0;
-  const measure = () => { offsets = spans.map(s => s.offsetLeft); widths = spans.map(s => s.offsetWidth); stripW = strip.scrollWidth; };
-  const lineX = () => press.clientWidth * 0.32;
-  const showToast = (t: string, cls: string) => { toast.textContent = t; toast.className = `rp-toast show ${cls}`; window.setTimeout(() => { toast.className = 'rp-toast'; }, 1100); };
-  const renderHud = () => {
-    const allow = mode.wrongAllowance >= 0 ? ` / ${mode.wrongAllowance} allowed` : '';
-    hud.replaceChildren(h('span', { text: `✎ Fixed ${fixed.size}/${errorAt.size}` }), h('span', { text: `Score ${points}` }),
-      h('span', { text: `Wrong stamps ${wrong}${allow}` }), h('span', { text: `Escaped ${escaped}` }),
-      h('span', { class: 'rp-speed', text: `Scroll speed ×${SPEEDS[speedIdx]}${paused ? ' · PAUSED' : ''}` }));
-  };
-  const penalise = (msg: string) => {
-    wrong++; points = Math.max(0, points - 50); showToast(msg, 'bad'); renderHud(); classroom()?.react('confused');
-    if (mode.wrongAllowance >= 0 && wrong > mode.wrongAllowance) { over = true; stop(); api.finish({ pass: false, quality: 0, summary: `Too many wrong stamps (${wrong}). Check the fact sheet and try again.` }); return true; }
-    return false;
-  };
-  const stamp = () => {
-    if (choosing || over) return;
-    const lx = lineX(); let best = -1, bd = Infinity;
-    spans.forEach((_, i) => { const c = x + offsets[i] + widths[i] / 2, d = Math.abs(c - lx); if (d < widths[i] / 2 + 18 && d < bd) { bd = d; best = i; } });
-    pulse = 1;
-    if (best < 0) { showToast('Whoosh — nothing under the line', ''); return; }
-    if (fixed.has(best)) return;
-    const e = errorAt.get(best);
-    if (!e) { spans[best].classList.add('rp-ok-word'); setTimeout(() => spans[best].classList.remove('rp-ok-word'), 600); penalise(`“${tokens[best]}” was correct!`); return; }
-    choosing = { i: best, opts: [...e.options].sort(() => Math.random() - 0.5), sel: 0 };
-    spans[best].classList.add('rp-stamped'); renderChoice();
-  };
-  const renderChoice = () => {
-    if (!choosing) { choice.classList.add('hidden'); return; }
+  // ---- bottom strip: progress, the current line as clickable words (mouse), corrections ----
+  const hud = h('div', { class: 'q1-eng-hud' });
+  const lineRow = h('div', { class: 'q1-eng-line' });
+  const choice = h('div', { class: 'q1-eng-choice' });
+  if (local) root.append(local.canvas);
+  root.append(hud, lineRow, choice);
+  const lineOf = (i: number) => lines.findIndex(l => l.includes(i));
+  const renderStrip = () => {
+    const allow = mode.wrongAllowance >= 0 ? ` / ${mode.wrongAllowance}` : '';
+    hud.textContent = `✎ Fixed ${fixed.size} of ${errorAt.size} · wrong marks ${wrong}${allow}`;
+    const li = Math.max(0, lineOf(cur));
+    lineRow.replaceChildren(h('span', { class: 'q1-eng-lbl', text: `Line ${li + 1}:` }), ...(lines[li] ?? []).map(i => {
+      const b = btn(fixed.get(i) ?? tokens[i], () => { cur = i; mark(); }, `${i === cur ? 'sel' : ''} ${fixed.has(i) ? 'fixed' : ''}`); b.removeAttribute('data-focus'); return b;
+    }));
+    if (!choosing) { choice.replaceChildren(h('span', { class: 'small', text: 'Move along the page and press ① on a word that is wrong.' })); return; }
     const c = choosing;
-    choice.classList.remove('hidden');
-    choice.replaceChildren(h('div', { class: 'rp-q', text: `Replace “${tokens[c.i]}” with…` }),
-      h('div', { class: 'rp-opts' }, ...c.opts.map((o, k) => { const b = btn(o, () => { c.sel = k; pick(); }, k === c.sel ? 'sel' : ''); b.removeAttribute('data-focus'); return b; })),
-      h('div', { class: 'small', text: 'L ← → choose · ① confirm · ② cancel' }));
+    choice.replaceChildren(h('b', { text: `Replace “${tokens[c.i]}” with: ` }), ...c.opts.map((o, k) => { const b = btn(o, () => { c.sel = k; pick(); }, k === c.sel ? 'sel' : ''); b.removeAttribute('data-focus'); return b; }),
+      (() => { const b = btn('Cancel', () => { choosing = null; renderAll(); }); b.removeAttribute('data-focus'); return b; })());
+  };
+  const renderAll = () => { draw(); renderStrip(); };
+
+  const finishIfDone = () => {
+    if (fixed.size < errorAt.size) return;
+    over = true; draw();
+    window.setTimeout(() => api.finish({ pass: true, quality: Math.max(0, 1 - wrong * 0.12 - api.hintsUsed() * 0.06),
+      summary: `All ${errorAt.size} mistakes corrected on the page, with ${wrong} wrong mark${wrong === 1 ? '' : 's'}.` }), 700);
+  };
+  const mark = () => {
+    if (over || choosing) return;
+    if (fixed.has(cur)) { api.setStatus('Already corrected.'); return; }
+    const e = errorAt.get(cur);
+    if (!e) {
+      wrong++; flashBad = cur; flashT = 1; classroom()?.react('confused', `“${tokens[cur]}” is fine, actually.`, 'Brother Price');
+      if (mode.wrongAllowance >= 0 && wrong > mode.wrongAllowance) { over = true; renderAll(); window.setTimeout(() => api.finish({ pass: false, quality: 0, summary: `Too many wrong marks (${wrong}). Check the Church News clipping and try again.` }), 900); return; }
+      renderAll(); return;
+    }
+    choosing = { i: cur, opts: [...e.options].sort(() => Math.random() - 0.5), sel: 0 }; renderAll();
   };
   const pick = () => {
     if (!choosing) return; const c = choosing, e = errorAt.get(c.i)!, o = c.opts[c.sel];
     if (o === e.correct) {
-      fixed.add(c.i); tokens[c.i] = o; spans[c.i].textContent = o; spans[c.i].classList.remove('rp-stamped', 'rp-glow'); spans[c.i].classList.add('rp-fixed');
-      points += Math.round(100 * SPEEDS[speedIdx]); choosing = null; renderChoice(); showToast(`✔ ${e.why}`, 'ok'); measure(); renderHud(); classroom()?.react('nod', '…yeah, okay, that’s fair.', 'Brother Price');
-      if (fixed.size === errorAt.size) {
-        over = true; stop();
-        const maxPts = errorAt.size * 100;
-        api.finish({ pass: true, quality: Math.max(0, Math.min(1, points / maxPts) * 0.6 + 0.4 - wrong * 0.1 - escaped * 0.05 - api.hintsUsed() * 0.05),
-          summary: `All ${errorAt.size} mistakes fixed! Score ${points} · ${wrong} wrong stamp(s) · ${escaped} escaped · ${passes} pass(es) of the projector.` });
-      }
+      fixed.set(c.i, o); choosing = null; glow.delete(sent[c.i]); api.setStatus(`✔ ${e.why}`);
+      classroom()?.react('nod', '…yeah, okay, that’s fair.', 'Brother Price'); classroom()?.bump(0.1);
+      renderAll(); finishIfDone();
     } else {
-      c.opts.splice(c.sel, 1); c.sel = 0;
-      if (!penalise(`“${o}” isn’t right here`)) renderChoice();
+      wrong++; c.opts.splice(c.sel, 1); c.sel = 0; classroom()?.react('confused');
+      api.setStatus(`“${o}” isn’t right here.`);
+      if (mode.wrongAllowance >= 0 && wrong > mode.wrongAllowance) { over = true; choosing = null; renderAll(); window.setTimeout(() => api.finish({ pass: false, quality: 0, summary: `Too many wrong marks (${wrong}).` }), 900); return; }
+      renderAll();
     }
   };
-  const cancel = () => { if (choosing) { spans[choosing.i].classList.remove('rp-stamped'); choosing = null; renderChoice(); } };
+  const move = (dx: number, dy: number) => {
+    if (dy) {
+      const li = lineOf(cur), nl = Math.max(0, Math.min(lines.length - 1, li + dy)); if (nl === li) return;
+      const x = pos[cur].x; cur = lines[nl].reduce((b, i) => (Math.abs(pos[i].x - x) < Math.abs(pos[b].x - x) ? i : b), lines[nl][0]);
+    } else cur = Math.max(0, Math.min(tokens.length - 1, cur + dx));
+    renderAll();
+  };
 
-  const stop = loop(dt => {
-    if (!stripW) { measure(); x = press.clientWidth * 0.6; }
-    drawScreen();
-    pulse = Math.max(0, pulse - dt * 4); line.style.setProperty('--p', String(pulse));
-    if (choosing || paused || over) return;
-    const prev = x; x -= mode.speed * SPEEDS[speedIdx] * dt;
-    const lx = lineX();
-    errorAt.forEach((_, i) => {
-      if (fixed.has(i) || escapedThisPass.has(i)) return;
-      const edge = offsets[i] + widths[i] + 18;
-      if (prev + edge >= lx && x + edge < lx) { escapedThisPass.add(i); escaped++; points = Math.max(0, points - 20); showToast('A mistake slipped past! It will come round again.', 'bad'); renderHud(); }
-    });
-    if (x + stripW < 0) { x = press.clientWidth; passes++; escapedThisPass.clear(); }
-    strip.style.transform = `translateX(${x}px)`;
-  });
-
+  api.setControls([['L', 'move along the page'], ['1', 'mark word / choose'], ['2', 'cancel'], ['RU', 'view'], ['3', 'hint']]);
   api.onHint(() => {
     if (hintsLeft <= 0) return null;
     const rem = [...errorAt.keys()].filter(i => !fixed.has(i)); if (!rem.length) return null;
     hintsLeft--;
-    if (mode.hintStyle === 'count') return `${rem.length} mistake(s) left. Compare places, dates and names with the fact sheet.`;
-    const lx = lineX(); const next = rem.sort((a, b) => ((x + offsets[a] - lx + stripW * 2) % stripW) - ((x + offsets[b] - lx + stripW * 2) % stripW))[0];
-    spans[next].classList.add('rp-glow');
-    return 'The next mistake glows on the paper strip — stamp it when it reaches the red line.';
+    if (mode.hintStyle === 'count') return `${rem.length} mistake(s) left. Compare dates, places and names with the Church News clipping on the bulletin board.`;
+    glow.add(sent[rem[0]]); draw();
+    return 'The sentence with the next mistake is highlighted on the page.';
   });
   api.onAction(a => {
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
+    if (over) return true;
     if (choosing) {
       if (a === 'left' || a === 'up' || a === 'alt2') choosing.sel = (choosing.sel + choosing.opts.length - 1) % choosing.opts.length;
       else if (a === 'right' || a === 'down' || a === 'alt') choosing.sel = (choosing.sel + 1) % choosing.opts.length;
       else if (a === 'confirm') { pick(); return true; }
-      else if (a === 'back') { cancel(); return true; }
-      else return a === 'rup' || a === 'rdown';
-      renderChoice(); return true;
+      else if (a === 'back') { choosing = null; renderAll(); return true; }
+      else return a === 'rdown';
+      renderStrip(); return true;
     }
-    if (a === 'confirm') { stamp(); return true; }
-    if (a === 'alt' || a === 'right') { speedIdx = Math.min(SPEEDS.length - 1, speedIdx + 1); renderHud(); return true; }
-    if (a === 'alt2' || a === 'left') { speedIdx = Math.max(0, speedIdx - 1); renderHud(); return true; }
-    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
-    if (a === 'rup' || a === 'rdown') { paused = !paused; renderHud(); return true; }
-    if (a === 'up' || a === 'down' || a === 'back') return true;
+    if (a === 'left' || a === 'alt2') { move(-1, 0); return true; }
+    if (a === 'right' || a === 'alt') { move(1, 0); return true; }
+    if (a === 'up') { move(0, -1); return true; }
+    if (a === 'down') { move(0, 1); return true; }
+    if (a === 'confirm') { mark(); return true; }
+    if (a === 'back' || a === 'rdown') return true;
     return false;
   });
-  press.addEventListener('pointerdown', () => stamp());
-  drawClipping();
-  if (room) api.setControls([['1', 'stamp the word on the lamp line'], ['R', 'scroll speed'], ['RU', 'view'], ['3', 'hint']]);
-  renderHud();
-  return () => stop();
+
+  // fact clipping on the bulletin board
+  const p = room?.get('poster');
+  if (p) {
+    const g = p.g; g.fillStyle = '#f4efe2'; g.fillRect(0, 0, p.w, p.h); g.fillStyle = '#c0392b'; g.beginPath(); g.arc(p.w / 2, 30, 14, 0, 7); g.fill();
+    let y = text(p, 'CHURCH NEWS · Sept. 11, 1999', p.w / 2, 60, 30, '#222', 'center', SERIF);
+    y = text(p, 'Fact sheet', p.w / 2, y + 4, 40, '#222', 'center', SERIF) + 10;
+    for (const f of ENGLISH.facts) y = text(p, '• ' + f, 40, y + 8, 27, '#222', 'left', SERIF, p.w - 80);
+    p.refresh();
+  }
+  let raf = 0, last = performance.now();
+  const tick = (now: number) => { const dt = (now - last) / 1000; last = now; if (flashT > 0) { flashT -= dt; if (flashT <= 0) draw(); } raf = requestAnimationFrame(tick); };
+  raf = requestAnimationFrame(tick);
+  layout(); renderAll();
+  return () => cancelAnimationFrame(raf);
 };

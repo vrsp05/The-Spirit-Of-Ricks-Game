@@ -185,6 +185,16 @@ function injectStyles() {
 .q1-demo .art-canvas .cell{background-color:#34463d}
 .q1-demo .art-canvas{background:#1d2a24}
 @keyframes q1up{from{translate:0 60px;opacity:0}to{translate:0 0;opacity:1}}
+/* English: page on the whiteboard; strip shows the current line + corrections */
+.q1-eng-hud{font:700 13px monospace;color:#9fe6ff}
+.q1-eng-line{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.q1-eng-line button{padding:4px 8px!important;font:600 14px Georgia,serif!important;text-transform:none!important}
+.q1-eng-line button.sel{outline:3px solid #ffd34d!important;background:#fff3c4!important}
+.q1-eng-line button.fixed{color:#c0392b!important;font-style:italic!important}
+.q1-eng-lbl{font:700 12px monospace;color:#e8dcc2;margin-right:4px}
+.q1-eng-choice{display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:#f3ecdc;min-height:34px}
+.q1-eng-choice button{text-transform:none!important}.q1-eng-choice button.sel{outline:3px solid #ffd34d!important}
+.q1-page{width:100%;max-width:1000px;display:block;margin:0 auto 8px;border:3px solid #0b0b0b}
 /* Math: binary board */
 .q1-bin{display:grid;gap:12px}
 .q1-bin-q{font:18px/1.4 Georgia,serif;color:#2a211a;background:#fffaf0;border:2px solid #3a2c22;border-radius:6px;padding:10px 14px}

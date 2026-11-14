@@ -8,6 +8,7 @@
 //   A = action / use (E: talk, doors, carts, balls; confirm in menus)   B = back + jump
 //   + or − = menu (pause; the tools bar in minigames)   X / Y = map (hint in minigames)
 //   left stick = move, right stick = camera, ZR/R = sprint (hold), D-pad = menu navigation.
+//   In minigames, L/ZL and R/ZR (SL/SR on one Joy-Con) change the view left/right.
 //   One Joy-Con sideways: its stick moves, SL/SR turn the camera.
 import type { ButtonName } from './actions';
 
@@ -45,11 +46,13 @@ export function readJoyCon(gp: PadLike, kind: JoyConKind): JoyConFrame {
     if (b(12)) out.buttons.add('navUp'); if (b(13)) out.buttons.add('navDown'); if (b(14)) out.buttons.add('navLeft'); if (b(15)) out.buttons.add('navRight');
     if (kind === 'pair') {
       out.axes = [gp.axes[0] ?? 0, -(gp.axes[1] ?? 0), gp.axes[2] ?? 0, -(gp.axes[3] ?? 0)];
-      if (b(7) || b(5)) add('run'); if (b(11) || b(6)) add('reset');
+      if (b(7) || b(5)) add('run'); if (b(11)) add('reset');
+      if (b(4) || b(6)) out.buttons.add('alt2'); if (b(5) || b(7)) out.buttons.add('alt');   // L/ZL · R/ZR: change view in minigames
     } else {
       // one Joy-Con held sideways: the browser already rotates the stick and face buttons; SL/SR = 4/5
       out.axes = [gp.axes[0] ?? 0, -(gp.axes[1] ?? 0), (b(5) ? 1 : 0) - (b(4) ? 1 : 0), 0];
       if (b(6) || b(7)) add('run');
+      if (b(4)) out.buttons.add('alt2'); if (b(5)) out.buttons.add('alt');   // SL/SR: change view in minigames
     }
     return out;
   }
@@ -62,6 +65,7 @@ export function readJoyCon(gp: PadLike, kind: JoyConKind): JoyConFrame {
   if (b(right)) add('A'); if (b(bottom)) add('B'); if (b(top)) add('X'); if (b(left)) add('Y');
   if (b(9)) add('plus'); if (b(8)) add('minus'); if (b(10) || b(11)) add('l3');
   if (b(14) || b(15)) add('run');
+  if (b(4)) out.buttons.add('alt2'); if (b(5)) out.buttons.add('alt');
   // stick: analog axes if the browser gives them, otherwise the 8-way hat (last axis; -1..1 in 8 steps, >1 = centred)
   let x = gp.axes[0] ?? 0, y = 0 - (gp.axes[1] ?? 0);
   const hat = gp.axes.length > 2 ? gp.axes[gp.axes.length - 1] : 2;

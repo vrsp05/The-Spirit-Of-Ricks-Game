@@ -174,7 +174,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const cv = h('canvas', { class: 'cx-board', 'aria-label': 'Circuit board' }) as HTMLCanvasElement;
   const goal = h('div', { class: 'cx-goal' }), bulbsEl = h('div', { class: 'cx-bulbs' }), info = h('div', { class: 'cx-info' });
   root.append(h('div', { class: 'cx-wrap' }, h('div', { class: 'cx-boardbox' }, cv), h('div', { class: 'cx-side' }, goal, bulbsEl, info)));
-  api.setControls([['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['3', 'hint'], ['4', 'tools']]);
+  api.setControls(classroom()?.room ? [['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', '◀ ▶ view'], ['3', 'hint'], ['4', 'tools']] : [['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['3', 'hint'], ['4', 'tools']]);
 
   const load = () => {
     const l = levels[li]; board = parseLevel(l);
@@ -277,7 +277,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     else if (a === 'up') cur.y = (cur.y + board.h - 1) % board.h; else if (a === 'down') cur.y = (cur.y + 1) % board.h;
     else if (a === 'confirm' || a === 'alt') { if (board.tiles[cur.y][cur.x].kind === 'switch') flip(); else rotate(1); }
     else if (a === 'back' || a === 'alt2') rotate(-1);
-    else if (a === 'rdown' && classroom()?.room) { const r = classroom()!.room!; r.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${r.viewLabel(r.current)} (G)`; }
+    else if (a === 'rdown' && classroom()?.room) { const r = classroom()!.room!; r.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${r.viewLabel(r.current)} (R)`; }
     else if (a === 'rup' || a === 'rdown') flip();
     else return false;
     return true;

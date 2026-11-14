@@ -252,8 +252,8 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   };
 
   api.setControls(mode.tray
-    ? [['L', 'choose coin / answer'], ['1', 'put coin down / answer'], ['2', 'take coin back'], ['RU', 'clear hand'], ['3', 'hint'], ['4', 'tools']]
-    : [['L', 'choose answer'], ['1', 'answer'], ['3', 'hint'], ['4', 'tools']]);
+    ? [['L', 'choose coin / answer'], ['1', 'put coin down / answer'], ['2', 'take coin back'], ['RU', '↓ clear hand'], ['R', '◀ ▶ view'], ['3', 'hint'], ['4', 'tools']]
+    : [['L', 'choose answer'], ['1', 'answer'], ['R', '◀ ▶ view'], ['3', 'hint'], ['4', 'tools']]);
   api.onHint(() => {
     if (hintsLeft <= 0 || busy || phase !== 'ask') return null;
     const cur = q(); hintsLeft--; hintStep++;
@@ -270,7 +270,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   });
   api.onAction(a => {
     if (busy) return true;
-    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (R)`; return true; }
     if (phase === 'intro') {
       const n4 = MATH.tray.length;
       if (a === 'left' || a === 'up' || a === 'alt2') { sel = (sel + n4 - 1) % n4; renderIntro(); return true; }
@@ -284,7 +284,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
     if (a === 'right' || a === 'down' || a === 'alt') { sel = (sel + 1) % n; renderQ(); return true; }
     if (a === 'confirm') { usesTray() ? add() : choose(); return true; }
     if (a === 'back') { if (usesTray() && hand.length) { hand.pop(); renderQ(); } return true; }
-    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (R)`; return true; }
     if (a === 'rup' || a === 'rdown') { if (usesTray()) { hand = []; renderQ(); } return true; }
     return false;
   });

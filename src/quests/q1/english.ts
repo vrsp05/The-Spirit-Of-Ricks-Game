@@ -178,7 +178,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     renderAll();
   };
 
-  api.setControls([['L', 'move along the page'], ['1', 'mark word / choose'], ['2', 'cancel'], ['RU', 'view'], ['3', 'hint']]);
+  api.setControls([['L', 'move along the page'], ['1', 'mark word / choose'], ['2', 'cancel'], ['R', '◀ ▶ view'], ['3', 'hint']]);
   api.onHint(() => {
     if (hintsLeft <= 0) return null;
     const rem = [...errorAt.keys()].filter(i => !fixed.has(i)); if (!rem.length) return null;
@@ -188,7 +188,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     return 'The sentence with the next mistake is highlighted on the page.';
   });
   api.onAction(a => {
-    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (R)`; return true; }
     if (over) return true;
     if (choosing) {
       if (a === 'left' || a === 'up' || a === 'alt2') choosing.sel = (choosing.sel + choosing.opts.length - 1) % choosing.opts.length;

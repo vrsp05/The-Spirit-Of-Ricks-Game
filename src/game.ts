@@ -163,7 +163,7 @@ export class Game {
         sound: n => playSound(n),
         reducedMotion: () => SETTINGS.reducedMotion,
         voxel: voxelBox,
-        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); this.registerSpeaker(o.label, a); return a.root; }, // no floating info card; the objective marker shows who to talk to
+        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); this.registerSpeaker(o.label, a); this.questAvatars.push({ a, x: NaN, z: NaN }); return a.root; }, // no floating info card; the objective marker shows who to talk to
         label: (t, s) => makeLabel(t, s),
       },
       addInteractable: d => this.interactions.add(d),
@@ -508,6 +508,17 @@ export class Game {
   private speakers = new Map<string, Avatar>();
   /** Characters whose mouths move when a line with their name is on screen. */
   registerSpeaker(name: string, a: Avatar) { this.speakers.set(name, a); }
+  /** Quest characters (e.g. a candidate following you) walk with their legs when a quest moves them. */
+  private questAvatars: { a: Avatar; x: number; z: number }[] = [];
+  private animateQuestAvatars(dt: number) {
+    const w = new THREE.Vector3();
+    for (const q of this.questAvatars) {
+      if (!q.a.root.parent || !q.a.root.visible) continue;
+      q.a.root.getWorldPosition(w);
+      const d = Math.hypot(w.x - q.x, w.z - q.z), speed = dt > 0 && d < 3 ? d / dt : 0;   // big jumps are teleports, not steps
+      q.x = w.x; q.z = w.z; q.a.animate(dt, Math.min(7, speed));
+    }
+  }
   private updateMouths(dt: number) {
     const sp = this.ui.currentSpeaker;
     for (const [name, a] of this.speakers) { a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }
@@ -1165,6 +1176,7 @@ export class Game {
     this.effects.update(dt);
     // The opening and ending drive their own subtitle-synchronized mouths.
     if (this.mode !== 'cutscene' && this.mode !== 'finale') this.updateMouths(dt);
+    this.animateQuestAvatars(dt);
     this.syncVehicles();
     if (this.overhead) {
       const c = this.renderer.camera, o = this.overhead, h = o.span / 2 / Math.tan(THREE.MathUtils.degToRad(c.fov / 2));

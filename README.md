@@ -1,6 +1,6 @@
 # The Spirit of Ricks
 
-A single-player voxel browser game about Ricks College becoming BYU–Idaho, built for a 24-hour hackathon.
+A [single-player voxel browser game](https://vrsp05.github.io/The-Spirit-Of-Ricks-Game/) about Ricks College becoming BYU–Idaho, built for a 24-hour hackathon.
 
 You play an assistant to President David A. Bednar. It begins on a sepia-toned campus in fall 1999. You finish three quests: recruit professors, construct buildings, find the lost letters. Each one brings colour back and moves the campus forward in time. Placing the letters on the Ricks College sign turns it into BYU–Idaho. The story ends with a celebration in the Science and Technology Center.
 

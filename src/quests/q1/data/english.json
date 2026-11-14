@@ -1,0 +1,126 @@
+{
+ "label": "STUDENT SUMMARY — fictional text written for this game by a fictional student, not a quotation. Facts checked against the Church News, Sept. 11, 1999 (\"President Hinckley dedicates new building at Ricks\").",
+ "facts": [
+  "The Spencer W. Kimball Building was dedicated on September 7, 1999.",
+  "President Gordon B. Hinckley dedicated it and offered the dedicatory prayer.",
+  "It is named for Spencer W. Kimball, the 12th President of the Church.",
+  "It is at Ricks College in Rexburg, Idaho.",
+  "It houses student services (admissions, financial aid) and executive offices."
+ ],
+ "passages": {
+  "easy": {
+   "text": "On September 7, 1899, President Gordon B. Hinckley dedicated the new Spencer W. Kimball Building at Ricks College in Rexburg, Utah. The building is named for President Hinckley.",
+   "errors": [
+    {
+     "word": "1899,",
+     "correct": "1999,",
+     "options": [
+      "1999,",
+      "1989,",
+      "2009,"
+     ],
+     "why": "The dedication was on September 7, 1999 — the HUD says Fall 1999."
+    },
+    {
+     "word": "Utah.",
+     "correct": "Idaho.",
+     "options": [
+      "Idaho.",
+      "Montana.",
+      "Wyoming."
+     ],
+     "why": "Rexburg is in Idaho."
+    },
+    {
+     "word": "Hinckley.",
+     "correct": "Kimball.",
+     "options": [
+      "Kimball.",
+      "Ricks.",
+      "Bednar."
+     ],
+     "why": "The wall plaque says Spencer W. Kimball Building — President Hinckley dedicated it."
+    }
+   ]
+  },
+  "hard": {
+   "text": "On September 7, 1899, President Gordon B. Hinckley dedicated the new Spencer W. Kimball Building at Ricks University in Rexburg, Utah. The building are named for President Hinckley. It houses admissions, financial aid and the president's office, so students and there families will visit it often.",
+   "errors": [
+    {
+     "word": "1899,",
+     "correct": "1999,",
+     "options": [
+      "1999,",
+      "1989,",
+      "2009,"
+     ],
+     "why": "The dedication was on September 7, 1999 — the HUD says Fall 1999."
+    },
+    {
+     "word": "University",
+     "correct": "College",
+     "options": [
+      "College",
+      "Academy",
+      "Institute"
+     ],
+     "why": "The campus sign says Ricks College."
+    },
+    {
+     "word": "Utah.",
+     "correct": "Idaho.",
+     "options": [
+      "Idaho.",
+      "Montana.",
+      "Wyoming."
+     ],
+     "why": "Rexburg is in Idaho."
+    },
+    {
+     "word": "are",
+     "correct": "is",
+     "options": [
+      "is",
+      "were",
+      "be"
+     ],
+     "why": "One building → \"is\"."
+    },
+    {
+     "word": "Hinckley.",
+     "correct": "Kimball.",
+     "options": [
+      "Kimball.",
+      "Ricks.",
+      "Bednar."
+     ],
+     "why": "The wall plaque says Spencer W. Kimball Building — President Hinckley dedicated it."
+    },
+    {
+     "word": "there",
+     "correct": "their",
+     "options": [
+      "their",
+      "they're",
+      "theirs"
+     ],
+     "why": "Belonging to the students → \"their\"."
+    }
+   ]
+  }
+ },
+ "modes": {
+  "easy": {
+   "wrongAllowance": -1,
+   "hints": 3,
+   "hintStyle": "glow",
+   "speed": 55
+  },
+  "hard": {
+   "wrongAllowance": 2,
+   "hints": 1,
+   "hintStyle": "count",
+   "speed": 90
+  }
+ }
+}

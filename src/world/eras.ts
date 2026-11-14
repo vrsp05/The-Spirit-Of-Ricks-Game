@@ -18,9 +18,10 @@ export const ERAS: Record<EraId, EraDef> = {
   // After the Kimball Building dedication (Sept 7, 1999); before the June 21, 2000 announcement.
   ricks1999: { id: 'ricks1999', year: 1999.8, label: 'Fall 1999 · Ricks College', cardTitle: 'Rexburg, Idaho — Fall 1999', institution: 'ricks' },
   // After original Spori demolition (Nov 2000) and Multi-Use/Hinckley groundbreaking (Apr 18, 2001).
-  transition: { id: 'transition', year: 2001.35, label: 'Ricks College · a new chapter', cardTitle: 'Time passes…', institution: 'ricksTransition' },
-  // After Rexburg Idaho Temple dedication (Feb 10, 2008); before the BYU–Idaho Center (Dec 2010).
-  byui: { id: 'byui', year: 2008.3, label: 'Ricks College · the campus grows', cardTitle: 'More time passes…', institution: 'ricksTransition' },
+  transition: { id: 'transition', year: 2001.35, label: 'Spring 2001 · Ricks College', cardTitle: 'Time passes — Spring 2001', institution: 'ricksTransition' },
+  // 2010 or later (quest prompt): Rexburg Idaho Temple (dedicated Feb 2008) and the I-Center (dedicated Dec 2010)
+  // coexist with the sign site for Quest 3. Naming stays neutral until the letters are placed (team decision #22).
+  byui: { id: 'byui', year: 2011.0, label: '2011 · Rexburg, Idaho', cardTitle: 'Time passes — 2011', institution: 'ricksTransition' },
   presentFinale: { id: 'presentFinale', year: 2026.0, label: 'Present day · BYU–Idaho', cardTitle: 'Ricks College is now BYU–Idaho', institution: 'byui' },
 };
 

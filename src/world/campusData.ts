@@ -30,7 +30,7 @@ export function toGame(x: number, z: number): Vec2 { return [x * S, z * S]; }
 export function toReal(x: number, z: number): Vec2 { return [x / S, z / S]; }
 
 // Road widths shrink less than distances so streets/paths stay usable.
-const roadWidth = (r: Road) => PATH_KINDS.has(r.kind) ? Math.max(2.6, r.width * 0.85)
+const roadWidth = (r: Road) => PATH_KINDS.has(r.kind) ? Math.max(3.2, r.width * 0.9)
   : r.kind === 'service' ? Math.max(5.5, r.width) : Math.max(8.5, r.width * 0.8); // wide enough for the golf cart
 
 export const CAMPUS: CampusData = {
@@ -82,7 +82,7 @@ function realPoly(b: BuildingEntry): Vec2[] | undefined {
 }
 
 // ---------------------------------------------------------------- compaction
-const constructionTargets = new Set((GAME_CONFIG.quests.construction.targets as { buildingId: string | null }[]).map(t => t.buildingId).filter(Boolean) as string[]);
+const constructionTargets = new Set(GAME_CONFIG.world.gatedBuildings);
 export function isQuestGated(id: string) { return constructionTargets.has(id); }
 
 const CELL = 1;
@@ -90,6 +90,8 @@ const gi0 = Math.floor(CAMPUS.bounds.minX), gj0 = Math.floor(CAMPUS.bounds.minZ)
 const GW = Math.ceil(CAMPUS.bounds.maxX) - gi0 + 1, GH = Math.ceil(CAMPUS.bounds.maxZ) - gj0 + 1;
 const eraGrids = ERA_ORDER.map(() => new Uint8Array(GW * GH));
 const roadGrid = new Uint8Array(GW * GH);
+/** Street direction (radians + 10) for cells strictly on the asphalt; 0 = not on a street. */
+const roadDir = new Float32Array(GW * GH);
 const compacted = new Map<string, Vec2[]>();
 
 (function rasterRoads() {
@@ -112,7 +114,11 @@ const compacted = new Map<string, Vec2[]>();
       for (let z = Math.floor(Math.min(az, bz) - hw); z <= Math.max(az, bz) + hw; z++) for (let x = Math.floor(Math.min(ax, bx) - hw); x <= Math.max(ax, bx) + hw; x++) {
         const t = Math.max(0, Math.min(1, ((x + 0.5 - ax) * dx + (z + 0.5 - az) * dz) / L2));
         const qx = ax + t * dx - x - 0.5, qz = az + t * dz - z - 0.5;
-        if (qx * qx + qz * qz <= hw * hw) { const i2 = x - gi0, j2 = z - gj0; if (i2 >= 0 && j2 >= 0 && i2 < GW && j2 < GH) roadGrid[j2 * GW + i2] = 1; }
+        const d2 = qx * qx + qz * qz;
+        if (d2 <= hw * hw) {
+          const i2 = x - gi0, j2 = z - gj0;
+          if (i2 >= 0 && j2 >= 0 && i2 < GW && j2 < GH) { roadGrid[j2 * GW + i2] = 1; if (d2 <= (r.width / 2 - 0.6) ** 2 && r.kind !== 'service') roadDir[j2 * GW + i2] = Math.atan2(dz, dx) + 10; }
+        }
       }
     }
   }
@@ -142,32 +148,45 @@ function presenceMask(id: string | null, b?: BuildingEntry): number {
 }
 
 (function compact() {
-  const items: { key: string; real: Vec2[]; mask: number; prio: number; area: number }[] = [];
+  const items: { key: string; real: Vec2[]; mask: number; prio: number; area: number; gap: number }[] = [];
   const area = (p: Vec2[]) => { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += p[j][0] * p[i][1] - p[i][0] * p[j][1]; return Math.abs(a / 2); };
-  for (const b of BUILDINGS) { const r = realPoly(b); if (r) items.push({ key: b.id, real: r, mask: presenceMask(b.id, b), prio: b.landmark ? 0 : 1, area: area(r) }); }
-  for (const b of RAW.buildings) if (!registeredOsm.has(b.osm)) items.push({ key: b.osm, real: b.poly, mask: presenceMask(null), prio: 2, area: area(b.poly) });
+  const G = GAME_CONFIG.world;
+  for (const b of BUILDINGS) { const r = realPoly(b); if (r) items.push({ key: b.id, real: r, mask: presenceMask(b.id, b), prio: b.landmark ? 0 : 1, area: area(r), gap: G.buildingGap }); }
+  for (const b of RAW.buildings) if (!registeredOsm.has(b.osm)) items.push({ key: b.osm, real: b.poly, mask: presenceMask(null), prio: 2, area: area(b.poly), gap: G.houseGap });
   items.sort((a, b) => a.prio - b.prio || b.area - a.area);
-  const maxF = Math.max(S, GAME_CONFIG.world.buildingScale);
+  // halo grids: cells within `gap` of an accepted building (per era) — new buildings may not enter them
+  const halos = ERA_ORDER.map(() => new Uint8Array(GW * GH));
+  const maxF = Math.max(S, G.buildingScale), minF = Math.min(S, G.minBuildingScale);
+  const fits = (cells: number[], mask: number) => {
+    for (const c of cells) {
+      if (roadGrid[c]) return false;
+      for (let e = 0; e < halos.length; e++) if ((mask >> e) & 1 && (halos[e][c] || eraGrids[e][c])) return false;
+    }
+    return true;
+  };
+  const markHalo = (cells: number[], mask: number, gap: number) => {
+    const set = new Set(cells), R = Math.ceil(gap), R2 = gap * gap;
+    for (const c of cells) {
+      if (set.has(c - 1) && set.has(c + 1) && set.has(c - GW) && set.has(c + GW)) continue; // interior cell
+      const ci = c % GW, cj = (c / GW) | 0;
+      for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
+        if (di * di + dj * dj > R2) continue;
+        const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= GW || j >= GH) continue;
+        for (let e = 0; e < halos.length; e++) if ((mask >> e) & 1) halos[e][j * GW + i] = 1;
+      }
+    }
+  };
   for (const it of items) {
     let chosen: Vec2[] | null = null, chosenCells: number[] = [];
-    for (let f = maxF; f >= S - 1e-6; f -= 0.04) {
-      const poly = scaledAround(it.real, Math.max(f, S));
+    for (let f = maxF; f >= minF - 1e-6; f -= 0.03) {
+      const poly = scaledAround(it.real, f);
       const cells = cellsOf(poly);
-      let ok = true;
-      for (const c of cells) {
-        // keep ~1 m clearance: test the cell and its 4 neighbours
-        for (const n of [c, c - 1, c + 1, c - GW, c + GW]) {
-          if (n < 0 || n >= GW * GH) continue;
-          if (roadGrid[n] && f > S + 1e-6) { ok = false; break; }
-          for (let e = 0; e < eraGrids.length; e++) if ((it.mask >> e) & 1 && eraGrids[e][n]) { ok = false; break; }
-          if (!ok) break;
-        }
-        if (!ok) break;
-      }
-      if (ok || f - 0.04 < S - 1e-6) { chosen = poly; chosenCells = cells; break; }
+      if (fits(cells, it.mask)) { chosen = poly; chosenCells = cells; break; }
     }
-    compacted.set(it.key, chosen!);
+    if (!chosen) { chosen = scaledAround(it.real, minF); chosenCells = cellsOf(chosen); } // tight real-world spot: smallest size
+    compacted.set(it.key, chosen);
     for (const c of chosenCells) for (let e = 0; e < eraGrids.length; e++) if ((it.mask >> e) & 1) eraGrids[e][c] = 1;
+    markHalo(chosenCells, it.mask, it.gap);
   }
 })();
 
@@ -200,6 +219,12 @@ export function obb(poly: Vec2[]) {
   if (v1 - v0 > u1 - u0) { [u, v] = [v, [-v[0], -v[1]]]; [u0, u1] = ext(u); [v0, v1] = ext(v); }
   const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
   return { u, v, length: u1 - u0, width: v1 - v0, center: [u[0] * cu + v[0] * cv, u[1] * cu + v[1] * cv] as Vec2, angle: Math.atan2(u[1], u[0]) };
+}
+/** Direction of the street under (x,z) if the point is well inside its asphalt, else null. */
+export function streetDirAt(x: number, z: number): number | null {
+  const i = Math.floor(x) - gi0, j = Math.floor(z) - gj0;
+  if (i < 0 || j < 0 || i >= GW || j >= GH) return null;
+  const v = roadDir[j * GW + i]; return v ? v - 10 : null;
 }
 export function onVehicleRoad(x: number, z: number): boolean {
   const i = Math.floor(x) - gi0, j = Math.floor(z) - gj0;
@@ -241,8 +266,12 @@ export function buildingsForEra(era: EraId, gateBuilt: (id: string) => boolean =
     out.push({ key: b.id, registryId: b.id, name, poly, style: b.style, state: st, landmark: !!b.landmark, context: false });
   }
   if (era === 'presentFinale' || GAME_CONFIG.world.contextBuildingsInHistoricalEras) {
+    const seen = new Set<string>();
     for (const b of RAW.buildings) {
       if (registeredOsm.has(b.osm) || ['roof', 'pavilion', 'carport'].includes(b.type)) continue;
+      // multi-part OSM buildings share one id and one compacted footprint: draw it once
+      // (duplicates sat in the same place with different heights → flickering, z-fighting walls/windows)
+      if (seen.has(b.osm)) continue; seen.add(b.osm);
       out.push({ key: b.osm, registryId: null, name: b.name, poly: compacted.get(b.osm)!, style: contextStyle(b), state: 'standing', landmark: false, context: true });
     }
   }

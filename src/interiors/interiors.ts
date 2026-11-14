@@ -15,13 +15,17 @@ export interface InteriorDef {
 // Layout extras per interior. STC layout is an APPROXIMATION (no verified floor
 // plan used): entrance lobby + opening into a celebration hall to the north.
 const LAYOUTS: Record<string, Partial<InteriorDef>> = {
-  // Simple, not a floor plan: entrance hall leading north into the president's office.
+  // Simple, not a floor plan: entrance hall leading north into the president's office,
+  // with Personnel Services opening off the east side of the hall. The Kimball Building
+  // housed "personnel" among its administrative services (Church News, Sept 11, 1999).
+  // CONTRACT ADDITION (Q1): Personnel Services room for the Quest 1 faculty candidates.
   'kimball-office': {
     floor: '#8b6f55', wall: '#ece4d4',
     walls: [
-      { x0: -7, z0: -2.3, x1: -1.6, z1: -1.8 }, { x0: 1.6, z0: -2.3, x1: 7, z1: -1.8 },   // office wall with doorway
-      { x0: -7, z0: -1.8, x1: -2.6, z1: 11, h: 3.6, color: '#d8cfbe' },                   // hall side blocks
-      { x0: 2.6, z0: -1.8, x1: 7, z1: 11, h: 3.6, color: '#d8cfbe' },
+      { x0: -10, z0: -2.3, x1: -1.6, z1: -1.8 }, { x0: 1.6, z0: -2.3, x1: 10, z1: -1.8 },  // office wall with doorway
+      { x0: -10, z0: -1.8, x1: -2.6, z1: 11, h: 3.6, color: '#d8cfbe' },                  // west hall block
+      { x0: 2.6, z0: -1.8, x1: 3.0, z1: 2.4 }, { x0: 2.6, z0: 5.8, x1: 3.0, z1: 8.6 },    // Personnel Services wall, doorway z 2.4–5.8
+      { x0: 2.6, z0: 8.6, x1: 10, z1: 11, h: 3.6, color: '#d8cfbe' },                     // block south of Personnel Services
     ],
     props: [
       { x0: -2.4, z0: -9.2, x1: 2.4, z1: -8.0, h: 0.95, color: '#5a3a22' },   // desk
@@ -29,12 +33,25 @@ const LAYOUTS: Record<string, Partial<InteriorDef>> = {
       { x0: 3.4, z0: -10.6, x1: 6.6, z1: -10.2, h: 2.4, color: '#4a3020' },
       { x0: -5.5, z0: -5, x1: -4.3, z1: -3.8, h: 0.6, color: '#6b2f2a' },     // chairs
       { x0: 4.3, z0: -5, x1: 5.5, z1: -3.8, h: 0.6, color: '#6b2f2a' },
+      // Personnel Services: reception counter, waiting chairs, file cabinets
+      { x0: 8.2, z0: -0.6, x1: 9.6, z1: 3.6, h: 1.1, color: '#7b5a3e' },
+      { x0: 9.2, z0: 5.0, x1: 9.8, z1: 5.6, h: 0.5, color: '#3f5a6b' }, { x0: 9.2, z0: 6.2, x1: 9.8, z1: 6.8, h: 0.5, color: '#3f5a6b' },
+      { x0: 9.2, z0: 7.4, x1: 9.8, z1: 8.0, h: 0.5, color: '#3f5a6b' },
+      { x0: 3.3, z0: -1.7, x1: 4.3, z1: -1.2, h: 1.4, color: '#8a8a80' }, { x0: 4.4, z0: -1.7, x1: 5.4, z1: -1.2, h: 1.4, color: '#8a8a80' },
     ],
     signs: [
       { text: ['Office of the President'], x: 0, z: -10.9, ry: 0 },
       { text: ['Kimball Building'], x: 0, z: -2.0, ry: Math.PI },
+      { text: ['Personnel Services'], x: 2.5, z: 4.1, ry: -Math.PI / 2 },
+      { text: ['Faculty interviews today'], x: 7.2, z: -1.7, ry: 0 },
     ],
   },
+  // CONTRACT ADDITION (Q1): teaching-demo classrooms. Furniture, boards and people are placed
+  // by the Q1 module (src/quests/q1/room3d.ts); only floor/wall colours live here.
+  'q1-room-math': { floor: '#5e6266', wall: '#dedcd6', signs: [{ text: ['Romney · Math & Computer Science'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-english': { floor: '#5c5f66', wall: '#dedcd6', signs: [{ text: ['Smith Building · English'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-art': { floor: '#7a5a3a', wall: '#cbbfa8', signs: [{ text: ['Spori Building · Art studio'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-engineering': { floor: '#4a4a4a', wall: '#d9d6cc', signs: [{ text: ['Austin Building · Electronics lab'], x: 0, z: 6.9, ry: Math.PI }] },
   'dev-quest-room': {
     floor: '#b9a68a', wall: '#e6dccb',
     props: [{ x0: -5, z0: -4, x1: 5, z1: -2.6, h: 0.9, color: '#6f5037' }, { x0: -7.4, z0: -5.8, x1: 7.4, z1: -5.5, h: 2.6, color: '#f7f7f2' }],
@@ -87,9 +104,9 @@ export class InteriorManager {
     const fx = fc.getContext('2d')!;
     for (let j = 0; j < D; j++) for (let i = 0; i < W; i++) { fx.fillStyle = (i + j) % 2 ? d.floor : shade(d.floor, 0.92); fx.fillRect(i * 8, j * 8, 8, 8); }
     const ft = new THREE.CanvasTexture(fc); ft.magFilter = THREE.NearestFilter; ft.colorSpace = THREE.SRGBColorSpace;
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshLambertMaterial({ map: ft }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ft }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
-    const wallMat = new THREE.MeshLambertMaterial({ color: d.wall });
+    const wallMat = new THREE.MeshStandardMaterial({ color: d.wall });
     const addBox = (r: Rect, h: number, mat: THREE.Material) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(r.x1 - r.x0, h, r.z1 - r.z0), mat);
       m.position.set((r.x0 + r.x1) / 2, h / 2, (r.z0 + r.z1) / 2); m.castShadow = m.receiveShadow = true; g.add(m);
@@ -102,9 +119,9 @@ export class InteriorManager {
     addBox({ x0: -W / 2 - t, z0: D / 2, x1: -1.5, z1: D / 2 + t }, 1.2, wallMat);
     addBox({ x0: 1.5, z0: D / 2, x1: W / 2 + t, z1: D / 2 + t }, 1.2, wallMat);
     for (const r of d.walls) addBox(r, r.h ?? H, wallMat);
-    for (const p of d.props) addBox(p, p.h ?? 1, new THREE.MeshLambertMaterial({ color: p.color ?? '#7a6a5a' }));
+    for (const p of d.props) addBox(p, p.h ?? 1, new THREE.MeshStandardMaterial({ color: p.color ?? '#7a6a5a' }));
     // exit mat
-    const mat = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.4), new THREE.MeshLambertMaterial({ color: '#6b2f2a' }));
+    const mat = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.4), new THREE.MeshStandardMaterial({ color: '#6b2f2a' }));
     mat.rotation.x = -Math.PI / 2; mat.position.set(0, 0.02, D / 2 - 0.8); g.add(mat);
     for (const s of d.signs) {
       const tex = new THREE.CanvasTexture(textCanvas(s.text, { w: 512, h: 128, bg: '#2d3a46' })); tex.colorSpace = THREE.SRGBColorSpace;

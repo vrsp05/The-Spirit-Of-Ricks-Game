@@ -1,0 +1,67 @@
+{
+ "note": "Authored game dialogue for fictional characters. The Bednar character's lines are NOT real quotes. Fall 1999: no new university name appears here (team decision 22).",
+ "assign": [
+  {
+   "speaker": "President Bednar (game character)",
+   "text": "Thank you for coming. Our college is growing, and our students will need more great teachers."
+  },
+  {
+   "speaker": "President Bednar (game character)",
+   "text": "Four faculty candidates are waiting in Personnel Services, just down the hall: math, English, art and engineering."
+  },
+  {
+   "speaker": "President Bednar (game character)",
+   "text": "Walk each one to their department for a teaching demonstration. The art studio's projector has been acting up, so start with art before engineering. Then come back and report to me."
+  }
+ ],
+ "reminder": "Candidates still to hire: {list}. They wait in Personnel Services, down the hall.",
+ "readyReminder": "All four are hired? Wonderful — tell me about them.",
+ "report": [
+  {
+   "speaker": "President Bednar (game character)",
+   "text": "Math, English, art and engineering — and I hear the Spori's projector works again."
+  },
+  {
+   "speaker": "President Bednar (game character)",
+   "text": "These teachers will bless many students. Well done."
+  }
+ ],
+ "boardTitle": "PERSONNEL SERVICES · Faculty interviews",
+ "greetings": {
+  "math": "Hi! I'm due in the Romney Building to teach the computer science students. They're stuck on binary — I have an idea from Alma 11.",
+  "english": "Hello. My demonstration is in the Smith Building — a student's write-up needs a careful red pen.",
+  "art": "Hi there! My demo is up in the old Spori's art studio. I'll be teaching the grid method.",
+  "engineering": "Ready when you are. I'm demonstrating in the Austin Building's electronics lab."
+ },
+ "waiting": {
+  "engineering": "I'm waiting on the art department's demo first — I hear their old projector is about to short out — that's what I'll be fixing."
+ },
+ "busy": "You're already walking the {other} over. Come back for me after that!",
+ "arrive": "Lead the way — the {building} is marked on your map.",
+ "notYet": "I'm not ready yet.",
+ "walk": {
+  "math": [
+   "I tried this lesson on my little brother. He's eight. He got it in five minutes.",
+   "Fun fact: a limnah is exactly a shum, a seon and a senine. That's my whole hook."
+  ],
+  "english": [
+   "Brother Price wrote the summary himself. I hope he doesn't mind a little red ink.",
+   "Rule one of editing: check the facts against a source. Rule two: be kind about it."
+  ],
+  "art": [
+   "I just hope that old projector in the Spori survives the demo.",
+   "The grid method is simple: one square at a time, and don't panic."
+  ],
+  "engineering": [
+   "I heard the Spori's projector died in the middle of the art demo. Perfect timing, honestly.",
+   "A short circuit is just electricity taking the lazy way home. Let's fix that."
+  ]
+ },
+ "othersWait": "The other candidates will meet you outside their buildings — they're marked on your map.",
+ "waitingOutside": {
+  "math": "Over here! Ready when you are.",
+  "english": "There you are! Shall we head in?",
+  "art": "Hi! The studio's on the third floor.",
+  "engineering": "Did the art demo finish? Let's go fix that projector."
+ }
+}

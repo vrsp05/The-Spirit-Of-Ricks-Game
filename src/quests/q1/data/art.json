@@ -1,0 +1,142 @@
+{
+  "note": "A fictional future temple CONCEPT (the candidate's \"vision of a temple on the hill\") inspired by the Rexburg Temple's general silhouette. The real temple was dedicated in 2008; it does not exist in the 1999 campus. Set \"subject\" to swap references later (e.g. the Rexburg Tabernacle).",
+  "palette": [
+    {
+      "id": "w",
+      "name": "White stone",
+      "color": "#f4f1ea"
+    },
+    {
+      "id": "g",
+      "name": "Gold",
+      "color": "#d9b13b"
+    },
+    {
+      "id": "b",
+      "name": "Window blue",
+      "color": "#5d86b0"
+    },
+    {
+      "id": "d",
+      "name": "Door",
+      "color": "#7a5233"
+    },
+    {
+      "id": "s",
+      "name": "Steps",
+      "color": "#9a958c"
+    }
+  ],
+  "reference": [
+    ".....gg.....",
+    ".....gg.....",
+    ".....ww.....",
+    ".....ww.....",
+    "....wwww....",
+    "....wbbw....",
+    "....wwww....",
+    "...wwwwww...",
+    ".wwwwwwwwww.",
+    ".wbwwbbwwbw.",
+    ".wbwwbbwwbw.",
+    ".wwwwwwwwww.",
+    ".wbwwwwwwbw.",
+    ".wwwwddwwww.",
+    ".wwwwddwwww.",
+    "ssssssssssss"
+  ],
+  "canvas": {
+    "width": 20,
+    "height": 24
+  },
+  "modes": {
+    "easy": {
+      "pass": 0.6,
+      "liveMeter": true,
+      "showReference": true,
+      "hintSeconds": 2.5,
+      "hints": 3,
+      "shortAtSeconds": 90
+    },
+    "hard": {
+      "pass": 0.85,
+      "liveMeter": false,
+      "showReference": true,
+      "hintSeconds": 3,
+      "hints": 2,
+      "shortAtSeconds": 40
+    }
+  },
+  "subject": "temple",
+  "guesses": [
+    {
+      "at": 0.12,
+      "text": "A castle?"
+    },
+    {
+      "at": 0.3,
+      "text": "Is it the Spori?"
+    },
+    {
+      "at": 0.45,
+      "text": "A wedding cake?"
+    },
+    {
+      "at": 0.6,
+      "text": "Wait — is that a temple?"
+    },
+    {
+      "at": 0.8,
+      "text": "It's a temple on the hill!"
+    }
+  ],
+  "references": {
+    "temple": [
+      ".....gg.....",
+      ".....gg.....",
+      ".....ww.....",
+      ".....ww.....",
+      "....wwww....",
+      "....wbbw....",
+      "....wwww....",
+      "...wwwwww...",
+      ".wwwwwwwwww.",
+      ".wbwwbbwwbw.",
+      ".wbwwbbwwbw.",
+      ".wwwwwwwwww.",
+      ".wbwwwwwwbw.",
+      ".wwwwddwwww.",
+      ".wwwwddwwww.",
+      "ssssssssssss"
+    ],
+    "tabernacle": [
+      "s.s......s.s",
+      "sss......sss",
+      "sbs......sbs",
+      "sss......sss",
+      "sbs.wwww.sbs",
+      "ssswwbbwwsss",
+      "sssswwwwssss",
+      "ssssssssssss",
+      "sbssbssbssbs",
+      "sbssbssbssbs",
+      "ssssssssssss",
+      "sbsssddsssbs",
+      "sbsssddsssbs",
+      "sssssddsssss",
+      "wwwwwwwwwwww",
+      "............"
+    ]
+  },
+  "subjects": {
+    "temple": "Projected reference (future temple concept)",
+    "tabernacle": "Projected reference (Rexburg Stake Tabernacle, 1911)"
+  },
+  "projectorNote": "The overhead projector always shorts out partway through the demo (Easy after 90 s, Hard after 40 s) and stays dead; the player finishes from memory. The engineering demo repairs that circuit.",
+  "music": {
+    "src": "music/high-on-the-mountain-top.m4a",
+    "volume": 0.35,
+    "enabled": false,
+    "note": "Off: the game's background playlist (src/fx/music.ts, public/music/) already plays the team's recordings, including 'High on the Mountain Top', during demos. Turn on only if the playlist is paused for the art demo."
+  }
+}

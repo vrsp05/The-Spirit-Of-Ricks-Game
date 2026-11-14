@@ -1,39 +1,134 @@
 // Small voxel humanoid used for the player, NPCs and the finale team avatars.
-// Likenesses are generic and replaceable (colours + label only).
+// Likenesses are generic and replaceable (colours, hair, clothing + label only).
+// Animation: knees, body bob and lean, arm swing with elbows, idle breathing,
+// blinking and the odd glance around. rebuild(look) re-dresses the same character
+// (NPC wardrobes change with the era).
 import * as THREE from 'three';
 import { textCanvas } from '../world/World';
 
-export interface AvatarLook { shirt: string; pants: string; skin: string; hair: string; shoes?: string; tie?: string; jacket?: string }
+export type HairStyle = 'short' | 'side' | 'long' | 'bun' | 'curly' | 'buzz' | 'bald';
+export type Hat = 'none' | 'cap' | 'beanie';
+export type Pattern = 'plain' | 'flannel' | 'stripe';
+export interface AvatarLook {
+  shirt: string; pants: string; skin: string; hair: string; shoes?: string; tie?: string; jacket?: string;
+  hairStyle?: HairStyle; hat?: Hat; hatColor?: string; pattern?: Pattern; shorts?: boolean;
+  coat?: string; scarf?: string; backpack?: string; glasses?: boolean;
+}
+
+const texCache = new Map<string, THREE.Texture>();
+/** Tiny pixel textures for shirts (flannel plaid / stripes), cached per colour. */
+function patternTex(kind: Pattern, base: string): THREE.Texture | null {
+  if (kind === 'plain') return null;
+  const key = `${kind}${base}`; const hit = texCache.get(key); if (hit) return hit;
+  const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d')!;
+  g.fillStyle = base; g.fillRect(0, 0, 16, 16);
+  if (kind === 'flannel') {
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 5, 16, 3); g.fillRect(5, 0, 3, 16);
+    g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(0, 12, 16, 1); g.fillRect(12, 0, 1, 16);
+  } else { g.fillStyle = 'rgba(255,255,255,0.55)'; for (let y = 0; y < 16; y += 4) g.fillRect(0, y, 16, 2); }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  texCache.set(key, t); return t;
+}
 
 export class Avatar {
   readonly root = new THREE.Group();
-  private legL: THREE.Object3D; private legR: THREE.Object3D;
-  private armL: THREE.Object3D; private armR: THREE.Object3D;
-  private phase = 0;
+  private body = new THREE.Group();
+  private hips = new THREE.Group();
+  private torso!: THREE.Group;
+  private head!: THREE.Group;
+  private legL!: THREE.Object3D; private legR!: THREE.Object3D;
+  private shinL!: THREE.Object3D; private shinR!: THREE.Object3D;
+  private armL!: THREE.Object3D; private armR!: THREE.Object3D;
+  private foreL!: THREE.Object3D; private foreR!: THREE.Object3D;
+  private eyes: THREE.Mesh[] = [];
+  private mouth!: THREE.Mesh;
+  private phase = 0; private spd = 0; private time = Math.random() * 10;
+  private blinkT = 2 + Math.random() * 3; private lookT = 3 + Math.random() * 4; private lookYaw = 0; private lookTarget = 0;
   private label?: THREE.Sprite;
+  private talkT = 0;
+  talking = false;
+  seated = false;
+  private scaleF: number;
 
-  constructor(look: AvatarLook, scale = 1) {
-    const mat = (c: string) => new THREE.MeshLambertMaterial({ color: c });
-    const box = (w: number, h: number, d: number, c: string) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.castShadow = true; return m; };
-    const body = new THREE.Group(); body.scale.setScalar(scale); this.root.add(body);
-    const limb = (w: number, h: number, c: string, x: number, y: number, footC?: string) => {
-      const pivot = new THREE.Group(); pivot.position.set(x, y, 0);
-      const m = box(w, h, w, c); m.position.y = -h / 2; pivot.add(m);
-      if (footC) { const f = box(w, 0.12, w * 1.3, footC); f.position.set(0, -h + 0.06, 0.05); pivot.add(f); }
-      body.add(pivot); return pivot;
+  constructor(public look: AvatarLook, scale = 1) {
+    this.scaleF = scale;
+    this.root.add(this.body); this.body.add(this.hips);
+    this.build(look);
+  }
+
+  /** Re-dress the character (keeps pose, label and position). */
+  rebuild(look: AvatarLook) {
+    this.look = look;
+    this.hips.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
+    this.hips.clear(); this.eyes = [];
+    this.build(look);
+    if (this.seated) this.sit(true);
+  }
+
+  private build(look: AvatarLook) {
+    this.body.scale.setScalar(this.scaleF);
+    const mat = (c: string, map: THREE.Texture | null = null) => new THREE.MeshStandardMaterial({ color: map ? '#ffffff' : c, map, roughness: 0.85 });
+    const box = (w: number, h: number, d: number, c: string, parent: THREE.Object3D, x = 0, y = 0, z = 0, map: THREE.Texture | null = null) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c, map)); m.castShadow = true; m.position.set(x, y, z); parent.add(m); return m;
     };
-    this.legL = limb(0.26, 0.8, look.pants, -0.15, 0.8, look.shoes ?? '#2a221c');
-    this.legR = limb(0.26, 0.8, look.pants, 0.15, 0.8, look.shoes ?? '#2a221c');
-    const torso = box(0.62, 0.72, 0.34, look.jacket ?? look.shirt); torso.position.y = 1.16; body.add(torso);
-    if (look.jacket) { const shirt = box(0.2, 0.6, 0.02, look.shirt); shirt.position.set(0, 1.2, 0.18); body.add(shirt); }
-    if (look.tie) { const tie = box(0.08, 0.45, 0.03, look.tie); tie.position.set(0, 1.22, 0.19); body.add(tie); }
-    this.armL = limb(0.2, 0.7, look.jacket ?? look.shirt, -0.42, 1.5);
-    this.armR = limb(0.2, 0.7, look.jacket ?? look.shirt, 0.42, 1.5);
-    for (const a of [this.armL, this.armR]) { const hand = box(0.18, 0.16, 0.18, look.skin); hand.position.y = -0.76; a.add(hand); }
-    const head = box(0.48, 0.48, 0.46, look.skin); head.position.y = 1.78; body.add(head);
-    const hair = box(0.52, 0.16, 0.5, look.hair); hair.position.y = 2.06; body.add(hair);
-    const back = box(0.52, 0.3, 0.1, look.hair); back.position.set(0, 1.9, -0.22); body.add(back);
-    for (const x of [-0.11, 0.11]) { const eye = box(0.07, 0.07, 0.02, '#1d1d1d'); eye.position.set(x, 1.8, 0.235); body.add(eye); }
+    const top = look.coat ?? look.jacket ?? look.shirt;
+    const topTex = !look.coat && !look.jacket ? patternTex(look.pattern ?? 'plain', look.shirt) : null;
+    const shoes = look.shoes ?? '#2a221c';
+    // legs: thigh pivot at the hip, shin pivot at the knee
+    const leg = (x: number) => {
+      const thigh = new THREE.Group(); thigh.position.set(x, 0.8, 0); this.hips.add(thigh);
+      box(0.26, 0.42, 0.26, look.pants, thigh, 0, -0.21, 0);
+      const shin = new THREE.Group(); shin.position.set(0, -0.4, 0); thigh.add(shin);
+      box(0.25, 0.4, 0.25, look.shorts ? look.skin : look.pants, shin, 0, -0.2, 0);
+      box(0.27, 0.12, 0.34, shoes, shin, 0, -0.36, 0.05);
+      return { thigh, shin };
+    };
+    const L = leg(-0.15), R = leg(0.15);
+    this.legL = L.thigh; this.shinL = L.shin; this.legR = R.thigh; this.shinR = R.shin;
+    // torso
+    this.torso = new THREE.Group(); this.torso.position.y = 0.8; this.hips.add(this.torso);
+    box(0.62, 0.72, 0.34, top, this.torso, 0, 0.36, 0, topTex);
+    if (look.coat) box(0.66, 0.28, 0.38, look.coat, this.torso, 0, -0.08, 0);                       // coat hem over the hips
+    if (look.jacket && !look.coat) box(0.2, 0.6, 0.02, look.shirt, this.torso, 0, 0.4, 0.18);
+    if (look.tie) box(0.08, 0.45, 0.03, look.tie, this.torso, 0, 0.42, 0.19);
+    if (look.scarf) { box(0.5, 0.14, 0.4, look.scarf, this.torso, 0, 0.74, 0); box(0.12, 0.34, 0.05, look.scarf, this.torso, 0.14, 0.54, 0.2); }
+    if (look.backpack) { box(0.48, 0.52, 0.2, look.backpack, this.torso, 0, 0.36, -0.27); box(0.07, 0.6, 0.04, '#2a2a2a', this.torso, -0.2, 0.42, 0.18); box(0.07, 0.6, 0.04, '#2a2a2a', this.torso, 0.2, 0.42, 0.18); }
+    // arms: shoulder pivot + elbow pivot
+    const arm = (x: number) => {
+      const up = new THREE.Group(); up.position.set(x, 0.7, 0); this.torso.add(up);
+      box(0.2, 0.36, 0.2, top, up, 0, -0.18, 0, topTex);
+      const fore = new THREE.Group(); fore.position.set(0, -0.34, 0); up.add(fore);
+      box(0.19, 0.32, 0.19, look.coat || look.jacket || !look.shorts ? top : look.skin, fore, 0, -0.16, 0, topTex);
+      box(0.18, 0.16, 0.18, look.skin, fore, 0, -0.38, 0);
+      return { up, fore };
+    };
+    const A = arm(-0.42), B = arm(0.42);
+    this.armL = A.up; this.foreL = A.fore; this.armR = B.up; this.foreR = B.fore;
+    // head
+    this.head = new THREE.Group(); this.head.position.y = 0.74; this.torso.add(this.head);
+    box(0.48, 0.48, 0.46, look.skin, this.head, 0, 0.24, 0);
+    for (const x of [-0.11, 0.11]) { const e = box(0.07, 0.07, 0.02, '#1d1d1d', this.head, x, 0.3, 0.235); this.eyes.push(e); }
+    if (look.glasses) { box(0.42, 0.04, 0.02, '#222', this.head, 0, 0.32, 0.245); for (const x of [-0.11, 0.11]) box(0.13, 0.11, 0.015, '#9fc3d6', this.head, x, 0.3, 0.244); }
+    // a gentle smile: centre line with the corners turned up
+    this.mouth = box(0.12, 0.035, 0.02, '#5a2a24', this.head, 0, 0.115, 0.236);
+    for (const sx of [-1, 1]) { const c = box(0.045, 0.035, 0.02, '#5a2a24', this.head, sx * 0.075, 0.14, 0.236); c.castShadow = false; }   // corners sit on the head, so talking only opens the centre
+    this.buildHair(look, box);
+  }
+
+  private buildHair(look: AvatarLook, box: (w: number, h: number, d: number, c: string, p: THREE.Object3D, x?: number, y?: number, z?: number) => THREE.Mesh) {
+    const H = this.head, c = look.hair, st = look.hairStyle ?? 'short';
+    if (st !== 'bald') {
+      if (st === 'buzz') box(0.5, 0.06, 0.48, c, H, 0, 0.5, 0);
+      else box(0.52, 0.14, 0.5, c, H, 0, 0.53, 0);
+      if (st !== 'buzz') box(0.52, 0.3, 0.1, c, H, 0, 0.36, -0.22);                     // back
+      if (st === 'side') { box(0.3, 0.1, 0.06, c, H, -0.1, 0.44, 0.23); box(0.06, 0.2, 0.46, c, H, -0.26, 0.38, 0); }
+      if (st === 'short' || st === 'curly') box(0.52, 0.08, 0.06, c, H, 0, 0.46, 0.23);  // fringe
+      if (st === 'curly') for (const [x, z] of [[-0.2, 0.12], [0.2, 0.12], [0, -0.15], [-0.2, -0.15], [0.2, -0.15]]) box(0.16, 0.16, 0.16, c, H, x, 0.6, z);
+      if (st === 'long') { box(0.54, 0.62, 0.12, c, H, 0, 0.2, -0.22); box(0.08, 0.5, 0.4, c, H, -0.27, 0.26, -0.02); box(0.08, 0.5, 0.4, c, H, 0.27, 0.26, -0.02); }
+      if (st === 'bun') { box(0.08, 0.3, 0.4, c, H, -0.26, 0.38, -0.02); box(0.08, 0.3, 0.4, c, H, 0.26, 0.38, -0.02); box(0.22, 0.22, 0.2, c, H, 0, 0.62, -0.18); }
+    }
+    if (look.hat === 'cap') { const hc = look.hatColor ?? '#2f4f7f'; box(0.54, 0.16, 0.52, hc, H, 0, 0.57, 0); box(0.46, 0.04, 0.24, hc, H, 0, 0.5, 0.34); }
+    if (look.hat === 'beanie') { const hc = look.hatColor ?? '#8d3b2f'; box(0.54, 0.24, 0.52, hc, H, 0, 0.58, 0); box(0.56, 0.08, 0.54, '#efe9de', H, 0, 0.47, 0); box(0.12, 0.1, 0.12, '#efe9de', H, 0, 0.74, 0); }
   }
 
   setLabel(text: string, sub?: string, height = 3.0) {
@@ -42,21 +137,64 @@ export class Avatar {
     this.root.add(this.label);
   }
 
-  /** speed in m/s drives the walk cycle. */
+  /** speed in m/s drives the walk/run cycle; at rest the character breathes, blinks and glances around. */
   animate(dt: number, speed: number) {
+    this.time += dt;
+    this.idleFace(dt);
     if (this.seated) return;
-    if (speed > 0.1) this.phase += dt * (4 + speed * 1.1); else this.phase *= 0.85;
-    const a = Math.sin(this.phase) * Math.min(0.9, speed * 0.16 + (speed > 0.1 ? 0.25 : 0));
-    this.legL.rotation.x = a; this.legR.rotation.x = -a; this.armL.rotation.x = -a * 0.8; this.armR.rotation.x = a * 0.8;
+    this.spd += (speed - this.spd) * Math.min(1, dt * 8);
+    const s = this.spd, moving = s > 0.15;
+    if (moving) this.phase += dt * (4.2 + s * 1.05); else this.phase *= Math.max(0, 1 - dt * 6);
+    const amp = moving ? Math.min(0.95, 0.3 + s * 0.13) : 0;
+    const sw = Math.sin(this.phase) * amp;
+    this.legL.rotation.x = -sw; this.legR.rotation.x = sw;
+    // knees bend as each leg swings back and lifts
+    this.shinL.rotation.x = Math.max(0, Math.sin(this.phase + 1.2)) * amp * 1.3;
+    this.shinR.rotation.x = Math.max(0, Math.sin(this.phase + 1.2 + Math.PI)) * amp * 1.3;
+    this.armL.rotation.x = sw * 0.85; this.armR.rotation.x = -sw * 0.85; this.armL.rotation.z = this.armR.rotation.z = 0;
+    this.foreL.rotation.x = this.foreR.rotation.x = -(moving ? 0.25 + amp * 0.5 : 0.08);
+    // bob, lean into a run, a little hip twist; breathing when idle
+    this.hips.position.y = moving ? Math.abs(Math.cos(this.phase)) * 0.05 * (0.5 + amp) : 0;
+    this.body.rotation.x = moving ? Math.min(0.2, s * 0.025) : 0;
+    this.torso.rotation.y = moving ? Math.sin(this.phase) * 0.08 * amp : 0;
+    this.torso.scale.y = moving ? 1 : 1 + Math.sin(this.time * 2.2) * 0.012;
   }
-  /** Seated pose (driving): legs forward, arms reaching to the wheel. */
+  private idleFace(dt: number) {
+    this.blinkT -= dt;
+    const closed = this.blinkT < 0.12;
+    for (const e of this.eyes) e.scale.y = closed ? 0.15 : 1;
+    if (this.blinkT < 0) this.blinkT = 2.5 + Math.random() * 3.5;
+    this.lookT -= dt;
+    if (this.lookT < 0) { this.lookTarget = this.spd > 0.2 ? 0 : (Math.random() - 0.5) * 0.9; this.lookT = 2 + Math.random() * 4; }
+    this.lookYaw += (this.lookTarget - this.lookYaw) * Math.min(1, dt * 3);
+    if (!this.talking) this.head.rotation.y = this.lookYaw;
+  }
+  /** Mouth opens and closes while this character's line is shown. */
+  updateMouth(dt: number) {
+    if (this.talking) { this.talkT += dt; const o = Math.abs(Math.sin(this.talkT * 13)) * (0.6 + 0.4 * Math.sin(this.talkT * 3.1)); this.mouth.scale.y = 1 + o * 3.2; this.head.rotation.y *= 0.9; this.head.rotation.x = Math.sin(this.talkT * 2.3) * 0.05; }
+    else if (this.mouth.scale.y !== 1) { this.mouth.scale.y += (1 - this.mouth.scale.y) * Math.min(1, dt * 15); this.head.rotation.x *= 0.9; }
+  }
+
+  /** Seated pose (driving, benches): thighs forward, knees bent, hands forward. */
   sit(on: boolean) {
     this.seated = on;
     this.legL.rotation.x = this.legR.rotation.x = on ? -Math.PI / 2 : 0;
-    this.armL.rotation.x = this.armR.rotation.x = on ? -0.9 : 0;
+    this.shinL.rotation.x = this.shinR.rotation.x = on ? Math.PI / 2 : 0;
+    this.armL.rotation.x = this.armR.rotation.x = on ? -0.7 : 0;
+    this.foreL.rotation.x = this.foreR.rotation.x = on ? -0.5 : 0;
+    this.hips.position.y = 0; this.body.rotation.x = 0; this.torso.rotation.y = 0;
   }
-  seated = false;
-  wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; }
+  private pedalT = 0;
+  /** Bicycle pose: legs pedal with speed (knees pumping), arms forward on the handlebar, slight lean. */
+  pedal(speed: number) {
+    this.seated = true; this.pedalT += speed * 0.05;
+    const p = Math.sin(this.pedalT);
+    this.legL.rotation.x = -1.1 + p * 0.45; this.legR.rotation.x = -1.1 - p * 0.45;
+    this.shinL.rotation.x = 1.2 - p * 0.45; this.shinR.rotation.x = 1.2 + p * 0.45;
+    this.armL.rotation.x = this.armR.rotation.x = -1.0; this.foreL.rotation.x = this.foreR.rotation.x = -0.3;
+    this.body.rotation.x = 0.25;
+  }
+  wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; this.foreR.rotation.x = -0.4 + Math.sin(t * 8) * 0.3; }
 }
 
 /** Floating, always-readable text label. */

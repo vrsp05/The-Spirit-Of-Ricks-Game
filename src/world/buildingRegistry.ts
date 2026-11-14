@@ -11,10 +11,14 @@
 //   NEWS = dated news articles listed in docs/sources.md
 //   OSM  = OpenStreetMap footprint (modern)
 
-export type RoofType = 'flat' | 'hip' | 'spire' | 'dome';
+export type RoofType = 'flat' | 'hip' | 'spire' | 'dome' | 'peak';
 export interface BuildingStyle {
   wall: string; trim: string; roof: string; glass: string;
   roofType: RoofType; levels: number; floorHeight?: number;
+  /** Spire roofs: 'center' (default) or 'east' (at the east end of the long axis, like the Rexburg temple). */
+  spireAt?: 'center' | 'east';
+  /** Wall finish: 'brick' (default) or smooth 'stone' (e.g. the temple's white stone). */
+  finish?: 'brick' | 'stone';
 }
 export interface BuildingEntry {
   id: string;
@@ -28,13 +32,14 @@ export interface BuildingEntry {
   sources: string[];
   approximation?: string;          // what is approximate about this entry
   landmark?: boolean;              // gets a name sign + extra detail
-  features?: ('steeple' | 'portico')[]; // stylized recognisable details (see World.addFeatures)
+  features?: ('steeple' | 'portico' | 'finial')[]; // stylized recognisable details (see World.addFeatures)
 }
 
+// Campus palette (team feedback): beige brick and white trim across the campus.
 const brick = (levels: number, roofType: RoofType = 'flat'): BuildingStyle =>
-  ({ wall: '#b98a6a', trim: '#e8dcc8', roof: '#8d8378', glass: '#4f6577', roofType, levels });
+  ({ wall: '#d4bf9b', trim: '#f6f1e6', roof: '#8f8a82', glass: '#4f6577', roofType, levels });
 const pale = (levels: number, roofType: RoofType = 'flat'): BuildingStyle =>
-  ({ wall: '#d9cbb3', trim: '#f2ece0', roof: '#8a8580', glass: '#4b6275', roofType, levels });
+  ({ wall: '#e6dac3', trim: '#fbf8f1', roof: '#8a8580', glass: '#4b6275', roofType, levels });
 
 const MODERN_FOOTPRINT = 'Footprint is the modern OSM outline; later additions/renovations may be included.';
 
@@ -43,13 +48,14 @@ export const BUILDINGS: BuildingEntry[] = [
     built: 1999.68, constructionStart: 1997.5, style: pale(3), landmark: true,
     sources: ['HOB p.26 (groundbreaking Jul 1 1997; dedicated Sep 7 1999; houses executive offices)', 'OSM'] },
   { id: 'taylor', osm: 'w292008073', names: { ricks: 'John Taylor Building', byui: 'John Taylor Building' },
-    built: 1997, style: { wall: '#a8553c', trim: '#f2ece0', roof: '#6d6a66', glass: '#4f6577', roofType: 'hip', levels: 2, floorHeight: 4.5 }, landmark: true, features: ['steeple'], sources: ['HOB p.3, p.87', 'OSM'] },
+    built: 1997, style: { wall: '#e3d3b4', trim: '#fbf8f1', roof: '#b9b6ad', glass: '#4f6577', roofType: 'peak', levels: 2, floorHeight: 4.5 }, landmark: true, features: ['finial'],
+    sources: ['HOB p.3, p.87', 'OSM', 'Team feedback: white walls (reference photos pending)'] },
   { id: 'spori-original', osm: 'w299927991', names: { ricks: 'Jacob Spori Building' },
-    built: 1903.8, demolished: 2000.91, style: { wall: '#a89a86', trim: '#d8cfc0', roof: '#5d5249', glass: '#3e4c58', roofType: 'hip', levels: 3 },
+    built: 1903.8, demolished: 2000.91, style: { wall: '#cbbd9f', trim: '#efe7d6', roof: '#5d5249', glass: '#3e4c58', roofType: 'hip', levels: 3 },
     landmark: true, sources: ['HOB p.70–79 (completed Oct 1903; last classes Aug 2000; demolition began Nov 29 2000)'],
     approximation: 'Original footprint and massing approximated from the replacement building outline (OSM). Facade is stylized; compare against period photos before final.' },
   { id: 'spori-new', osm: 'w299927991', names: { byui: 'Jacob Spori Building' },
-    built: 2003, constructionStart: 2001.4, style: { wall: '#e3d6bf', trim: '#fbf7ef', roof: '#7b6a5c', glass: '#4f6577', roofType: 'hip', levels: 4 },
+    built: 2003, constructionStart: 2001.4, style: { wall: '#ece2cf', trim: '#ffffff', roof: '#7b6a5c', glass: '#4f6577', roofType: 'hip', levels: 4 },
     landmark: true, sources: ['HOB p.3 (New Spori 2003), p.79 (groundbreaking May 29 2001)', 'OSM'],
     approximation: 'Stylized facade; distinct palette from the original Spori.' },
   { id: 'kirkham', osm: null, poly: [], // filled in kirkhamPoly below
@@ -88,7 +94,7 @@ export const BUILDINGS: BuildingEntry[] = [
     approximation: 'Construction start inferred from the HOB "Multi-Use" entry.' },
   { id: 'ricks-building', osm: 'w299952009', names: { byui: 'Thomas E. Ricks Building' }, built: 2005, style: pale(3), landmark: true, sources: ['HOB p.3 (planned 2005)', 'OSM'], approximation: 'HOB (2003) gives a planned year; completion not independently verified.' },
   { id: 'temple', osm: 'w289415710', names: { byui: 'Rexburg Idaho Temple' }, built: 2008.11,
-    style: { wall: '#f4f1ea', trim: '#ffffff', roof: '#e9e4d8', glass: '#6c7f8e', roofType: 'spire', levels: 2, floorHeight: 6 },
+    style: { wall: '#f4f1ea', trim: '#ffffff', roof: '#e9e4d8', glass: '#6c7f8e', roofType: 'spire', spireAt: 'east', finish: 'stone', levels: 2, floorHeight: 6 },   // the Rexburg temple's spire rises from its east end
     landmark: true, sources: ['NEWS: Church News 2008-02-16 (dedicated Feb 10 2008)', 'OSM'], approximation: 'Stylized silhouette; single spire.' },
   { id: 'icenter', osm: 'w299928003', names: { ricks: 'Campus Center', byui: 'BYU–Idaho Center' }, built: 2010.96, landmark: true, features: ['portico'],
     style: { wall: '#d8c3a0', trim: '#f4ede0', roof: '#8e9a95', glass: '#5d7d93', roofType: 'dome', levels: 3, floorHeight: 4.5 }, sources: ['NEWS: Church News 2010-12-17 (dedicated)', 'OSM'] },

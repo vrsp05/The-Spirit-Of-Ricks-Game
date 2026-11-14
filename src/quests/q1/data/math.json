@@ -1,0 +1,305 @@
+{
+ "source": "Alma 11:3–19, 22 (checked against churchofjesuschrist.org on 2026-11-13). Values are in senums / senines (a senum of silver equals a senine of gold, v.7).",
+ "reference": [
+  {
+   "gold": "senine",
+   "silver": "senum",
+   "value": 1,
+   "note": "one measure of barley (v.7)"
+  },
+  {
+   "gold": "seon",
+   "silver": "amnor",
+   "value": 2,
+   "note": "twice a senine / two senums (vv.8, 11)"
+  },
+  {
+   "gold": "shum",
+   "silver": "ezrom",
+   "value": 4,
+   "note": "twice a seon / four senums (vv.9, 12)"
+  },
+  {
+   "gold": "limnah",
+   "silver": "onti",
+   "value": 7,
+   "note": "the value of them all: 1 + 2 + 4 (vv.10, 13)"
+  },
+  {
+   "gold": "",
+   "silver": "shiblon",
+   "value": 0.5,
+   "note": "half of a senum (v.15)"
+  },
+  {
+   "gold": "",
+   "silver": "shiblum",
+   "value": 0.25,
+   "note": "half of a shiblon (v.16)"
+  },
+  {
+   "gold": "",
+   "silver": "leah",
+   "value": 0.125,
+   "note": "half of a shiblum (v.17)"
+  },
+  {
+   "gold": "antion",
+   "silver": "",
+   "value": 1.5,
+   "note": "equal to three shiblons (v.19)"
+  }
+ ],
+ "coins": [
+  {
+   "id": "senine",
+   "metal": "gold",
+   "value": 1
+  },
+  {
+   "id": "seon",
+   "metal": "gold",
+   "value": 2
+  },
+  {
+   "id": "shum",
+   "metal": "gold",
+   "value": 4
+  },
+  {
+   "id": "limnah",
+   "metal": "gold",
+   "value": 7
+  },
+  {
+   "id": "onti",
+   "metal": "silver",
+   "value": 7
+  }
+ ],
+ "story": "Binary, the Nephite way. The computer science students keep tripping on binary; the candidate explains it with the gold coins of Alma 11 (senine 1, seon 2, shum 4, limnah 7 = 1 + 2 + 4). A judge earned one senine a day (Alma 11:3).",
+ "tray": [
+  "senine",
+  "seon",
+  "shum",
+  "limnah"
+ ],
+ "opening": [
+  {
+   "who": "Brother Hale (math chair)",
+   "text": "Our computer science students keep tripping on binary. Explain it so it sticks."
+  },
+  {
+   "who": "You (candidate)",
+   "text": "Forget computers for a minute. The Nephites already used binary. Look at their coins: 1, 2, 4… and a limnah is 7."
+  }
+ ],
+ "closing": {
+  "student": "So 101 just means shum, no seon, senine?",
+  "candidate": "That's all binary is: which coins you're holding."
+ },
+ "questions": [
+  {
+   "id": "pay6",
+   "kind": "pay",
+   "who": "Sister Hall",
+   "ask": "Pay 6 with the fewest coins.",
+   "target": 6,
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "shum + seon",
+    "seon + seon + seon",
+    "shum + senine + senine",
+    "limnah"
+   ],
+   "correct": "shum + seon",
+   "explain": "4 + 2 = 6 → 110.",
+   "bits": [
+    1,
+    1,
+    0
+   ]
+  },
+  {
+   "id": "read011",
+   "kind": "choice",
+   "who": "Sister Kim",
+   "ask": "I wrote 011 on my paper — shum no, seon yes, senine yes. How much is that?",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "3",
+    "11",
+    "6",
+    "1"
+   ],
+   "correct": "3",
+   "explain": "0 shum + 1 seon + 1 senine = 2 + 1 = 3.",
+   "bits": [
+    0,
+    1,
+    1
+   ]
+  },
+  {
+   "id": "pay7",
+   "kind": "pay",
+   "who": "Brother Ortiz",
+   "ask": "Pay 7 with the fewest coins.",
+   "target": 7,
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "limnah",
+    "shum + seon + senine",
+    "shum + shum",
+    "seon + seon + seon + senine"
+   ],
+   "correct": "limnah",
+   "explain": "One limnah — a single coin does it. (Three coins, shum + seon + senine, also make 7, but that's more coins.)",
+   "bits": [
+    1,
+    1,
+    1
+   ]
+  },
+  {
+   "id": "why7",
+   "kind": "choice",
+   "who": "Brother Lund",
+   "ask": "Why is a limnah worth 7?",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "It's one of every smaller coin: 1 + 2 + 4",
+    "It's 2 + 2 + 2 + 1",
+    "Seven is a holy number",
+    "It's a shum and a half"
+   ],
+   "correct": "It's one of every smaller coin: 1 + 2 + 4",
+   "explain": "Alma 11:10 calls the limnah \"the value of them all\" — 111 in binary.",
+   "bits": [
+    1,
+    1,
+    1
+   ]
+  },
+  {
+   "id": "pay9",
+   "kind": "pay",
+   "who": "Sister Hall",
+   "ask": "Pay 9 with the fewest coins.",
+   "target": 9,
+   "modes": [
+    "hard"
+   ],
+   "options": [
+    "limnah + seon",
+    "shum + shum + senine",
+    "limnah + senine + senine",
+    "shum + seon + seon + senine"
+   ],
+   "correct": "limnah + seon",
+   "explain": "7 + 2 = 9 — two coins.",
+   "bits": [
+    0,
+    1,
+    0
+   ],
+   "boardNote": "  + limnah (7) = 9"
+  },
+  {
+   "id": "pay13",
+   "kind": "pay",
+   "who": "Brother Ortiz",
+   "ask": "Pay 13 with the fewest coins.",
+   "target": 13,
+   "modes": [
+    "hard"
+   ],
+   "options": [
+    "limnah + shum + seon",
+    "shum + shum + shum + senine",
+    "limnah + limnah",
+    "limnah + shum + senine + senine"
+   ],
+   "correct": "limnah + shum + seon",
+   "explain": "7 + 4 + 2 = 13 — three coins.",
+   "bits": [
+    1,
+    1,
+    0
+   ],
+   "boardNote": "  + limnah (7) = 13"
+  },
+  {
+   "id": "zeezrom",
+   "kind": "choice",
+   "who": "Sister Kim",
+   "ask": "Zeezrom offered Amulek six onties (Alma 11:22). An onti is the silver version of a limnah. How many days of a judge's pay is that?",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "42",
+    "36",
+    "13",
+    "6"
+   ],
+   "correct": "42",
+   "explain": "6 × 7 = 42 days of pay.",
+   "reaction": "Six weeks of work!",
+   "bits": [
+    1,
+    1,
+    1
+   ],
+   "boardNote": "  per onti × 6 onties = 42"
+  }
+ ],
+ "modes": {
+  "easy": {
+   "misses": 2,
+   "hints": 3,
+   "tray": false
+  },
+  "hard": {
+   "misses": 1,
+   "hints": 2,
+   "tray": true
+  }
+ },
+ "howItWorks": [
+  "Each gold coin is worth double the one before it: senine 1, seon 2, shum 4.",
+  "For any amount up to 7, each coin is either in your hand (1) or not (0).",
+  "Write the coins biggest to smallest — shum · seon · senine — and you have a binary number.",
+  "Example: 5 = shum + senine = 1 0 1."
+ ],
+ "tutorial": {
+  "who": "Sister Hall",
+  "ask": "Pay 5 with the fewest coins.",
+  "target": 5,
+  "steps": [
+   {
+    "coin": "shum",
+    "say": "Start with the biggest coin that fits. A limnah (7) is too much, so put down a shum (4)."
+   },
+   {
+    "coin": "senine",
+    "say": "That's 4 so far — you need 1 more. Put down a senine (1)."
+   }
+  ],
+  "wrong": "Not that one — try the highlighted coin.",
+  "done": "Shum yes, seon no, senine yes → 1 0 1. That's 5 in binary! Each coin is a digit: in your hand = 1, not in your hand = 0."
+ }
+}

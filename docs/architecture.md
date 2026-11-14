@@ -55,10 +55,16 @@ Each device is an `InputSource`:
 
 `InputManager` merges them: the largest stick deflection wins and any device can press a button. Menu navigation repeats when a stick is held. The protocol is in `docs/controller-protocol.md`.
 
+## Story systems
+- **`cutscene/Cutscene.ts`:** reusable in-engine scenes made of camera moves, subtitles, prop animation and fades. They are skippable and replayable, and their `onDone` state change runs exactly once. The game saves before and after each scene.
+- **`quests/rewards.ts`:** pure reward maths and the active-time timer. `QuestManager` writes one immutable receipt per quest.
+- **`fx/fireworks.ts`, `fx/audio.ts`:** pooled fireworks, the colour-wave ring, and synthesized sounds.
+- **`core/settings.ts`:** reduced motion and mute, stored per viewer.
+
 ## Quests (`src/quests/`)
 - **`contract.ts`:** the only API quest modules use: `QuestModule` and `QuestContext`.
 - **`QuestManager.ts`:** status flow (`locked → available → active → completed`), per-quest saved progress, objectives, and target states. It hooks into the game for colour and era changes and building gates.
-- **`examples/*.dev.ts`:** clearly labelled development examples. Swap them in `quests/index.ts`.
+- **`q1/`, `q3/`:** quests 1 and 3 (Quest 2 is a placeholder in `placeholders/` while Gio builds it). Their content is JSON in `data/`; `shared/` holds the challenge frame and scene helpers.
 - **Story flow** (in `game.ts`):
   1. Talk to Bednar in his office.
   2. Bednar assigns the next quest.
@@ -92,3 +98,13 @@ Each device is an `InputSource`:
 | Tune colours | `GAME_CONFIG.look`, `GAME_CONFIG.colorStages` |
 | Add a building's dates or style | `src/world/buildingRegistry.ts` |
 | Add a room | `GAME_CONFIG.interiors` + `LAYOUTS` in `src/interiors/interiors.ts` |
+
+## Rendering and atmosphere
+- **Renderer** (`src/render/Renderer.ts`): render → tone mapping (Khronos PBR Neutral) + colour-stage grade → output. Screen-space AO and bloom were removed after profiling (they cut the frame rate by about 3×); the voxel AO is baked into the meshes instead. Pixel ratio is capped at 1.5. The pause menu's *Graphics: High / Low* switch drops to pixel ratio 1 and 1024 shadows on weaker laptops (`SETTINGS.graphics`).
+- **Materials** are physically based (`MeshStandardMaterial`) lit by the sun, a hemisphere light and an environment map generated from each era's sky.
+- **Procedural textures** (`src/render/textures.ts`): brick with mortar relief, roof gravel, framed windows, ripple normals for water, and a world-space detail layer for the ground. No image files.
+- **Voxel ambient occlusion** is baked per vertex in `voxelMesher.ts` (stored in the vertex colours and in a separate `ao` attribute that the snow-roof material uses).
+- **Per-era atmosphere** (`src/config/atmosphere.ts`): sun angle and colour, sky, haze, exposure and `season` (tree and grass colours, snow roofs, falling snow or leaves). Edit that file to change an era's look.
+- **Characters** (`src/player/Avatar.ts`): knees and elbows, walk/run bob and lean, idle breathing, blinking and glances, hairstyles, hats, coats, scarves, backpacks and shirt patterns. NPCs re-dress per era (`eraLook` in `src/world/Npcs.ts`), and the player wears a coat and scarf in winter.
+- **Vehicles** (`src/player/Vehicle.ts`): spinning wheels with hub caps, steering front wheels, body roll and pitch, brake lights.
+- **No duplicate geometry:** multi-part OSM buildings are drawn once, and a background building that overlaps another is skipped (`World.buildEra`). Overlapping copies caused flickering walls and windows.

@@ -795,10 +795,8 @@ export class Game {
     const s = this.ui.menu(GAME_CONFIG.title, [
       { label: save ? `Continue (${ERAS[save.era]?.label ?? save.era})` : 'Continue', disabled: !save, action: () => save && this.continueGame(save) },
       { label: 'New game', action: () => this.chooseDifficulty() },
-      { label: 'Watch opening', action: () => { void this.previewOpening(); } },
-      { label: 'Watch ending', action: () => this.previewEnding() },
+      { label: 'Settings', action: () => this.showSettings() },
       { label: 'Controls', action: () => this.showControls() },
-      { label: 'Controllers', action: () => this.showControllers() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Reset saved game', disabled: !save, action: () => this.confirmReset() },
     ], { subtitle: GAME_CONFIG.disclaimer, className: 'title-screen', footer: `Map data © OpenStreetMap contributors (ODbL) · elevation USGS 3DEP · see docs/sources.md` });
@@ -894,7 +892,6 @@ export class Game {
       { label: '⌨ Cheat codes', action: () => this.showCheats() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
-      { label: 'Controllers', action: () => this.showControllers() },
       ...(this.devMode ? [{ label: 'Skip current quest (dev — no reward)', disabled: this.quests.allComplete(), action: () => this.confirmSkip() }] : []),
       { label: 'Save game', action: () => { this.save(); this.ui.toast('Game saved in this browser.'); } },
       { label: 'Save and quit to title', action: () => { this.pauseOpen = false; this.quitToTitle(true); } },
@@ -964,6 +961,13 @@ export class Game {
       button(() => `Season: ${SETTINGS.season[0].toUpperCase()}${SETTINGS.season.slice(1)} (whole game)`, () => { SETTINGS.season = SEASONS[(SEASONS.indexOf(SETTINGS.season) + 1) % 4]; this.applySeason(); });
       button(() => `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
       button(() => `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; });
+      head('Controllers');
+      button(() => 'Controllers (pair, calibrate, status)', () => this.showControllers());
+      if (this.mode === 'title') {   // the movies play from the title screen
+        head('Movies');
+        button(() => 'Watch opening', () => { panel.close(null); void this.previewOpening(); });
+        button(() => 'Watch ending', () => { panel.close(null); this.previewEnding(); });
+      }
       const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null));
       list.append(back);
       const hint = document.createElement('p'); hint.className = 'sub'; hint.textContent = 'Up/down to choose · left/right to change sliders · confirm to toggle.';

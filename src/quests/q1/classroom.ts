@@ -279,7 +279,7 @@ function injectStyles() {
 .screen.fullscreen.q1-inroom.q1-closeup .panel{max-height:60dvh;background:rgba(20,15,11,.80)!important}
 .q1-closeup .cx-board{max-height:38dvh!important;width:auto!important;max-width:100%}
 .q1-closeup .cx-wrap{align-items:flex-start}
-.q1-closeup .art-canvas{max-height:40dvh!important;aspect-ratio:20/24;width:auto!important}
+.q1-closeup .art-canvas{max-height:40dvh!important;aspect-ratio:1/1;width:auto!important}
 .q1-closeup .art-refbox{display:none}
 .q1-inroom .ch-intro,.q1-inroom .legend-box{display:none}
 .q1-inroom .ch-head{padding:3px 8px}.q1-inroom .ch-title{font-size:16px!important}

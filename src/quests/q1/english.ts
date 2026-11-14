@@ -40,6 +40,15 @@ export function layoutLines(tokens: string[], measure: (t: string) => number, ma
 /** Sentence number for each token (a token ending in . ! ? closes a sentence). */
 export const sentenceOf = (tokens: string[]) => { let s = 0; return tokens.map(t => { const id = s; if (/[.!?]$/.test(t)) s++; return id; }); };
 
+/** The Church News fact clipping on the bulletin board (also drawn before the demo starts). */
+export function drawFactClipping(p: Surface) {
+  const SERIF = 'Georgia, serif', g = p.g; g.fillStyle = '#f4efe2'; g.fillRect(0, 0, p.w, p.h); g.fillStyle = '#c0392b'; g.beginPath(); g.arc(p.w / 2, 30, 14, 0, 7); g.fill();
+  let y = text(p, 'CHURCH NEWS · Sept. 11, 1999', p.w / 2, 60, 30, '#222', 'center', SERIF);
+  y = text(p, 'Fact sheet', p.w / 2, y + 4, 40, '#222', 'center', SERIF) + 10;
+  for (const f of ENGLISH.facts) y = text(p, '• ' + f, 40, y + 8, 27, '#222', 'left', SERIF, p.w - 80);
+  p.refresh();
+}
+
 export const englishChallenge: ChallengeBody = (root, api) => {
   const mode = ENGLISH.modes[api.difficulty];
   const { tokens, errorAt } = preparePassage(api.difficulty);
@@ -172,15 +181,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     return false;
   });
 
-  // fact clipping on the bulletin board
-  const p = room?.get('poster');
-  if (p) {
-    const g = p.g; g.fillStyle = '#f4efe2'; g.fillRect(0, 0, p.w, p.h); g.fillStyle = '#c0392b'; g.beginPath(); g.arc(p.w / 2, 30, 14, 0, 7); g.fill();
-    let y = text(p, 'CHURCH NEWS · Sept. 11, 1999', p.w / 2, 60, 30, '#222', 'center', SERIF);
-    y = text(p, 'Fact sheet', p.w / 2, y + 4, 40, '#222', 'center', SERIF) + 10;
-    for (const f of ENGLISH.facts) y = text(p, '• ' + f, 40, y + 8, 27, '#222', 'left', SERIF, p.w - 80);
-    p.refresh();
-  }
+  const clip = room?.get('poster'); if (clip) drawFactClipping(clip);
   let raf = 0, last = performance.now();
   const tick = (now: number) => { const dt = (now - last) / 1000; last = now; if (flashT > 0) { flashT -= dt; if (flashT <= 0) draw(); } raf = requestAnimationFrame(tick); };
   raf = requestAnimationFrame(tick);

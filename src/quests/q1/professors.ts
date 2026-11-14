@@ -15,12 +15,12 @@ import { runChallenge, type ChallengeBody } from '../shared/frame';
 import { bednarSteps, shoulderCam } from '../shared/scenes';
 import { CLASSROOM, withClassroom } from './classroom';
 import { Room3D, type RoomId } from './room3d';
-import { mathChallenge } from './math';
-import { artChallenge } from './art';
+import { drawCoinPoster, mathChallenge } from './math';
+import { artChallenge, drawProjectedRef } from './art';
 import { circuitChallenge } from './circuit';
-import { englishChallenge } from './english';
+import { drawFactClipping, englishChallenge } from './english';
 
-export interface Candidate { id: 'math' | 'engineering' | 'art' | 'english'; label: string; anchor: string; lobby: string; building: string; challenge: 'math' | 'art' | 'circuit' | 'english'; shirt: string; requires?: string; wait?: [number, number] }
+export interface Candidate { id: 'math' | 'engineering' | 'art' | 'english'; name?: string; label: string; anchor: string; lobby: string; building: string; challenge: 'math' | 'art' | 'circuit' | 'english'; shirt: string; requires?: string; wait?: [number, number] }
 
 const BODIES: Record<Candidate['challenge'], { body: ChallengeBody; title: string; intro: string; pass: string; fail: string }> = {
   math: { body: mathChallenge, title: 'Binary, the Nephite way', intro: 'The computer science students keep tripping on binary. Use the gold coins of Alma 11 to explain it so it sticks — answer each student’s question.', pass: 'Hired: math candidate!', fail: 'The class is still lost' },
@@ -50,6 +50,9 @@ export function createProfessors(): QuestModule {
   const byId = (id: string) => cands().find(c => c.id === id)!;
   const locked = (c: Candidate) => !!c.requires && !hired()[c.requires];
   const short = (c: Candidate) => c.label.replace(' candidate', '');
+  /** "Sister Ames (math candidate)" — fictional names; falls back to the role label. */
+  const who = (c: Candidate) => c.name ? `${c.name} (${short(c).toLowerCase()} candidate)` : c.label;
+  const nameOf = (c: Candidate) => c.name ?? c.label;
 
   // ---------- hiring board (floating labels in the Kimball hall) ----------
   let removeBoard: (() => void) | null = null;
@@ -67,6 +70,11 @@ export function createProfessors(): QuestModule {
   const buildRooms = () => {
     if (rooms.size || ctx.world.era() !== 'ricks1999') return;
     for (const c of cands()) { try { rooms.set(c.id, new Room3D(ctx, c.id as RoomId)); } catch (e) { console.warn('Q1 room', c.id, e); } }
+    // walls are dressed before any demo: coin poster, fact clipping, projected reference
+    const wall = (id: string) => rooms.get(id)?.get('poster');
+    const m = wall('math'), e = wall('english'), a = wall('art');
+    if (m) drawCoinPoster(m); if (e) drawFactClipping(e); if (a) drawProjectedRef(a, !hired().art);
+    rooms.get('art')?.signal('beam', !hired().art);
   };
   const destroyRooms = () => { rooms.forEach(r => r.destroy()); rooms.clear(); };
   const roomAnchor = (c: Candidate) => `q1.room.${c.id}`;
@@ -77,7 +85,7 @@ export function createProfessors(): QuestModule {
     despawnFollower();
     const id = escorting(); if (!id || !ctx.isActive()) return;
     const c = byId(id), p = ctx.world.playerPosition();
-    follower = ctx.world.npc({ label: c.label, sub: `→ ${c.building}`, shirt: c.shirt, pants: '#2c2540' });
+    follower = ctx.world.npc({ label: nameOf(c), sub: `${c.label} → ${c.building}`, shirt: c.shirt, pants: '#2c2540' });
     removeFollower = ctx.world.addObject(follower, { x: 0, z: 0 });
     follower.position.set(p.x + 1.4, p.y, p.z); followerSpace = p.space; lastP = { x: p.x, z: p.z };
   };
@@ -91,13 +99,13 @@ export function createProfessors(): QuestModule {
     if (esc) {
       const c = byId(esc);
       ctx.ui.setWaypoints([roomAnchor(c)]);
-      ctx.ui.setObjective(`Hire the professors (${n}/4) — walk the ${c.label} to the ${c.building} classroom`, { x: 0, z: -2.6, space: `q1-room-${c.id}` });
+      ctx.ui.setObjective(`Hire the professors (${n}/4) — walk ${who(c)} to the ${c.building} classroom`, { x: 0, z: -2.6, space: `q1-room-${c.id}` });
       return;
     }
     const next = rem.find(c => !locked(c)) ?? rem[0];
     if (firstPicked()) {
       ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.anchor));
-      ctx.ui.setObjective(`Hire the professors (${n}/4) — the ${next.label} is waiting outside the ${next.building}`, waitAt(next));
+      ctx.ui.setObjective(`Hire the professors (${n}/4) — ${who(next)} is waiting outside the ${next.building}`, waitAt(next));
       return;
     }
     ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.lobby));
@@ -112,9 +120,9 @@ export function createProfessors(): QuestModule {
   async function lobbyTalk(c: Candidate, outside = false) {
     if (hired()[c.id]) { ctx.ui.toast(`${c.label} is already hired.`); return; }
     const esc = escorting();
-    if (esc === c.id) { await ctx.ui.dialogue([{ speaker: c.label, text: D.arrive.replace('{building}', c.building) }]); return; }
-    if (esc) { await ctx.ui.dialogue([{ speaker: c.label, text: D.busy.replace('{other}', byId(esc).label) }]); return; }
-    if (locked(c)) { await ctx.ui.dialogue([{ speaker: c.label, text: D.waiting[c.id] ?? D.notYet }]); return; }
+    if (esc === c.id) { await ctx.ui.dialogue([{ speaker: who(c), text: D.arrive.replace('{building}', c.building) }]); return; }
+    if (esc) { await ctx.ui.dialogue([{ speaker: who(c), text: D.busy.replace('{other}', byId(esc).label) }]); return; }
+    if (locked(c)) { await ctx.ui.dialogue([{ speaker: who(c), text: D.waiting[c.id] ?? D.notYet }]); return; }
     void outside;
     const pp = ctx.world.playerPosition();
     const cp = outside ? { ...waitAt(c), y: pp.y } : ctx.world.position(c.lobby);
@@ -122,12 +130,12 @@ export function createProfessors(): QuestModule {
     const lines = [D.greetings[c.id] ?? 'Hello!'];
     if (outside) lines.unshift(D.waitingOutside[c.id] ?? 'Hi!');
     await ctx.cutscene({ id: `q1-greet-${c.id}`, steps: lines.map((t, i) => ({
-      ...(i === 0 ? { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 0.9 } } : {}), look: cam.look, say: { speaker: c.label, text: t } })),
+      ...(i === 0 ? { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 0.9 } } : {}), look: cam.look, say: { speaker: who(c), text: t } })),
       onDone: () => { ctx.progress.set('escort', c.id); } });
     const first = !firstPicked();
     ctx.progress.set('firstPicked', true);
     spawnFollower(); startTalk(c);
-    ctx.ui.toast(`The ${c.label} is following you to the ${c.building}.`);
+    ctx.ui.toast(`${nameOf(c)} (${short(c).toLowerCase()} candidate) is following you to the ${c.building}.`);
     if (first) window.setTimeout(() => ctx.ui.toast(D.othersWait), 2500);
     updateObjective();
   }
@@ -168,11 +176,11 @@ export function createProfessors(): QuestModule {
   };
   const outro = async (c: Candidate, room: Room3D) => {
     const I = CLASSROOM.rooms[c.id].intro, spot = room.teachSpot();
-    room.standHired(c.label, c.shirt);
+    room.standHired(nameOf(c), c.shirt);
     await ctx.cutscene({ id: `q1-outro-${c.id}`, steps: [
       { camera: { from: room.w(0, 2.6, -5.5), to: room.w(1.6, 2.4, -4.6), dur: 1.2 }, look: room.w(-2, 1.4, 2), run: () => { room.hop(room.who('all')); ctx.world.sound('cheer'); },
         say: { speaker: CLASSROOM.rooms[c.id].chair, text: I.verdict } },
-      { look: { x: spot.x, y: spot.y + 1.7, z: spot.z }, camera: { from: room.w(1.6, 2.4, -4.6), to: { x: spot.x + 2.6, y: spot.y + 2.0, z: spot.z + 3.0 }, dur: 1.0 }, say: { speaker: c.label, text: I.thanks } },
+      { look: { x: spot.x, y: spot.y + 1.7, z: spot.z }, camera: { from: room.w(1.6, 2.4, -4.6), to: { x: spot.x + 2.6, y: spot.y + 2.0, z: spot.z + 3.0 }, dur: 1.0 }, say: { speaker: who(c), text: I.thanks } },
     ] });
   };
 
@@ -192,17 +200,17 @@ export function createProfessors(): QuestModule {
       await ctx.cutscene({ id: `q1-demo-${c.id}`, steps: [{ camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 1.0 }, look: cam.look, say: { speaker: 'Teaching demonstration', text: `You are now the ${c.label} — ${c.building}.` } }] });
     }
     room?.start(c.id === 'engineering' ? 'bench' : 'board');
-    ctx.ui.setBanner(`You are now the ${c.label}`);
-    window.setTimeout(() => { if (demoRoom === room) ctx.ui.setBanner(`Playing as: ${c.label}`); }, 2600);
+    ctx.ui.setBanner(`You are now ${nameOf(c)}, the ${short(c).toLowerCase()} candidate`);
+    window.setTimeout(() => { if (demoRoom === room) ctx.ui.setBanner(`Playing as: ${who(c)}`); }, 2600);
     ctx.progress.set('attempts', { ...attempts(), [c.id]: (attempts()[c.id] ?? 0) + 1 });
     const def = BODIES[c.challenge];
-    const r = await runChallenge(ctx, { title: def.title, playingAs: c.label, intro: def.intro, allowSkip: ctx.config.allowSkipChallenge,
+    const r = await runChallenge(ctx, { title: def.title, playingAs: who(c), intro: def.intro, allowSkip: ctx.config.allowSkipChallenge,
       body: withClassroom(ctx, c.id, def.body, room), passText: def.pass, failText: def.fail,
       className: `ch-${c.challenge} q1-demo ${room ? 'q1-inroom' : ''} ${room && (c.id === 'art' || c.id === 'engineering') ? 'q1-pad' : ''}` });
     room?.stop();
     ctx.ui.setBanner(null); ctx.world.releaseCamera();
     if (r.outcome === 'pass' && room) { despawnFollower(); room.showCeiling(true); await outro(c, room); }
-    else if (r.outcome === 'skip' && room) room.standHired(c.label, c.shirt);
+    else if (r.outcome === 'skip' && room) room.standHired(nameOf(c), c.shirt);
     room?.showCeiling(false);
     demoRoom = null; demoBusy = false;
     if (r.outcome === 'pass' || r.outcome === 'skip') {
@@ -211,7 +219,7 @@ export function createProfessors(): QuestModule {
       if (r.outcome === 'skip') ctx.progress.set('skipped', { ...skipped(), [c.id]: true });
       else ctx.progress.set('quality', { ...quality(), [c.id]: Math.max(0, Math.min(1, r.quality)) });
       ctx.progress.set('escort', null); despawnFollower();
-      ctx.ui.toast(r.outcome === 'skip' ? `${c.label} hired (demo skipped — no bonus)` : `${c.label} hired! (${4 - remaining().length}/4) Back to you.`);
+      ctx.ui.toast(r.outcome === 'skip' ? `${nameOf(c)} hired (demo skipped — no bonus)` : `${nameOf(c)} hired as ${short(c).toLowerCase()} professor! (${4 - remaining().length}/4) Back to you.`);
       if (c.id === 'art' && !hired().engineering) ctx.ui.toast('The art studio’s projector shorted out — the engineering candidate can demo now (fixing it).');
       updateObjective();
     }
@@ -225,7 +233,7 @@ export function createProfessors(): QuestModule {
         // Waiting in the Personnel Services lobby (Kimball hall)
         ctx.addInteractable({
           id: `lobby-${cand.id}`, kind: 'npc', at: cand.lobby, radius: 2.2, eras: ['ricks1999'],
-          visual: ctx.world.npc({ label: cand.label, sub: 'Personnel Services', shirt: cand.shirt, pants: '#2c2540' }),
+          visual: ctx.world.npc({ label: nameOf(cand), sub: `${cand.label} · Personnel Services`, shirt: cand.shirt, pants: '#2c2540' }),
           enabled: () => ctx.isActive() && !firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
           prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
           objective: () => ctx.isActive() && !escorting() && !hired()[cand.id] && !locked(cand),
@@ -234,7 +242,7 @@ export function createProfessors(): QuestModule {
         // Waiting outside their building after the first pickup
         ctx.addInteractable({
           id: `outside-${cand.id}`, kind: 'npc', at: waitAt(cand), radius: 2.6, eras: ['ricks1999'],
-          visual: ctx.world.npc({ label: cand.label, sub: `waiting · ${cand.building}`, shirt: cand.shirt, pants: '#2c2540' }),
+          visual: ctx.world.npc({ label: nameOf(cand), sub: `${cand.label} · waiting`, shirt: cand.shirt, pants: '#2c2540' }),
           enabled: () => ctx.isActive() && firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
           prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
           objective: () => ctx.isActive() && firstPicked() && !escorting() && !hired()[cand.id] && !locked(cand),

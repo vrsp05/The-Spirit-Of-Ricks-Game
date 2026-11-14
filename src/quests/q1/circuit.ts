@@ -10,7 +10,7 @@ import { classroom } from './classroom';
 import { chalk, text } from './room3d';
 
 export type Brightness = 'off' | 'dim' | 'bright';
-export interface LevelDef { id: string; title: string; goal: string; rows: string[]; labels: Record<string, string>; expect: { switches: Record<string, boolean>; bulbs: Record<string, Brightness> }[]; hint: string; hardOnly?: boolean }
+export interface LevelDef { id: string; title: string; goal: string; rows: string[]; labels: Record<string, string>; expect: { switches: Record<string, boolean>; bulbs: Record<string, Brightness> }[]; hint: string; hardOnly?: boolean; startShort?: [number, number, number] }
 export const CIRCUIT = data as unknown as { note: string; levels: LevelDef[]; modes: Record<string, { levels: string[]; hints: number; hintStyle: 'visual' | 'text'; scramble: number }> };
 
 const DIRS = 'NESW', DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
@@ -179,7 +179,8 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const load = () => {
     const l = levels[li]; board = parseLevel(l);
     needed = new Set(l.expect.flatMap(e => [...simulate(board, e.switches).live]));   // tiles the solved circuit uses
-    scramble(board, l, mode.scramble);
+    if (l.startShort) { const [sx, sy, r] = l.startShort; board.tiles[sy][sx].rot = r; }   // starts shorted: find the bridging wire
+    else scramble(board, l, mode.scramble);
     switchState = Object.fromEntries(Object.keys(l.expect[0].switches).map(k => [k, false]));
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__circuit = { board, level: l };   // test hook (dev builds only)
     par = board.tiles.reduce((s, r, y) => s + r.reduce((q, t, x) => q + (needed.has(`${x},${y}`) ? stepsToSolved(t) : 0), 0), 0); moves = 0; hintTile = null; solvedT = 0;

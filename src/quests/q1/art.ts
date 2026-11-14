@@ -7,9 +7,10 @@ import data from './data/art.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
-import { chalk } from './room3d';
+import { chalk, type Surface } from './room3d';
+import { playHymn, type HymnData } from './hymn';
 
-export const ART = data as unknown as { note: string; subject: string; references?: Record<string, string[]>; subjects?: Record<string, string>; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
+export const ART = data as unknown as { note: string; hymn?: HymnData & { enabled: boolean }; subject: string; references?: Record<string, string[]>; subjects?: Record<string, string>; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
   modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number; shortAtSeconds?: number }> };
 
 /** Index of the furthest class guess reached for a live score (−1 = none yet). */
@@ -88,6 +89,17 @@ export function voxelReveal(el: HTMLElement, canvas: Grid): () => void {
   return () => { cancelAnimationFrame(id); geo.dispose(); mat.dispose(); renderer.dispose(); renderer.forceContextLoss(); };
 }
 
+/** The temple reference projected on the studio wall (dark when the projector is out). */
+export function drawProjectedRef(p: Surface, on: boolean) {
+  const ref = refGrid(), colorOf = (id: string) => ART.palette.find(q => q.id === id)!.color;
+  const g = p.g; g.fillStyle = on ? '#4f5a63' : '#151515'; g.fillRect(0, 0, p.w, p.h);
+  if (on) {
+    const cs = Math.floor(Math.min((p.w - 40) / ref[0].length, (p.h - 40) / ref.length)), ox = (p.w - cs * ref[0].length) / 2, oy = (p.h - cs * ref.length) / 2;
+    ref.forEach((r, y) => r.forEach((c, x) => { g.fillStyle = c ? colorOf(c) : '#6f7b86'; g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2); }));
+  }
+  p.refresh();
+}
+
 export const artChallenge: ChallengeBody = (root, api) => {
   const mode = ART.modes[api.difficulty], { width: W, height: H } = ART.canvas, ref = refGrid();
   const canvas: Grid = Array.from({ length: H }, () => Array(W).fill(null));
@@ -117,15 +129,7 @@ export const artChallenge: ChallengeBody = (root, api) => {
   const cls = classroom();
   const room = cls?.room ?? null;
   const colorOf = (id: string) => ART.palette.find(p => p.id === id)!.color;
-  const drawProjected = (on: boolean) => {
-    const p = room?.get('poster'); if (!p) return;
-    const g = p.g; g.fillStyle = on ? '#4f5a63' : '#151515'; g.fillRect(0, 0, p.w, p.h);
-    if (on) {
-      const cs = Math.floor(Math.min((p.w - 40) / ref[0].length, (p.h - 40) / ref.length)), ox = (p.w - cs * ref[0].length) / 2, oy = (p.h - cs * ref.length) / 2;
-      ref.forEach((r, y) => r.forEach((c, x) => { g.fillStyle = c ? colorOf(c) : '#6f7b86'; g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2); }));
-    }
-    p.refresh(); room?.signal('beam', on);
-  };
+  const drawProjected = (on: boolean) => { const p = room?.get('poster'); if (p) drawProjectedRef(p, on); room?.signal('beam', on); };
   const drawBoard3d = () => {
     const b = room?.get('board'); if (!b) return;
     chalk(b, '#34463d');
@@ -176,6 +180,7 @@ export const artChallenge: ChallengeBody = (root, api) => {
     let poppedAtEnd = false;
     if (score >= mode.pass) {
       finished = true; clearTimeout(bulbClock);
+      if (ART.hymn?.enabled) { stopHymn(); window.setTimeout(() => { stopHymn = playHymn(ART.hymn!); }, 1800); }
       // The projector always shorts out during the art demo — if you finished first, it pops right at the end.
       if (bulb === 'on') { poppedAtEnd = true; bulb = 'out'; refBox.classList.add('q1-dark'); drawProjected(false); room?.signal('fuse', true); cls?.react('gasp', 'Pop! The projector just shorted out — right at the end!'); }
     }
@@ -238,6 +243,8 @@ export const artChallenge: ChallengeBody = (root, api) => {
     return 'The reference is visible again for a few seconds.';
   });
   drawProjected(true);
+  // the temple vision gets the opening phrase of "High on the Mountain Top" (quietly)
+  let stopHymn = ART.hymn?.enabled ? playHymn(ART.hymn) : () => {};
   paintUI();
-  return () => { finished = true; clearTimeout(timer); clearTimeout(bulbClock); window.removeEventListener('pointerup', up); };
+  return () => { finished = true; stopHymn(); clearTimeout(timer); clearTimeout(bulbClock); window.removeEventListener('pointerup', up); };
 };

@@ -132,5 +132,46 @@
     "temple": "Projected reference (future temple concept)",
     "tabernacle": "Projected reference (Rexburg Stake Tabernacle, 1911)"
   },
-  "projectorNote": "The overhead projector always shorts out partway through the demo (Easy after 90 s, Hard after 40 s) and stays dead; the player finishes from memory. The engineering demo repairs that circuit."
+  "projectorNote": "The overhead projector always shorts out partway through the demo (Easy after 90 s, Hard after 40 s) and stays dead; the player finishes from memory. The engineering demo repairs that circuit.",
+  "hymn": {
+    "note": "Opening phrase of 'High on the Mountain Top' (Ebenezer Beesley, 1854, public domain). Pitches = hymnary.org incipit 51112 32354 32232 in G major; beats approximated from the 6-syllable lines — check by ear and adjust.",
+    "key": "G major",
+    "tonicHz": 392.0,
+    "degrees": [
+      5,
+      1,
+      1,
+      1,
+      2,
+      3,
+      2,
+      3,
+      5,
+      4,
+      3,
+      2,
+      2,
+      3,
+      2
+    ],
+    "beats": [
+      1,
+      1,
+      0.5,
+      0.5,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2
+    ],
+    "bpm": 96,
+    "enabled": true
+  }
 }

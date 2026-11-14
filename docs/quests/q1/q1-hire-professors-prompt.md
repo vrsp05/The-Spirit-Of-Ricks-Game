@@ -46,7 +46,7 @@ Read these first; they win over this brief if they disagree:
 
 ### 1. Quest flow
 1. **Bednar** (Kimball office) assigns Q1 in a cutscene (`onAssign`). The four candidates wait in Personnel Services, and art must come before engineering.
-2. **Personnel Services** is a room off the Kimball hall, with a counter, waiting chairs, file cabinets, a "Faculty interviews today" sign and a floating hiring board.
+2. **Personnel Services** is a room off the Kimball hall (classroom walls such as the coin poster, fact clipping and projected reference are dressed as soon as the rooms are built), with a counter, waiting chairs, file cabinets, a "Faculty interviews today" sign and a floating hiring board.
    - The four candidates stand there.
    - Talking to one plays a greeting, then they follow you.
    - Toast: "The other candidates will meet you outside their buildings."
@@ -92,12 +92,12 @@ Read these first; they win over this brief if they disagree:
 
 **Details:**
 - **Math:**
-  - **Opening:** an unscored **guided tutorial**: "Pay 5", shum then senine, with the coin highlighted each step, ending at 1 0 1 → 5.
+  - **Opening:** an unscored **guided tutorial** (once per session; a retry goes straight to the lesson): "Pay 5", shum then senine, with the coin highlighted each step, ending at 1 0 1 → 5.
   - **Questions:** Pay 6 · read 011 · Pay 7 (one limnah) · why is a limnah 7 · Zeezrom's six onties = 42 days of pay. Hard adds Pay 9 and Pay 13.
   - **Rules:** misses allowed are Easy 2, Hard 1. On Hard, a right amount with too many coins counts as a miss.
 - **English:** Easy has 3 mistakes, Hard 6. Wrong marks allowed: Easy unlimited, Hard 2. Hints highlight the sentence.
-- **Art:** pass at 60% on Easy, 85% on Hard. Scoring ignores position, the class guesses as you draw, the first mirror stroke gets an "ooh", and passing shows a voxel reveal.
-- **Engineering:** Easy plays 3 levels, Hard 4: lamp; lamp + fan in parallel; fan switch; dim power light + slow fan in series with the lamp bright.
+- **Art:** pass at 60% on Easy, 85% on Hard. Scoring ignores position, the class guesses as you draw, the first mirror stroke gets an "ooh", and passing shows a voxel reveal. The opening phrase of "High on the Mountain Top" (Beesley, 1854, public domain) plays softly at the start and on passing: the pitches are the verified hymnary.org incipit, the rhythm is approximated, and it lives in `art.json` → `hymn` so it can be corrected by ear. Mute silences it.
+- **Engineering:** Easy plays 3 levels, Hard 5: lamp; lamp + fan in parallel; fan switch; dim power light + slow fan in series with the lamp bright; **Find the short** (the board starts sparking because one stray wire bridges + to −; find it and turn it).
 
 ### 4. Content and tests
 - **Content** lives in `src/quests/q1/data/`:
@@ -115,14 +115,12 @@ Read these first; they win over this brief if they disagree:
 
 ## Part 3: Plan (what's left)
 
-1. **Playtest fail paths on Easy:** losing each demo for real, and Retry/Leave mid-demo, then walking back in (the short walk-in should play).
-2. **Not built yet** (optional):
-   - an Engineering "find the short" level 4 (today shorts pop the fuse on any level);
-   - an original arrangement of "High on the Mountain Top" for the art demo;
-   - drawing the math coin poster before the demo starts (it's blank during the walk-in).
+1. **Fail paths:** played on Easy for math: losing, Retry (straight to the lesson), Leave and walking back in (the short walk-in plays). The other demos use the same frame.
+2. **Check by ear:** the hymn phrase's rhythm in `art.json` → `hymn.beats`.
 3. **Tune after playtests:** walk-in shot timing, waiting-spot offsets (`wait` in `GAME_CONFIG.quests.professors.candidates`), short times in `art.json`.
 4. **World teammate:** review the marked additions in `src/interiors/interiors.ts` (Kimball Personnel Services room and the four classrooms) and in `GAME_CONFIG`.
-5. **Team content:** final candidate names and dialogue (placeholders now).
+5. **Team content:** the candidates have fictional names (Sister Ames, Brother Nielsen, Sister Okada, Brother Ruiz, set in `GAME_CONFIG.quests.professors.candidates[].name`); change them freely. Dialogue is authored placeholder text.
+6. **Quest 2** is Gio's: `game-foundation` only has a labelled placeholder (`src/quests/placeholders/construction.placeholder.ts`). See `docs/quests/q1/world-team-notes.md`.
 
 **Keep while editing:**
 - the quest contract only (no renderer, player or input imports);

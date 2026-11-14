@@ -7,7 +7,7 @@ import data from './data/math.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
-import { chalk, text } from './room3d';
+import { chalk, text, type Surface } from './room3d';
 
 export interface Coin { id: string; metal: 'gold' | 'silver'; value: number }
 export interface Question { id: string; kind: 'pay' | 'choice'; who: string; ask: string; target?: number; modes: string[]; options: string[]; correct: string; explain: string; reaction?: string; bits?: number[]; boardNote?: string }
@@ -41,12 +41,31 @@ export const questionsFor = (diff: string) => MATH.questions.filter(q => q.modes
 
 export function shuffle<T>(a: T[], rnd: () => number = Math.random): T[] { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
+/** The Alma 11 gold-coin poster on the classroom wall (also drawn before the demo starts). */
+export function drawCoinPoster(p: Surface) {
+  const g = p.g; g.fillStyle = '#efe3c2'; g.fillRect(0, 0, p.w, p.h); g.strokeStyle = '#7a5a2a'; g.lineWidth = 14; g.strokeRect(7, 7, p.w - 14, p.h - 14);
+  const serif = 'Georgia, serif';
+  let y = text(p, 'ALMA 11', p.w / 2, 40, 64, '#5a3a12', 'center', serif);
+  y = text(p, 'Nephite gold coins', p.w / 2, y, 40, '#5a3a12', 'center', serif) + 20;
+  for (const id of ['senine', 'seon', 'shum', 'limnah']) {
+    g.fillStyle = '#d9a52b'; g.beginPath(); g.arc(110, y + 38, 36, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#6b4a0e'; g.lineWidth = 5; g.stroke();
+    text(p, String(coin(id).value), 110, y + 14, 44, '#3a2600', 'center', serif);
+    text(p, id, 175, y + 8, 46, '#2a211a', 'left', serif);
+    text(p, id === 'limnah' ? '“the value of them all”' : id === 'senine' ? 'a judge’s pay for one day' : `${coin(id).value} senines`, 175, y + 52, 26, '#5a4a3a', 'left', serif);
+    y += 110;
+  }
+  y += 10; text(p, 'An onti (silver) is worth the same as a limnah: 7.', p.w / 2, y, 26, '#5a3a12', 'center', serif, p.w - 60);
+  p.refresh();
+}
+
+let tutorialDone = false;
 export const mathChallenge: ChallengeBody = (root, api) => {
   const mode = MATH.modes[api.difficulty];
   const qs = questionsFor(api.difficulty);
   const cls = classroom();
   let qi = 0, misses = 0, right = 0, hintsLeft = mode.hints, hintStep = 0, sel = 0, busy = false;
   let hand: string[] = [], opts: string[] = [], gone = new Set<string>(), hintCoins: string[] = [], dead = false;
+  let failed = false;
   let phase: 'intro' | 'ask' | 'review' = 'intro', reveal: number[] | null = null, revealExtra = '', tutStep = 0;
   const tut = MATH.tutorial;
   const later = (fn: () => void, ms: number) => window.setTimeout(() => { if (!dead) fn(); }, ms);
@@ -71,22 +90,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   };
   // ---- 3D classroom surfaces (chalkboard + coin poster) ----
   const room = cls?.room ?? null;
-  const drawPoster = () => {
-    const p = room?.get('poster'); if (!p) return;
-    const g = p.g; g.fillStyle = '#efe3c2'; g.fillRect(0, 0, p.w, p.h); g.strokeStyle = '#7a5a2a'; g.lineWidth = 14; g.strokeRect(7, 7, p.w - 14, p.h - 14);
-    const serif = 'Georgia, serif';
-    let y = text(p, 'ALMA 11', p.w / 2, 40, 64, '#5a3a12', 'center', serif);
-    y = text(p, 'Nephite gold coins', p.w / 2, y, 40, '#5a3a12', 'center', serif) + 20;
-    for (const id of ['senine', 'seon', 'shum', 'limnah']) {
-      g.fillStyle = '#d9a52b'; g.beginPath(); g.arc(110, y + 38, 36, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#6b4a0e'; g.lineWidth = 5; g.stroke();
-      text(p, String(coin(id).value), 110, y + 14, 44, '#3a2600', 'center', serif);
-      text(p, id, 175, y + 8, 46, '#2a211a', 'left', serif);
-      text(p, id === 'limnah' ? '“the value of them all”' : id === 'senine' ? 'a judge’s pay for one day' : `${coin(id).value} senines`, 175, y + 52, 26, '#5a4a3a', 'left', serif);
-      y += 110;
-    }
-    y += 10; text(p, 'An onti (silver) is worth the same as a limnah: 7.', p.w / 2, y, 26, '#5a3a12', 'center', serif, p.w - 60);
-    p.refresh();
-  };
+  const drawPoster = () => { const p = room?.get('poster'); if (p) drawCoinPoster(p); };
   const drawBoard = () => {
     const b = room?.get('board'); if (!b) return;
     chalk(b);
@@ -141,7 +145,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
     sel = Math.max(0, MATH.tray.indexOf(tut.steps[tutStep]?.coin ?? 'senine'));
     renderIntro();
   };
-  const startLesson = () => { hand = []; phase = 'ask'; reveal = null; revealExtra = ''; load(); };
+  const startLesson = () => { tutorialDone = true; hand = []; phase = 'ask'; reveal = null; revealExtra = ''; load(); };
   const renderQ = () => {
     const cur = q(); if (!cur) return;
     qEl.replaceChildren(h('b', { text: `${cur.who}: ` }), `“${cur.ask}”`);
@@ -156,7 +160,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
         const b = btn(o, () => { if (phase === 'review') return next(); sel = k; choose(); }, `${k === sel && phase === 'ask' ? 'sel' : ''} ${gone.has(o) ? 'gone' : ''} ${mark}`); b.removeAttribute('data-focus'); return b;
       })));
     }
-    if (phase === 'review') { const b = btn(qi + 1 < qs.length ? 'Next question ▶' : 'Finish the lesson ▶', () => next(), 'q1-next'); b.removeAttribute('data-focus'); work.append(b); }
+    if (phase === 'review' && !failed) { const b = btn(qi + 1 < qs.length ? 'Next question ▶' : 'Finish the lesson ▶', () => next(), 'q1-next'); b.removeAttribute('data-focus'); work.append(b); }
     renderBoard(); renderScore(); drawBoard();
   };
   const load = () => {
@@ -175,11 +179,11 @@ export const mathChallenge: ChallengeBody = (root, api) => {
       cls?.react('confused', nonMinimal ? 'Right amount — but can you do it with fewer coins?' : undefined);
       fb.className = 'q1-bin-fb bad';
       fb.textContent = `${nonMinimal ? 'Right amount, but not the fewest coins. ' : '✖ Not quite. '}${cur.explain}`;
-      if (misses > mode.misses) { renderQ(); later(() => api.finish({ pass: false, quality: 0, summary: `${misses} misses — the class is still confused. (${mode.misses} allowed.)` }), 2200); return; }
+      if (misses > mode.misses) { failed = true; renderQ(); later(() => api.finish({ pass: false, quality: 0, summary: `${misses} misses — the class is still confused. (${mode.misses} allowed.)` }), 2200); return; }
     }
     busy = false; renderQ();
   };
-  const next = () => { if (phase !== 'review') return; qi++; load(); };
+  const next = () => { if (phase !== 'review' || failed) return; qi++; load(); };
   const choose = () => {
     if (busy || usesTray() || phase !== 'ask') return; const cur = q(), o = opts[sel]; if (gone.has(o)) return;
     const valid = cur.kind === 'pay' && comboValue(parseCombo(o)) === cur.target;
@@ -243,6 +247,6 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   MATH.opening.forEach((l, i) => later(() => cls?.react(i ? 'nod' : 'confused', l.text, l.who), 200 + i * 2200));
   drawPoster();
   sel = MATH.tray.indexOf(tut.steps[0].coin);
-  renderIntro();
+  if (tutorialDone) startLesson(); else renderIntro();   // the tutorial plays once; retries go straight to the lesson
   return () => { busy = true; dead = true; };
 };

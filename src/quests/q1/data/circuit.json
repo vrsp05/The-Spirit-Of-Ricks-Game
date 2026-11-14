@@ -111,6 +111,34 @@
     }
    ],
    "hint": "Two loads in one chain (series) share the supply and run dim. Route them as one chain up and over."
+  },
+  {
+   "id": "find-short",
+   "title": "Find the short",
+   "goal": "The projector keeps blowing its fuse. Find the wire that connects + straight to − and turn it so the lamp lights.",
+   "hardOnly": true,
+   "rows": [
+    "ES WE WES WE WS",
+    "B+N . WE . U:NS:L",
+    "NE WE WEN WE WN"
+   ],
+   "labels": {
+    "L": "Lamp"
+   },
+   "expect": [
+    {
+     "switches": {},
+     "bulbs": {
+      "L": "bright"
+     }
+    }
+   ],
+   "startShort": [
+    2,
+    1,
+    1
+   ],
+   "hint": "Sparks mean + is wired straight to −. Look for a wire that bridges the top rail and the bottom rail without going through the lamp."
   }
  ],
  "modes": {
@@ -129,7 +157,8 @@
     "one-bulb",
     "two-parallel",
     "switch-one",
-    "spire"
+    "spire",
+    "find-short"
    ],
    "hints": 2,
    "hintStyle": "text",

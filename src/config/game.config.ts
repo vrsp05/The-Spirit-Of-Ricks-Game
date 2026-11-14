@@ -107,11 +107,11 @@ export const GAME_CONFIG = {
   quests: {
     professors: {
       candidates: [
-        { id: 'math', label: 'Math candidate', anchor: 'candidate.math', lobby: 'q1.lobby.math', building: 'Romney Building', challenge: 'math', shirt: '#6d4b8d' },
-        { id: 'english', label: 'English candidate', anchor: 'candidate.english', lobby: 'q1.lobby.english', building: 'Smith Building', challenge: 'english', shirt: '#8d3b4b' },
-        { id: 'art', label: 'Art candidate', anchor: 'candidate.art', lobby: 'q1.lobby.art', building: 'Spori Building', challenge: 'art', shirt: '#3b6d8d' },
+        { id: 'math', name: 'Sister Ames', label: 'Math candidate', anchor: 'candidate.math', lobby: 'q1.lobby.math', building: 'Romney Building', challenge: 'math', shirt: '#6d4b8d' },
+        { id: 'english', name: 'Brother Nielsen', label: 'English candidate', anchor: 'candidate.english', lobby: 'q1.lobby.english', building: 'Smith Building', challenge: 'english', shirt: '#8d3b4b' },
+        { id: 'art', name: 'Sister Okada', label: 'Art candidate', anchor: 'candidate.art', lobby: 'q1.lobby.art', building: 'Spori Building', challenge: 'art', shirt: '#3b6d8d' },
         // Engineering repairs the projector that breaks in the art demo, so art comes first.
-        { id: 'engineering', label: 'Engineering candidate', anchor: 'candidate.engineering', lobby: 'q1.lobby.engineering', building: 'Austin Building', challenge: 'circuit', shirt: '#4b6d3b', requires: 'art', wait: [0, 3.2] },
+        { id: 'engineering', name: 'Brother Ruiz', label: 'Engineering candidate', anchor: 'candidate.engineering', lobby: 'q1.lobby.engineering', building: 'Austin Building', challenge: 'circuit', shirt: '#4b6d3b', requires: 'art', wait: [0, 3.2] },
       ],
       allowSkipChallenge: true,
     },

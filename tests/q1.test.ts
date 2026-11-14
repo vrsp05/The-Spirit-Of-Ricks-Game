@@ -144,7 +144,12 @@ describe('circuit (Light the Temple)', () => {
     expect(live.has('0,0')).toBe(true); expect(live.has('1,1')).toBe(false);   // decoy carries nothing
     expect(sides(b.tiles[1][0])).toEqual([0, 2]);
   });
-  it('Easy plays 3 circuits, Hard 4', () => { expect(CIRCUIT.modes.easy.levels).toHaveLength(3); expect(CIRCUIT.modes.hard.levels).toHaveLength(4); });
+  it('Easy plays 3 circuits, Hard 5 (ending with Find the short)', () => { expect(CIRCUIT.modes.easy.levels).toHaveLength(3); expect(CIRCUIT.modes.hard.levels).toHaveLength(5); expect(CIRCUIT.modes.hard.levels.at(-1)).toBe('find-short'); });
+  it('Find the short starts shorted and is fixed by turning the bridging wire back', () => {
+    const l = lvl('find-short'), b = parseLevel(l); const [x, y, r] = (l as unknown as { startShort: [number, number, number] }).startShort;
+    b.tiles[y][x].rot = r; expect(simulate(b, {}).short).toBe(true); expect(testBoard(l, b).pass).toBe(false);
+    b.tiles[y][x].rot = 0; expect(simulate(b, {}).short).toBe(false); expect(testBoard(l, b).pass).toBe(true);
+  });
 });
 
 describe('english answer keys', () => {
@@ -192,5 +197,14 @@ describe('math tutorial', () => {
     expect(ids.length).toBe(fewestCoins(t.target, MATH.tray)!.length);
     expect(bits(ids)).toEqual([1, 0, 1]);
     expect(questionsFor('easy').some(q => q.target === t.target && q.kind === 'pay')).toBe(false);
+  });
+});
+
+describe('art hymn phrase', () => {
+  it('uses the verified hymnary incipit (51112 32354 32232) in G major, one beat per note', async () => {
+    const { degreeHz } = await import('../src/quests/q1/hymn');
+    const h = ART_DATA.hymn!;
+    expect(h.degrees.join('')).toBe('511123235432232'); expect(h.beats).toHaveLength(h.degrees.length);
+    expect(degreeHz(392, 1)).toBeCloseTo(392); expect(degreeHz(392, 5)).toBeCloseTo(587.33, 1); expect(degreeHz(392, -2)).toBeCloseTo(293.66, 1);
   });
 });

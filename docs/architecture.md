@@ -64,7 +64,7 @@ Each device is an `InputSource`:
 ## Quests (`src/quests/`)
 - **`contract.ts`:** the only API quest modules use: `QuestModule` and `QuestContext`.
 - **`QuestManager.ts`:** status flow (`locked → available → active → completed`), per-quest saved progress, objectives, and target states. It hooks into the game for colour and era changes and building gates.
-- **`q1/`, `q2/`, `q3/`:** the three quests. Their content is JSON in `data/`; `shared/` holds the challenge frame and scene helpers.
+- **`q1/`, `q3/`:** quests 1 and 3 (Quest 2 is a placeholder in `placeholders/` while Gio builds it). Their content is JSON in `data/`; `shared/` holds the challenge frame and scene helpers.
 - **Story flow** (in `game.ts`):
   1. Talk to Bednar in his office.
   2. Bednar assigns the next quest.

@@ -11,8 +11,7 @@
     "data:fetch-osm": "node tools/fetch-osm.mjs",
     "data:fetch-elevation": "node tools/fetch-elevation.mjs",
     "data:build": "node tools/build-campus.mjs",
-    "test": "vitest run",
-    "gen:tiling": "vite-node tools/gen-tiling.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "three": "^0.170.0"

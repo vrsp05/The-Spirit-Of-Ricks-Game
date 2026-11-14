@@ -23,8 +23,7 @@ npm run dev        # http://localhost:5173
 | `npm run build` | Type-check and production build into `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | TypeScript only |
-| `npm test` | Unit tests (Alma 11 coins + fewest-coin DP, art scoring + fill, tile-circuit solver + scrambles, English keys, tiling solvability, rewards, quest idempotency, save migration) |
-| `npm run gen:tiling` | Regenerate the Quest 2 blueprint puzzles |
+| `npm test` | Unit tests (Alma 11 coins + fewest-coin DP, art scoring + fill, tile-circuit solver + scrambles, English keys, rewards, quest idempotency, save migration) |
 | `npm run data:fetch-osm` / `data:fetch-elevation` / `data:build` | Rebuild the campus map data (see [Map data](#map-data)) |
 
 Add **`?dev=1`** to the URL for developer tools. Press <kbd>`</kbd> or <kbd>F1</kbd> to show or hide them.
@@ -55,17 +54,13 @@ Two custom ESP32 controllers can play at the same time; either one moves the sam
   - Nothing says "BYU–Idaho" until all three quests are done.
 - **Colour:** each completed quest restores colour, from sepia to a warm 90s-photo grade.
 - **Difficulty:** Easy or Hard, chosen at the start and switchable from the pause menu (applies to your next attempt). Each quest has its own tuning for each mode.
-- **Quest 1, Hire the professors (fall 1999):** Bednar assigns it in his Kimball office. Four candidates wait at the Romney, Austin, Spori and Snow buildings, and each challenge has hints, retry and an optional skip:
-  - **Nephite Market** (math): customers queue at a barley stall; count out exact payments and change in Alma 11 coins before their patience runs out (fewest coins = perfect).
-  - **Paint a future temple concept** (art): pixel canvas with mirror and fill bucket; a passing painting is rebuilt as a spinning voxel model.
-  - **Light the Temple** (engineering): rotate wire tiles; a live circuit solver lights the bulbs (series dim, parallel bright, switches).
-  - **Red Pen Rush** (English): a printing press scrolls a labelled paraphrase of the June 21, 2000 announcement; stamp the mistakes at the red line and pick the fix.
-  - Every minigame ends with a 1–3 star rating; the Quest 2 blueprints use a tower-crane drop and a "Blueprint approved!" screen.
+- **Quest 1, Hire the professors (fall 1999):** Bednar assigns it in his Kimball office. Four candidates wait in Personnel Services; you walk each one to a teaching demonstration inside their department's classroom (Romney, Smith, Spori, Austin) and play it as the candidate. Walking in plays a short scene; after the first pickup the others wait outside their buildings. Each demo has hints, retry, skip and a Hard follow-up. Details: `docs/quests/q1/`.
+  - **Binary, the Nephite way** (math): a guided tutorial, then students' questions on the chalkboard, explained with the Alma 11 gold coins.
+  - **Editing for accuracy** (English): Brother Price's summary of the Kimball dedication is projected on the whiteboard; mark mistakes and the fixes appear in red ink.
+  - **Drawing what you see** (art): paint the temple concept on the studio board from the projected reference — until the old projector shorts out.
+  - **Fix it live** (engineering): repair that projector on the lab bench; its lamp and fan react as you wire the circuit.
   - When all four are hired, report back to Bednar.
-- **Quest 2, Build the campus (2001):**
-  - Blueprint tiling puzzles for the Taylor Building and the I-Center: fill the footprint with no gaps or overlaps, and ignore the decoy pieces.
-  - Both sites stay fenced until their blueprint is solved; each building then rises in a short montage.
-  - Report back to Bednar to finish.
+- **Quest 2, Build the campus (2001):** placeholder while Gio builds the real quest. The Taylor site offers a labelled "mark Quest 2 complete" panel so the story can continue.
 - **Quest 3, Find and place B Y U I (2011):**
   - Bednar hands over four illustrated clue cards, which you can reread any time in the Journal (J).
   - Letters are camouflaged in the architecture at the library, temple approach, Hart Building and Snow Building. Find them by looking and pressing Interact.

@@ -1,12 +1,11 @@
 {
- "note": "Scripture excerpts verified against churchofjesuschrist.org (2026-11-13). Each 'note' is AUTHORED DIALOGUE for the fictional Bednar game character — never a real quote.",
+ "note": "Scripture excerpts verified against churchofjesuschrist.org (2026-11-13; Isaiah 2:3 added 2026-11-14). Each 'note' is AUTHORED DIALOGUE for the fictional Bednar game character — never a real quote.",
  "noteLabel": "A note from President Bednar (game character)",
  "cards": [
   {
    "letter": "B",
    "destination": "David O. McKay Library",
    "anchor": "letter.B",
-   "art": "books",
    "scripture": {
     "text": "…seek ye out of the best books words of wisdom…",
     "ref": "Doctrine and Covenants 88:118"
@@ -21,8 +20,10 @@
    "letter": "Y",
    "destination": "Rexburg Idaho Temple",
    "anchor": "letter.Y",
-   "art": "temple",
-   "scripture": null,
+   "scripture": {
+    "text": "Come ye, and let us go up to the mountain of the Lord, to the house of the God of Jacob…",
+    "ref": "Isaiah 2:3"
+   },
    "note": "Look toward the house on the hill, where thoughts turn heavenward. Near its approach, two lines become one if you stand in the right place.",
    "hints": {
     "broad": "On the lawn north of the temple, beside the approach.",
@@ -33,7 +34,6 @@
    "letter": "U",
    "destination": "Hart Building / athletics area",
    "anchor": "letter.U",
-   "art": "track",
    "scripture": {
     "text": "…be one; and if ye are not one ye are not mine.",
     "ref": "Doctrine and Covenants 38:27"
@@ -48,7 +48,6 @@
    "letter": "I",
    "destination": "Eliza R. Snow Performing Arts Center",
    "anchor": "letter.I",
-   "art": "note",
    "scripture": {
     "text": "For my soul delighteth in the song of the heart…",
     "ref": "Doctrine and Covenants 25:12"

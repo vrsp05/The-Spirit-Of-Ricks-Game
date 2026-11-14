@@ -38,7 +38,7 @@ export function createLetters(): QuestModule {
 
   const updateObjective = () => {
     const f = found().length, p = placed().length;
-    if (f < 4) ctx.ui.setObjective(`Find the hidden letters (${f}/4 found${p ? `, ${p} placed` : ''}) — open your Journal (J) for clues`, f > p ? ctx.config.signAnchor : null);
+    if (f < 4) ctx.ui.setObjective(`Find the hidden letters (${f}/4 found${p ? `, ${p} placed` : ''}) — using the clues in your Journal (J), find the building where each letter is hidden`, f > p ? ctx.config.signAnchor : null);
     else if (p < 4) ctx.ui.setObjective(`Place the letters on the sign by the roundabout (${p}/4)`, ctx.config.signAnchor);
     ctx.reportColorProgress(p / 4);
   };

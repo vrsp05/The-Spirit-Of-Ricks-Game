@@ -212,6 +212,7 @@ button.primary { background: #2f5f8f !important; color: #fff; border-color: #1f3
 .card .emblem { font: 700 46px Georgia, serif; color: #6b1f2a; text-align: center; line-height: 1; border-bottom: 2px solid #1f3a5f; padding-bottom: 4px; }
 .card .emblem.small { font-size: 26px; }
 .card-art svg { display: block; margin: 0 auto; width: 90px; height: 56px; fill: none; stroke: #1f3a5f; stroke-width: 2; }
+.journal-goal { font: 700 20px Georgia, serif; color: #ffe39a; margin: 4px 0 2px; }
 .card .dest { font: 700 13px system-ui; color: #1f3a5f; text-align: center; }
 .card blockquote { margin: 4px 0; font-style: italic; } .card blockquote p { margin: 0; } .card cite { display: block; font-size: 12px; color: #6b1f2a; font-style: normal; margin-top: 2px; }
 .card .no-scripture { font-size: 12px; color: #7a6a5a; font-style: italic; }

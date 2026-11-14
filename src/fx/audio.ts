@@ -95,7 +95,7 @@ export function playSound(name: SoundName) {
 /** Continuous engine hum for the vehicle you drive (pitch follows speed). */
 export class EngineSound {
   private o: OscillatorNode | null = null; private o2: OscillatorNode | null = null; private g: GainNode | null = null; private f: BiquadFilterNode | null = null;
-  update(on: boolean, speed: number, kind: 'car' | 'cart') {
+  update(on: boolean, speed: number, kind: 'car' | 'cart' | 'scooter') {
     const a = on ? ac() : null;
     if (!a) { this.stop(); return; }
     if (!this.o) {
@@ -103,11 +103,11 @@ export class EngineSound {
       this.o.type = 'sawtooth'; this.o2.type = 'square'; this.f.type = 'lowpass'; this.f.frequency.value = 420; this.g.gain.value = 0;
       this.o.connect(this.f); this.o2.connect(this.f); this.f.connect(this.g).connect(out(a)); this.o.start(); this.o2.start();
     }
-    const s = Math.min(1, Math.abs(speed) / 20), base = kind === 'cart' ? 70 : 42;
+    const s = Math.min(1, Math.abs(speed) / (kind === 'scooter' ? 8.5 : 20)), base = kind === 'scooter' ? 210 : kind === 'cart' ? 70 : 42;   // scooter: thin electric whine
     const t = a.currentTime;
     this.o.frequency.setTargetAtTime(base + s * (kind === 'cart' ? 60 : 110), t, 0.15);
     this.o2!.frequency.setTargetAtTime((base + s * 110) * 0.5, t, 0.15);
-    this.g!.gain.setTargetAtTime((kind === 'cart' ? 0.025 : 0.04) * (0.5 + s), t, 0.2);
+    this.g!.gain.setTargetAtTime((kind === 'scooter' ? 0.012 * s : kind === 'cart' ? 0.025 : 0.04) * (0.5 + s), t, 0.2);
   }
   stop() {
     if (!this.o) return;

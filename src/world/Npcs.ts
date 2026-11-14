@@ -1,16 +1,32 @@
-// Ambient NPCs: generic, fictional students/staff who walk campus paths, avoid
-// buildings, stop and face the player nearby, and say a short line on interact.
+// Ambient NPCs: generic, fictional students/staff with somewhere to be. Each one picks a
+// building entrance, walks there along the campus path network (A* on the NavGraph), goes
+// inside for a while, then comes out and heads somewhere else. Some walk together in small
+// groups. They stop and face the player nearby and say a short line on interact.
 // Not real people. Lines live in GAME_CONFIG.npcs (editable, era-aware).
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/game.config';
 import { Avatar, type AvatarLook, type HairStyle } from '../player/Avatar';
 import type { EraId } from './eras';
-import { CAMPUS, everOccupied, onVehicleRoad, PATH_KINDS, pointInPoly, terrainHeight, type Vec2 } from './campusData';
+import { CAMPUS, everOccupied, PATH_KINDS, pointInPoly, terrainHeight, type Vec2 } from './campusData';
+import { NavGraph } from './navGraph';
 
 interface Walker {
-  avatar: Avatar; route: Vec2[]; seg: number; t: number; dir: 1 | -1; speed: number;
+  avatar: Avatar; route: Vec2[]; speed: number;
   pause: number; x: number; z: number; yaw: number; talking: number;
   name: string; heard: number; gather: { x: number; z: number; until: number } | null; seed: number;
+  /** current route (points), index of the next point, where they're heading */
+  path: Vec2[]; pi: number; dest: Vec2 | null;
+  inside: number;                 // > 0: inside a building for this many seconds (hidden)
+  leader: Walker | null; side: number;   // group members walk beside their leader
+}
+
+/** On campus (where the game is played) — people spawn here so the campus feels busy. */
+export const onCampus = (x: number, z: number) => CAMPUS.campus.some(c => pointInPoly(x, z, c));
+/** Shared path network for everyone who walks or rides on campus paths. */
+let PATHS: NavGraph | null = null;
+export function pathGraph(): NavGraph {
+  PATHS ??= new NavGraph(CAMPUS.roads.filter(r => PATH_KINDS.has(r.kind) && r.pts.length > 1).map(r => r.pts), (x, z) => !everOccupied(x, z, 0));
+  return PATHS;
 }
 
 const HAIR = ['#2a1d14', '#4a3324', '#7a4b2a', '#c9a35a', '#1a1a1a', '#8b5a2b'];
@@ -51,36 +67,48 @@ export class NpcCrowd {
   readonly walkers: Walker[] = [];
   private rnd: () => number;
 
-  constructor(scene: THREE.Scene, count = GAME_CONFIG.npcs.count) {
+  private graph = pathGraph();
+  private shown = true;
+
+  /** doors(): entrances of buildings standing in the current era (where people can go). */
+  constructor(scene: THREE.Scene, count = GAME_CONFIG.npcs.count, private doors: () => Vec2[] = () => []) {
     let s = 777; this.rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    const routes = CAMPUS.roads
-      .filter(r => PATH_KINDS.has(r.kind) && r.pts.length > 1)
-      .map(r => r.pts.filter(([x, z]) => !everOccupied(x, z) && !onVehicleRoad(x, z)))
-      .filter(pts => pts.length > 1 && CAMPUS.campus.some(c => pointInPoly(pts[0][0], pts[0][1], c)))
-      .filter(pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L > 18; });
-    const pick = <T,>(a: T[]) => a[(this.rnd() * a.length) | 0];
-    for (let i = 0; i < count && routes.length; i++) {
-      const route = pick(routes);
+    for (let i = 0; i < count && this.graph.size; i++) {
       const seed = i + 1;
       const avatar = new Avatar(eraLook('ricks1999', seed), 0.92 + this.rnd() * 0.12);
-      const w: Walker = { avatar, route, seg: (this.rnd() * (route.length - 1)) | 0, t: this.rnd(), dir: this.rnd() < 0.5 ? 1 : -1,
-        speed: 1.2 + this.rnd() * 0.7, pause: 0, x: 0, z: 0, yaw: 0, talking: 0, name: NAMES[i % NAMES.length], heard: 0, gather: null, seed };
-      this.place(w);
+      const n = this.graph.pts[this.graph.random(this.rnd, onCampus)];
+      // about a third walk with a friend (groups of 2–3)
+      const prev = this.walkers[this.walkers.length - 1];
+      const joins = !!prev && !prev.leader && this.rnd() < 0.35, leader = joins ? prev : null;
+      const w: Walker = { avatar, route: [], speed: 1.15 + this.rnd() * 0.6, pause: this.rnd() * 3, x: leader ? leader.x + 1 : n[0], z: leader ? leader.z : n[1], yaw: 0, talking: 0,
+        name: NAMES[i % NAMES.length], heard: 0, gather: null, seed, path: [], pi: 0, dest: null, inside: 0, leader, side: leader ? (this.walkers.filter(x => x.leader === leader).length % 2 ? -1 : 1) : 0 };
       scene.add(avatar.root);
       this.walkers.push(w);
     }
   }
 
-  private place(w: Walker) {
-    const a = w.route[w.seg], b = w.route[w.seg + 1];
-    w.x = a[0] + (b[0] - a[0]) * w.t; w.z = a[1] + (b[1] - a[1]) * w.t;
+  /** Pick a building entrance and route there along the paths. */
+  private plan(w: Walker) {
+    const doors = this.doors();
+    for (let k = 0; k < 6; k++) {
+      const dest: Vec2 = doors.length ? doors[(this.rnd() * doors.length) | 0] : this.graph.pts[this.graph.random(this.rnd)];
+      if (Math.hypot(dest[0] - w.x, dest[1] - w.z) < 25) continue;                 // somewhere worth walking to
+      const r = this.graph.route(this.graph.nearest(w.x, w.z), this.graph.nearest(dest[0], dest[1]));
+      if (r && r.length > 1) { w.path = [...r, dest]; w.pi = 0; w.dest = dest; w.route = w.path; return; }
+    }
+    w.pause = 2;                                                                    // try again shortly
+  }
+  /** Come back out of a building (at its door, or another one) and pick the next place. */
+  private exitBuilding(w: Walker) {
+    w.inside = 0; const d = w.dest ?? this.graph.pts[this.graph.random(this.rnd)];
+    w.x = d[0]; w.z = d[1]; w.dest = null; w.path = []; this.plan(w);
   }
 
   /** Re-dress everyone for the era (winter coats in 2011, flannel in 1999, …). */
   private lookKey = '';
   setEra(era: EraId, season: 'spring' | 'summer' | 'autumn' | 'winter' = 'autumn') { const k = era + season; if (k === this.lookKey) return; this.lookKey = k; for (const w of this.walkers) w.avatar.rebuild(eraLook(era, w.seed, season)); }
 
-  setVisible(v: boolean) { for (const w of this.walkers) w.avatar.root.visible = v; }
+  setVisible(v: boolean) { this.shown = v; for (const w of this.walkers) w.avatar.root.visible = v && w.inside <= 0; }
 
   /** blocked(x,z,r) = current-era building/prop collision. */
   private time = 0;
@@ -107,30 +135,49 @@ export class NpcCrowd {
         continue;
       }
       if (w.gather) { w.gather = null; w.avatar.sit(false); }
+      // inside a building (hidden) — group members stay with their leader
+      const inside = w.leader ? w.leader.inside : w.inside;
+      if (inside > 0) {
+        if (!w.leader) { w.inside -= dt; if (w.inside <= 0) this.exitBuilding(w); }
+        w.avatar.root.visible = false;
+        if (w.leader) { w.x = w.leader.x + w.side; w.z = w.leader.z; }
+        continue;
+      }
+      w.avatar.root.visible = this.shown;
       const dp = Math.hypot(player.x - w.x, player.z - w.z);
+      let moveSpeed = 0;
       if (w.talking > 0 || dp < 2.4) {
         // stop and face the player
         w.talking = Math.max(0, w.talking - dt);
         const want = Math.atan2(player.x - w.x, player.z - w.z);
         let d = want - w.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); w.yaw += d * Math.min(1, dt * 6);
-        w.avatar.animate(dt, 0);
+      } else if (w.leader) {
+        // walk beside the leader (a little behind), matching their pace
+        const L = w.leader, fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
+        const tx = L.x + fz * 0.85 * w.side - fx * 0.35, tz = L.z - fx * 0.85 * w.side - fz * 0.35;
+        const dx = tx - w.x, dz = tz - w.z, d = Math.hypot(dx, dz);
+        if (d > 0.08) { const step = Math.min(d, (L.speed * 1.35 + d) * dt); w.x += dx / d * step; w.z += dz / d * step; moveSpeed = step / Math.max(dt, 1e-3); }
+        const want = d > 0.3 ? Math.atan2(dx, dz) : L.yaw; let dy = want - w.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); w.yaw += dy * Math.min(1, dt * 6);
       } else if (w.pause > 0) {
-        w.pause -= dt; w.avatar.animate(dt, 0);
+        w.pause -= dt;
       } else {
-        const a = w.route[w.seg], b = w.route[w.seg + 1];
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 0.01;
-        w.t += (w.dir * w.speed * dt) / L;
-        if (w.t > 1 || w.t < 0) {
-          w.seg += w.dir; w.t = w.dir > 0 ? 0 : 1;
-          if (w.seg < 0 || w.seg >= w.route.length - 1) { w.dir = (w.dir * -1) as 1 | -1; w.seg = Math.max(0, Math.min(w.route.length - 2, w.seg)); w.t = w.dir > 0 ? 0 : 1; if (this.rnd() < 0.5) w.pause = 1 + this.rnd() * 3; }
+        if (!w.path.length) this.plan(w);
+        const target = w.path[w.pi];
+        if (target) {
+          const dx = target[0] - w.x, dz = target[1] - w.z, d = Math.hypot(dx, dz);
+          const fx = Math.sin(w.yaw), fz = Math.cos(w.yaw), pAhead = (player.x - w.x) * fx + (player.z - w.z) * fz;
+          if (pAhead > 0 && pAhead < 1.6 && dp < 1.8) { /* someone in the way: wait */ }
+          else if (d < 0.5) {
+            w.pi++;
+            if (w.pi >= w.path.length) { w.path = []; w.inside = 12 + this.rnd() * 40; w.avatar.root.visible = false; continue; }   // reached the door: go in
+          } else {
+            const step = Math.min(d, w.speed * dt); w.x += dx / d * step; w.z += dz / d * step; moveSpeed = w.speed;
+            const want = Math.atan2(dx, dz); let dy = want - w.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); w.yaw += dy * Math.min(1, dt * 7);
+          }
         }
-        const ox = w.x, oz = w.z; this.place(w);
-        if (blocked(w.x, w.z, 0.35)) { w.x = ox; w.z = oz; w.dir = (w.dir * -1) as 1 | -1; w.pause = 0.5; } // a building/prop in the way: turn around
-        const dx = w.x - ox, dz = w.z - oz;
-        if (Math.abs(dx) + Math.abs(dz) > 1e-4) { const want = Math.atan2(dx, dz); let d = want - w.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); w.yaw += d * Math.min(1, dt * 8); }
-        w.avatar.animate(dt, w.speed);
-        if (this.rnd() < dt * 0.04) w.pause = 1 + this.rnd() * 2.5; // occasional stop
+        if (this.rnd() < dt * 0.02) w.pause = 1 + this.rnd() * 2;                    // the odd stop to check a phone
       }
+      w.avatar.animate(dt, moveSpeed);
       w.avatar.root.position.set(w.x, terrainHeight(w.x, w.z), w.z);
       w.avatar.root.rotation.y = w.yaw;
     }
@@ -141,7 +188,7 @@ export class NpcCrowd {
 
   nearest(x: number, z: number, maxD: number): Walker | null {
     let best: Walker | null = null, bd = maxD;
-    for (const w of this.walkers) { const d = Math.hypot(w.x - x, w.z - z); if (d < bd) { bd = d; best = w; } }
+    for (const w of this.walkers) { if (!w.avatar.root.visible) continue; const d = Math.hypot(w.x - x, w.z - z); if (d < bd) { bd = d; best = w; } }
     return best;
   }
 }

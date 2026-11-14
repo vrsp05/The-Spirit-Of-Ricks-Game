@@ -153,7 +153,7 @@ export const GAME_CONFIG = {
   // Ambient walking NPCs (fictional students; no real people). Flavour lines are editable.
   // Pools by era id; nothing before the finale may mention BYU–Idaho. Lines never repeat until a pool is used up.
   npcs: {
-    count: 18,
+    count: 40,
     title: 'Student',
     lines: {
       ricks1999: [

@@ -90,6 +90,7 @@ export class PlayerController {
     this.avatar.root.rotation.y = this.yaw;
     this.avatar.root.visible = !cart.hideRider;
     if (cart.pose === 'bike') this.avatar.pedal(cart.speed);
+    else if (cart.pose === 'stand') this.avatar.scoot(cart.speed);
   }
 
   private move(dx: number, dz: number, r: number) {

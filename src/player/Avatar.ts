@@ -194,6 +194,13 @@ export class Avatar {
     this.armL.rotation.x = this.armR.rotation.x = -1.0; this.foreL.rotation.x = this.foreR.rotation.x = -0.3;
     this.body.rotation.x = 0.25;
   }
+  /** Standing on a scooter: legs straight (one slightly back), hands on the bar, leaning into speed. */
+  scoot(speed: number) {
+    this.seated = true;
+    this.legL.rotation.x = 0.08; this.legR.rotation.x = -0.25; this.shinL.rotation.x = 0.05; this.shinR.rotation.x = 0.25;
+    this.armL.rotation.x = this.armR.rotation.x = -1.15; this.foreL.rotation.x = this.foreR.rotation.x = -0.2;
+    this.hips.position.y = 0; this.body.rotation.x = Math.min(0.12, Math.abs(speed) * 0.012); this.torso.rotation.y = 0;
+  }
   wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; this.foreR.rotation.x = -0.4 + Math.sin(t * 8) * 0.3; }
 
   /** Deterministic poses for the opening, without replacing gameplay animation. */

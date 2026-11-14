@@ -1029,10 +1029,17 @@ export class World {
 
   /** Every entrance (decorative + enterable) in any era — a clear zone is kept in front of each. */
   doorZones: { x: number; z: number }[] = [];
+  private doorInfo: { x: number; z: number; id: string }[] = [];
+  private doorCache: { era: string; pts: [number, number][] } | null = null;
+  /** Entrances of buildings standing in the current era (destinations for NPCs). */
+  activeDoors(): [number, number][] {
+    if (this.doorCache?.era !== this.era) this.doorCache = { era: this.era, pts: this.doorInfo.filter(d => this.buildingStanding(d.id) || this.gateBuilt(d.id)).map(d => [d.x, d.z] as [number, number]) };
+    return this.doorCache.pts;
+  }
   private computeDoorZones() {
     for (const b of BUILDINGS) {
       const poly = registryPoly(b.id); if (!poly) continue;
-      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 });
+      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) { this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 }); this.doorInfo.push({ x: sp.x + sp.nx * 1.2, z: sp.z + sp.nz * 1.2, id: b.id }); }
     }
     for (const i of Object.values(GAME_CONFIG.interiors)) { const d = this.doorPlacement(GAME_CONFIG.locations[i.exteriorDoor]); this.doorZones.push({ x: d.x + d.nx * 2, z: d.z + d.nz * 2 }); }
   }

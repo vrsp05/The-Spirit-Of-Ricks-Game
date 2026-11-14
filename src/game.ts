@@ -192,9 +192,9 @@ export class Game {
     this.setupCoreInteractables();
     this.setupVehicles();
     this.setupBenches();
-    this.npcs = new NpcCrowd(this.renderer.scene);
+    this.npcs = new NpcCrowd(this.renderer.scene, GAME_CONFIG.npcs.count, () => this.world.activeDoors());
     this.npcs.setEra(this.world.era, SETTINGS.season);
-    this.traffic = new Traffic(this.renderer.scene);
+    this.traffic = new Traffic(this.renderer.scene, () => this.world.activeDoors());
     this.traffic.setEra(this.world.era, SETTINGS.season);
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
@@ -333,6 +333,15 @@ export class Game {
       if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 5) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 100)) continue;
       add(new Vehicle(`bike-${bikes++}`, 'bike'), x, z, Math.atan2(bx - ax, bz - az));
     }
+    // electric scooters parked by the paths (rideable)
+    const SC = ['#2fbf71', '#1f2328', '#e8a33d', '#3d6fa8'];
+    let scooters = 0;
+    for (let tries = 0; tries < 3000 && scooters < 10; tries++) {
+      const r = paths[(rnd() * paths.length) | 0], [ax, az] = r.pts[0], [bx, bz] = r.pts[1], L = Math.hypot(bx - ax, bz - az); if (L < 4) continue;
+      const nx = -(bz - az) / L, nz = (bx - ax) / L, x = (ax + bx) / 2 + nx * (r.width / 2 + 0.6), z = (az + bz) / 2 + nz * (r.width / 2 + 0.6);
+      if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 4) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 64)) continue;
+      add(new Vehicle(`scooter-${scooters}`, 'scooter', 'boxy90s', SC[scooters++ % SC.length]), x, z, Math.atan2(bx - ax, bz - az));
+    }
   }
   /** Benches: E to sit; moving or pressing E again stands up. */
   private setupBenches() {
@@ -350,7 +359,7 @@ export class Game {
     this.player.seated = false; this.player.avatar.sit(false);
     this.player.place(this.exteriorSpace, p.x + Math.sin(y) * 1.1, p.z + Math.cos(y) * 1.1, y); this.unstick();
   }
-  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
+  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'scooter' ? 'Ride the electric scooter' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
   private addVehicleInteract(v: Vehicle) {
     this.interactions.add({
       id: `core:${v.id}`, kind: 'generic', at: { x: v.root.position.x, z: v.root.position.z }, radius: v.kind === 'car' ? 3.4 : 2.6,
@@ -364,13 +373,13 @@ export class Game {
     if (cart.pose === 'sit') this.player.avatar.sit(true);
     this.interactions.remove(`core:${id}`);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = cart.kind === 'car' ? 15 : 12;
-    playSound(cart.kind === 'bike' ? 'bell' : 'carDoor'); if (cart.kind !== 'bike') setTimeout(() => playSound('engineStart'), 250);
-    this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : 'W/S drive · A/D steer · E to get out');
+    playSound(cart.kind === 'bike' ? 'bell' : cart.kind === 'scooter' ? 'tick' : 'carDoor'); if (cart.kind === 'car' || cart.kind === 'cart') setTimeout(() => playSound('engineStart'), 250);
+    this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : cart.kind === 'scooter' ? 'W/S go/brake · A/D steer · E to step off' : 'W/S drive · A/D steer · E to get out');
   }
   exitCart() {
     const cart = this.player.vehicle; if (!cart) return;
     this.player.vehicle = null; cart.speed = 0; this.player.avatar.sit(false); this.player.avatar.root.visible = true;
-    if (cart.kind !== 'bike') playSound('carDoor');
+    if (cart.kind === 'car' || cart.kind === 'cart') playSound('carDoor');
     // step out to the side
     const side = cart.kind === 'car' ? 2.4 : 1.8;
     const sx = Math.cos(this.player.yaw) * side, sz = -Math.sin(this.player.yaw) * side;
@@ -992,7 +1001,7 @@ export class Game {
     this.music.update(dt, !cinematic);
     this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic });
     const veh = this.player.vehicle;
-    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : 'car');
+    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.updateTraffic(dt);
     // footsteps: one per ~0.8 m walked (shorter when running), surface from where you are
     const P = this.player;
@@ -1075,7 +1084,7 @@ export class Game {
       this.ui.updateHud({
         objective: obj.text, era: ERAS[this.world.era].label,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
-        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, target: this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],

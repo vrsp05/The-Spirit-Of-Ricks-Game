@@ -27,11 +27,18 @@ export const GAME_CONFIG = {
     'door.stc.main':         { x: -140, z: 236, building: 'stc', label: 'Science and Technology Center, north entrance' },
     // President Bednar's office inside the Kimball Building (executive offices, HOB p.26). Room-local.
     'npc.bednar.office':     { x: 0, z: -7, space: 'kimball-office', yaw: 0, label: 'President’s office, Kimball Building' },
-    // Quest 1 candidates wait at the entrances of their department buildings (configurable).
+    // Quest 1: candidates wait in Personnel Services (the Kimball hall for now; room-local),
+    // then the assistant walks each one to a teaching-demo door beside their department building.
+    'q1.lobby.math':         { x: -1.9, z: 2.5, space: 'kimball-office', yaw: Math.PI / 2, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.engineering':  { x: 1.9, z: 2.5, space: 'kimball-office', yaw: -Math.PI / 2, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.art':          { x: -1.9, z: 5.5, space: 'kimball-office', yaw: Math.PI / 2, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.english':      { x: 1.9, z: 5.5, space: 'kimball-office', yaw: -Math.PI / 2, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.board':        { x: 0, z: 0.2, space: 'kimball-office', label: 'Personnel Services hiring board' },
     'candidate.math':        { x: -12, z: -318, building: 'romney', offset: 3.5, label: 'Romney Building' },
     'candidate.engineering': { x: -82, z: 108, building: 'austin', offset: 3.5, label: 'Austin Building' },
     'candidate.art':         { x: 44, z: -395, building: 'spori-original', offset: 3.5, label: 'Spori Building' },
-    'candidate.english':     { x: -20, z: -405, building: 'snow', offset: 3.5, label: 'Snow Building' },
+    // English department was in the Joseph Fielding Smith Building (Campus Building Histories).
+    'candidate.english':     { x: 94, z: -238, building: 'smith', offset: 3.5, label: 'Smith Building' },
     // Quest 2 blueprint sites (Taylor stays standing: its puzzle is a retrospective; the I-Center site is a future plan).
     'construction.taylor':   { x: 40, z: -60, building: 'taylor', offset: 5, label: 'John Taylor Building' },
     'construction.icenter':  { x: -60, z: -158, building: 'icenter', offset: 5, label: 'Campus Center construction site' },
@@ -95,10 +102,11 @@ export const GAME_CONFIG = {
   quests: {
     professors: {
       candidates: [
-        { id: 'math', label: 'Math candidate', anchor: 'candidate.math', building: 'Romney Building', challenge: 'math' },
-        { id: 'engineering', label: 'Engineering candidate', anchor: 'candidate.engineering', building: 'Austin Building', challenge: 'circuit' },
-        { id: 'art', label: 'Art candidate', anchor: 'candidate.art', building: 'Spori Building', challenge: 'art' },
-        { id: 'english', label: 'English candidate', anchor: 'candidate.english', building: 'Snow Building', challenge: 'english' },
+        { id: 'math', label: 'Math candidate', anchor: 'candidate.math', lobby: 'q1.lobby.math', building: 'Romney Building', challenge: 'math', shirt: '#6d4b8d' },
+        { id: 'english', label: 'English candidate', anchor: 'candidate.english', lobby: 'q1.lobby.english', building: 'Smith Building', challenge: 'english', shirt: '#8d3b4b' },
+        { id: 'art', label: 'Art candidate', anchor: 'candidate.art', lobby: 'q1.lobby.art', building: 'Spori Building', challenge: 'art', shirt: '#3b6d8d' },
+        // Engineering repairs the projector that breaks in the art demo, so art comes first.
+        { id: 'engineering', label: 'Engineering candidate', anchor: 'candidate.engineering', lobby: 'q1.lobby.engineering', building: 'Austin Building', challenge: 'circuit', shirt: '#4b6d3b', requires: 'art' },
       ],
       allowSkipChallenge: true,
     },

@@ -4,9 +4,9 @@ Items marked **open** still need a team decision; until then the game uses a cle
 
 | # | Decision | Status | Config key / file | Input needed |
 |---|---|---|---|---|
-| 1 | Quest 1 content (questions, art reference, circuits, passage) | implemented from the quest prompt; needs team review | `src/quests/q1/data/*.json` | Approve wording and thresholds after playtest |
-| 2 | Candidate locations | decided: math → Romney, engineering → Austin, art → original Spori, English → Snow | `candidate.*` in `GAME_CONFIG.locations` | — |
-| 3 | English passage | decided: a labelled fictional paraphrase; facts verified against the official announcement page | `q1/data/english.json` | — |
+| 1 | Quest 1 content (questions, art reference, circuits, passage) | implemented from the refined prompt (`docs/quests/q1/`): Personnel Services lobby in the Kimball hall, escort, classroom-framed teaching demos, binary math, Art → Engineering projector thread; needs team review | `src/quests/q1/data/*.json` | Approve wording and thresholds after playtest; ask the world team for a lobby alcove |
+| 2 | Candidate locations | decided: candidates wait in Personnel Services (`q1.lobby.*`, Kimball hall); demo doors at math → Romney, engineering → Austin, art → original Spori, English → **Smith** (the English department's building; Snow was performing arts) | `q1.lobby.*`, `candidate.*` in `GAME_CONFIG.locations` | — |
+| 3 | English passage | decided: a labelled fictional student summary of the Kimball Building dedication (Sept 7, 1999); facts verified against the Church News, Sept 11, 1999. Replaces the June 2000 announcement, which postdates Q1 and names BYU–Idaho (decision 22) | `q1/data/english.json` | — |
 | 4 | Quest 2 buildings | **decided (team, overrides the quest prompt)**: Taylor Building and I-Center. Both are fenced construction sites until their blueprint is solved, then appear permanently in any era | `world.gatedBuildings`, `quests.construction.buildings` | — |
 | 5 | Story framing of building Taylor (opened 1997) and the I-Center (dedicated 2010) in 2001 | open: currently symbolic montage text with the real dates | `q2/data/dialogue.json` | Story owner |
 | 6 | Tiling puzzles | implemented (Easy 5+1 / 6+2, Hard 7+2 / 9+3), generated and validated | `q2/data/tiling.json`, `npm run gen:tiling` | Tune after playtest |

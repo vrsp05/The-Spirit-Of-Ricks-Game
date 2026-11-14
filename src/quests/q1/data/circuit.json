@@ -1,42 +1,139 @@
 {
- "note": "Light a fictional FUTURE temple concept (a plan in 1999 — no temple exists yet). Rotate the wire tiles. Bulbs have resistance 1, the battery is 1 unit: current ≥ 0.75 = bright, ≥ 0.2 = dim, otherwise off. Rows list tiles in their SOLVED orientation; the game scrambles them.",
+ "note": "Repair the Spori art studio's overhead projector (it broke during the art demo). Rotate the wire tiles. Lamp, fan and power light are identical loads (resistance 1); the supply is 1 unit: current ≥ 0.75 = bright/full, ≥ 0.2 = dim/slow, otherwise off. Rows list tiles in their SOLVED orientation; the game scrambles them.",
  "legend": "Tiles: '.' empty; wire tiles list their open sides (N E S W), e.g. 'WE', 'ES', 'WES'; 'B+N' battery with + on that side and − opposite; 'U:NS:id' bulb; 'S:WE:id' switch. Battery, bulbs and switches are fixed.",
  "levels": [
   {
-   "id": "one-bulb", "title": "Light the lantern", "goal": "Make the lantern glow brightly.",
-   "rows": ["ES WE WE WS", "B+N NE WE U:NS:L", "NE WE WE WN"],
-   "labels": { "L": "Lantern" },
-   "expect": [{ "switches": {}, "bulbs": { "L": "bright" } }],
-   "hint": "Make a loop: from + (top of the battery) around to the lantern and back to −."
-  },
-  {
-   "id": "two-parallel", "title": "Two equal window lights", "goal": "Both window bulbs must be equally BRIGHT.",
-   "rows": ["ES WE WES WE WS", "B+N NS U:NS:A NE U:NS:B", "NE WE WEN WE WN"],
-   "labels": { "A": "Window A", "B": "Window B" },
-   "expect": [{ "switches": {}, "bulbs": { "A": "bright", "B": "bright" } }],
-   "hint": "Use the T-tiles so each bulb gets its own path to both ends of the battery (parallel)."
-  },
-  {
-   "id": "switch-one", "title": "A switch for the door light", "goal": "Window A always bright; the switch turns the Door light on and off.",
-   "rows": ["ES WE WES S:WE:SW WS", "B+N NE U:NS:A WE U:NS:D", "NE WE WEN WE WN"],
-   "labels": { "A": "Window A", "D": "Door light", "SW": "Switch" },
-   "expect": [
-    { "switches": { "SW": false }, "bulbs": { "A": "bright", "D": "off" } },
-    { "switches": { "SW": true }, "bulbs": { "A": "bright", "D": "bright" } }
+   "id": "one-bulb",
+   "title": "Get the lamp to light",
+   "goal": "Make the projector lamp glow brightly.",
+   "rows": [
+    "ES WE WE WS",
+    "B+N NE WE U:NS:L",
+    "NE WE WE WN"
    ],
-   "hint": "The switch should sit only on the Door light's branch. Flip it (right stick ↑) to test both ways."
+   "labels": {
+    "L": "Lamp"
+   },
+   "expect": [
+    {
+     "switches": {},
+     "bulbs": {
+      "L": "bright"
+     }
+    }
+   ],
+   "hint": "Make a loop: from + (top of the plug) around through the lamp and back to −."
   },
   {
-   "id": "spire", "title": "Dim spire, bright window", "goal": "Both spire bulbs glow DIM; the window bulb is BRIGHT.",
+   "id": "two-parallel",
+   "title": "Lamp and fan at full",
+   "goal": "The lamp and the cooling fan must BOTH run at full power.",
+   "rows": [
+    "ES WE WES WE WS",
+    "B+N NS U:NS:A NE U:NS:B",
+    "NE WE WEN WE WN"
+   ],
+   "labels": {
+    "A": "Lamp",
+    "B": "Fan"
+   },
+   "expect": [
+    {
+     "switches": {},
+     "bulbs": {
+      "A": "bright",
+      "B": "bright"
+     }
+    }
+   ],
+   "hint": "Give the lamp and the fan each their own path to both ends of the plug (parallel). In one chain they'd both run weak."
+  },
+  {
+   "id": "switch-one",
+   "title": "A switch for the fan",
+   "goal": "The lamp stays bright; the switch turns the cooling fan on and off.",
+   "rows": [
+    "ES WE WES S:WE:SW WS",
+    "B+N NE U:NS:A WE U:NS:D",
+    "NE WE WEN WE WN"
+   ],
+   "labels": {
+    "A": "Lamp",
+    "D": "Fan",
+    "SW": "Fan switch"
+   },
+   "expect": [
+    {
+     "switches": {
+      "SW": false
+     },
+     "bulbs": {
+      "A": "bright",
+      "D": "off"
+     }
+    },
+    {
+     "switches": {
+      "SW": true
+     },
+     "bulbs": {
+      "A": "bright",
+      "D": "bright"
+     }
+    }
+   ],
+   "hint": "Put the switch only on the fan's branch. Flip it (right stick ↑) to test both ways."
+  },
+  {
+   "id": "spire",
+   "title": "Dim power light, bright lamp",
+   "goal": "The power light and the fan's low setting share one path and run DIM; the lamp stays BRIGHT.",
    "hardOnly": true,
-   "rows": ["NE WE . ES WS", "ES WE WES WN U:NS:S1", "B+N NS U:NS:W ES U:NS:S2", "NE WE WEN WE WN"],
-   "labels": { "W": "Window", "S1": "Spire top", "S2": "Spire base" },
-   "expect": [{ "switches": {}, "bulbs": { "W": "bright", "S1": "dim", "S2": "dim" } }],
-   "hint": "Two bulbs in one chain (series) share the battery and glow dim. Route the spire as one chain up and over."
+   "rows": [
+    "NE WE . ES WS",
+    "ES WE WES WN U:NS:S1",
+    "B+N NS U:NS:W ES U:NS:S2",
+    "NE WE WEN WE WN"
+   ],
+   "labels": {
+    "W": "Lamp",
+    "S1": "Power light",
+    "S2": "Fan (low)"
+   },
+   "expect": [
+    {
+     "switches": {},
+     "bulbs": {
+      "W": "bright",
+      "S1": "dim",
+      "S2": "dim"
+     }
+    }
+   ],
+   "hint": "Two loads in one chain (series) share the supply and run dim. Route them as one chain up and over."
   }
  ],
  "modes": {
-  "easy": { "levels": ["one-bulb", "two-parallel", "switch-one"], "hints": 4, "hintStyle": "visual", "scramble": 0.6 },
-  "hard": { "levels": ["one-bulb", "two-parallel", "switch-one", "spire"], "hints": 2, "hintStyle": "text", "scramble": 1 }
+  "easy": {
+   "levels": [
+    "one-bulb",
+    "two-parallel",
+    "switch-one"
+   ],
+   "hints": 4,
+   "hintStyle": "visual",
+   "scramble": 0.6
+  },
+  "hard": {
+   "levels": [
+    "one-bulb",
+    "two-parallel",
+    "switch-one",
+    "spire"
+   ],
+   "hints": 2,
+   "hintStyle": "text",
+   "scramble": 1
+  }
  }
 }

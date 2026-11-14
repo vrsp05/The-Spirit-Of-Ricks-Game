@@ -1,39 +1,74 @@
 import { describe, expect, it } from 'vitest';
-import { MATH, coin, fewestCoins, makeRound, units } from '../src/quests/q1/math';
+import { MATH, bits, coin, comboValue, fewestCoins, parseCombo, questionsFor } from '../src/quests/q1/math';
+import { ART as ART_DATA, guessIndex } from '../src/quests/q1/art';
+import { CLASSROOM } from '../src/quests/q1/classroom';
+import { GAME_CONFIG } from '../src/config/game.config';
 import { ART, floodFill, refGrid, scoreDrawing, type Grid } from '../src/quests/q1/art';
 import { CIRCUIT, parseLevel, scramble, simulate, sides, stepsToSolved, testBoard } from '../src/quests/q1/circuit';
 import { ENGLISH, preparePassage } from '../src/quests/q1/english';
 
 const V = (name: string) => MATH.reference.find(r => r.gold === name || r.silver === name)!.value;
 
-describe('math (Nephite Market, Alma 11)', () => {
+describe('math (Binary, the Nephite way — Alma 11 gold coins)', () => {
   it('reference table matches Alma 11:5–19', () => {
     expect([V('senine'), V('senum'), V('seon'), V('amnor'), V('shum'), V('ezrom'), V('limnah'), V('onti')]).toEqual([1, 1, 2, 2, 4, 4, 7, 7]);
     expect(V('limnah')).toBe(V('senine') + V('seon') + V('shum'));
-    expect([V('shiblon'), V('shiblum'), V('leah'), V('antion')]).toEqual([0.5, 0.25, 0.125, 1.5]);
   });
-  it('tray coin values come from the reference card', () => {
+  it('coin values come from the reference card; the tray is gold only', () => {
     for (const c of MATH.coins) expect(c.value, c.id).toBe(V(c.id));
+    expect(MATH.tray).toEqual(['senine', 'seon', 'shum', 'limnah']);
+    expect(MATH.tray.every(id => coin(id).metal === 'gold')).toBe(true);
   });
-  it('every order is payable with its tray, and change orders add up', () => {
-    for (const o of MATH.orders) {
-      expect(fewestCoins(o.target, o.coins), o.id).not.toBeNull();
-      if (o.paidWith) expect(units(coin(o.paidWith).value) - units(o.price!), o.id).toBe(units(o.target));
-      for (const id of o.coins) expect(coin(id), id).toBeTruthy();
+  it('every pay answer is the fewest-coin combination and adds up', () => {
+    for (const q of MATH.questions.filter(q => q.kind === 'pay')) {
+      const ids = parseCombo(q.correct);
+      expect(comboValue(ids), q.id).toBe(q.target);
+      expect(ids.length, q.id).toBe(fewestCoins(q.target!, MATH.tray)!.length);
+      expect(q.options, q.id).toContain(q.correct); expect(new Set(q.options).size).toBe(q.options.length);
     }
   });
-  it('fewest-coin DP finds the optimum', () => {
-    expect(fewestCoins(7, ['senine', 'seon', 'shum', 'limnah'])).toEqual(['limnah']);
-    expect(fewestCoins(3.5, ['senine', 'seon', 'antion'])!.length).toBe(2);
-    expect(fewestCoins(4.125, ['senum', 'amnor', 'ezrom', 'leah'])!.length).toBe(2);
-    expect(fewestCoins(1.25, ['senum', 'shiblon', 'shiblum', 'leah'])!.length).toBe(2);
-    expect(fewestCoins(0.1, ['senum'])).toBeNull();
+  it('binary digits: 5 = 101, 6 = 110, 3 = 011, limnah = 111', () => {
+    expect(bits(['shum', 'senine'])).toEqual([1, 0, 1]);
+    expect(bits(['shum', 'seon'])).toEqual([1, 1, 0]);
+    expect(bits(['seon', 'senine'])).toEqual([0, 1, 1]);
+    expect(bits(['shum', 'seon', 'senine'])).toEqual([1, 1, 1]); expect(comboValue(['shum', 'seon', 'senine'])).toBe(V('limnah'));
   });
-  it('rounds: Easy 5 basic customers (pass 3), Hard 6 with ≥3 advanced (pass 5)', () => {
-    const e = makeRound('easy'); expect(e).toHaveLength(5); expect(e.every(o => o.tier === 'basic')).toBe(true); expect(MATH.modes.easy.pass).toBe(3);
-    const h = makeRound('hard'); expect(h).toHaveLength(6); expect(h.filter(o => o.tier === 'advanced').length).toBeGreaterThanOrEqual(3); expect(MATH.modes.hard.pass).toBe(5);
-    expect(new Set(h.map(o => o.id)).size).toBe(6);
-    expect(MATH.modes.hard.patience).toBeLessThan(MATH.modes.easy.patience);
+  it('Zeezrom finale: six onties = 42 days of a judge’s pay (Alma 11:3, 22)', () => {
+    const z = MATH.questions.find(q => q.id === 'zeezrom')!;
+    expect(Number(z.correct)).toBe(6 * V('onti'));
+    expect(questionsFor('easy').at(-1)!.id).toBe('zeezrom'); expect(questionsFor('hard').at(-1)!.id).toBe('zeezrom');
+  });
+  it('modes: Easy 5 multiple-choice questions (2 misses), Hard adds pay 9 and 13 with the tray (1 miss)', () => {
+    expect(questionsFor('easy')).toHaveLength(5); expect(MATH.modes.easy.tray).toBe(false); expect(MATH.modes.easy.misses).toBe(2);
+    expect(questionsFor('hard').map(q => q.id)).toEqual(expect.arrayContaining(['pay9', 'pay13'])); expect(MATH.modes.hard.tray).toBe(true); expect(MATH.modes.hard.misses).toBe(1);
+  });
+  it('fewest-coin DP finds the optimum', () => {
+    expect(fewestCoins(7, MATH.tray)).toEqual(['limnah']);
+    expect(fewestCoins(13, MATH.tray)!.length).toBe(3);
+    expect(fewestCoins(0.1, ['senine'])).toBeNull();
+  });
+});
+
+describe('quest flow config', () => {
+  const cands = GAME_CONFIG.quests.professors.candidates as { id: string; anchor: string; lobby: string; building: string; requires?: string }[];
+  it('engineering requires art (it repairs the art studio projector)', () => {
+    expect(cands.find(c => c.id === 'engineering')!.requires).toBe('art');
+    expect(cands.filter(c => c.requires).map(c => c.id)).toEqual(['engineering']);
+  });
+  it('every candidate has a Kimball lobby anchor and a demo door anchor', () => {
+    const L = GAME_CONFIG.locations as Record<string, { space?: string; building?: string }>;
+    for (const c of cands) { expect(L[c.lobby]?.space, c.id).toBe('kimball-office'); expect(L[c.anchor]?.building, c.id).toBeTruthy(); }
+  });
+  it('English demonstrates in the Smith Building', () => {
+    const e = cands.find(c => c.id === 'english')!;
+    expect(e.building).toBe('Smith Building'); expect((GAME_CONFIG.locations as Record<string, { building?: string }>)[e.anchor].building).toBe('smith');
+  });
+  it('every candidate has a classroom with a Hard follow-up whose answer is an option', () => {
+    for (const c of cands) { const r = CLASSROOM.rooms[c.id]; expect(r, c.id).toBeTruthy(); expect(r.followUp.options).toContain(r.followUp.correct); }
+  });
+  it('nothing in Q1 data names BYU–Idaho (Fall 1999)', async () => {
+    const fs = await import('node:fs');
+    for (const f of fs.readdirSync('src/quests/q1/data')) expect(fs.readFileSync(`src/quests/q1/data/${f}`, 'utf8'), f).not.toMatch(/BYU|Brigham Young University/);
   });
 });
 
@@ -57,6 +92,11 @@ describe('art scoring', () => {
     expect(g[0][6]).toBe(null); expect(floodFill(g, 0, 0, 'b')).toBe(0);
   });
   it('thresholds are 60% (Easy) and 85% (Hard)', () => { expect(ART.modes.easy.pass).toBe(0.6); expect(ART.modes.hard.pass).toBe(0.85); });
+  it('the bulb burns out only on Hard; class guesses advance with the score', () => {
+    expect(ART_DATA.modes.easy.bulbSeconds).toBeUndefined(); expect(ART_DATA.modes.hard.bulbSeconds).toBe(15);
+    expect(guessIndex(0)).toBe(-1); expect(guessIndex(1)).toBe(ART_DATA.guesses.length - 1);
+    for (let i = 1; i < ART_DATA.guesses.length; i++) expect(ART_DATA.guesses[i].at).toBeGreaterThan(ART_DATA.guesses[i - 1].at);
+  });
 });
 
 describe('circuit (Light the Temple)', () => {
@@ -113,12 +153,12 @@ describe('english answer keys', () => {
       for (const e of p.errors) { expect(e.options).toHaveLength(3); expect(e.options).toContain(e.correct); expect(e.correct).not.toBe(e.word); }
     }
   });
-  it('the corrected passage contains the verified facts', () => {
+  it('the corrected passage contains the verified Kimball dedication facts (Church News 1999)', () => {
     for (const diff of ['easy', 'hard']) {
       const { tokens, errorAt } = preparePassage(diff); for (const [i, e] of errorAt) tokens[i] = e.correct;
       const text = tokens.join(' ');
-      expect(text).toContain('June 21, 2000'); expect(text).toContain('Rexburg, Idaho'); expect(text).toContain('four-year');
-      if (diff === 'hard') expect(text).toContain('Brigham Young University–Idaho');
+      expect(text).toContain('September 7, 1999'); expect(text).toContain('Rexburg, Idaho'); expect(text).toContain('Spencer W. Kimball Building');
+      expect(text).toContain('named for President Kimball'); expect(text).toContain('Gordon B. Hinckley dedicated'); expect(text).toContain('Ricks College');
     }
   });
   it('wrong-stamp allowance: Easy unlimited, Hard 2; Hard press is faster', () => { expect(ENGLISH.modes.easy.wrongAllowance).toBe(-1); expect(ENGLISH.modes.hard.wrongAllowance).toBe(2); expect(ENGLISH.modes.hard.speed).toBeGreaterThan(ENGLISH.modes.easy.speed); });

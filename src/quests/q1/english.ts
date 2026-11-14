@@ -1,10 +1,11 @@
-// 1D. English — "Red Pen Rush": the campus press prints the announcement paraphrase on a
-// moving paper strip. Stamp each planted mistake as it passes the red line, then pick the
-// right correction before the press rolls on. Data: data/english.json (fictional
-// paraphrase, facts checked against the June 21, 2000 announcement).
+// 1D. English — "Editing for accuracy" (Smith Building): Brother Price's summary of the
+// Kimball Building dedication (Sept 7, 1999) scrolls up the overhead projector. Stamp each
+// planted mistake with the red marker as it crosses the lamp line, then pick the right
+// correction. Data: data/english.json (fictional student summary; facts from Church News 1999).
 import data from './data/english.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h, loop } from '../shared/frame';
+import { classroom } from './classroom';
 
 export interface EnglishError { word: string; correct: string; options: string[]; why: string }
 export const ENGLISH = data as unknown as {
@@ -36,15 +37,15 @@ export const englishChallenge: ChallengeBody = (root, api) => {
 
   const strip = h('div', { class: 'rp-strip' });
   const spans = tokens.map(t => h('span', { class: 'rp-tok', text: t }));
-  strip.append(h('span', { class: 'rp-mast', text: '★ THE CAMPUS PRESS ★' }), ...spans, h('span', { class: 'rp-mast', text: '— 30 —' }));
-  const line = h('div', { class: 'rp-line' }, h('span', { text: 'STAMP' }));
+  strip.append(h('span', { class: 'rp-mast', text: '▤ TRANSPARENCY · Brother Price ▤' }), ...spans, h('span', { class: 'rp-mast', text: '— end —' }));
+  const line = h('div', { class: 'rp-line' }, h('span', { text: 'LAMP' }));
   const press = h('div', { class: 'rp-press' }, h('div', { class: 'rp-roller top' }), strip, line, h('div', { class: 'rp-roller bottom' }));
   const choice = h('div', { class: 'rp-choice hidden' });
   const hud = h('div', { class: 'rp-hud' });
   const toast = h('div', { class: 'rp-toast' });
-  const facts = h('div', { class: 'eng-facts rp-facts' }, h('div', { class: 'ref-title', text: 'News desk fact sheet' }), h('ul', {}, ...ENGLISH.facts.map(f => h('li', { text: f }))));
+  const facts = h('div', { class: 'eng-facts rp-facts' }, h('div', { class: 'ref-title', text: 'Fact sheet (Church News, 1999)' }), h('ul', {}, ...ENGLISH.facts.map(f => h('li', { text: f }))));
   root.append(h('div', { class: 'eng-label', text: ENGLISH.label.split(' Facts')[0] }), hud, h('div', { class: 'rp-stage' }, press, choice, toast), facts);
-  api.setControls([['1', 'STAMP / choose'], ['L', 'pick correction'], ['2', 'cancel'], ['R', 'press speed'], ['RU', 'pause press'], ['3', 'hint'], ['4', 'tools']]);
+  api.setControls([['1', 'STAMP / choose'], ['L', 'pick correction'], ['2', 'cancel'], ['R', 'scroll speed'], ['RU', 'pause scrolling'], ['3', 'hint'], ['4', 'tools']]);
 
   let offsets: number[] = [], widths: number[] = [], stripW = 0;
   const measure = () => { offsets = spans.map(s => s.offsetLeft); widths = spans.map(s => s.offsetWidth); stripW = strip.scrollWidth; };
@@ -54,10 +55,10 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     const allow = mode.wrongAllowance >= 0 ? ` / ${mode.wrongAllowance} allowed` : '';
     hud.replaceChildren(h('span', { text: `✎ Fixed ${fixed.size}/${errorAt.size}` }), h('span', { text: `Score ${points}` }),
       h('span', { text: `Wrong stamps ${wrong}${allow}` }), h('span', { text: `Escaped ${escaped}` }),
-      h('span', { class: 'rp-speed', text: `Press speed ×${SPEEDS[speedIdx]}${paused ? ' · PAUSED' : ''}` }));
+      h('span', { class: 'rp-speed', text: `Scroll speed ×${SPEEDS[speedIdx]}${paused ? ' · PAUSED' : ''}` }));
   };
   const penalise = (msg: string) => {
-    wrong++; points = Math.max(0, points - 50); showToast(msg, 'bad'); renderHud();
+    wrong++; points = Math.max(0, points - 50); showToast(msg, 'bad'); renderHud(); classroom()?.react('confused');
     if (mode.wrongAllowance >= 0 && wrong > mode.wrongAllowance) { over = true; stop(); api.finish({ pass: false, quality: 0, summary: `Too many wrong stamps (${wrong}). Check the fact sheet and try again.` }); return true; }
     return false;
   };
@@ -85,12 +86,12 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     if (!choosing) return; const c = choosing, e = errorAt.get(c.i)!, o = c.opts[c.sel];
     if (o === e.correct) {
       fixed.add(c.i); tokens[c.i] = o; spans[c.i].textContent = o; spans[c.i].classList.remove('rp-stamped', 'rp-glow'); spans[c.i].classList.add('rp-fixed');
-      points += Math.round(100 * SPEEDS[speedIdx]); choosing = null; renderChoice(); showToast(`✔ ${e.why}`, 'ok'); measure(); renderHud();
+      points += Math.round(100 * SPEEDS[speedIdx]); choosing = null; renderChoice(); showToast(`✔ ${e.why}`, 'ok'); measure(); renderHud(); classroom()?.react('nod', '…yeah, okay, that’s fair.', 'Brother Price');
       if (fixed.size === errorAt.size) {
         over = true; stop();
         const maxPts = errorAt.size * 100;
         api.finish({ pass: true, quality: Math.max(0, Math.min(1, points / maxPts) * 0.6 + 0.4 - wrong * 0.1 - escaped * 0.05 - api.hintsUsed() * 0.05),
-          summary: `All ${errorAt.size} mistakes fixed! Score ${points} · ${wrong} wrong stamp(s) · ${escaped} escaped · ${passes} pass(es) of the press.` });
+          summary: `All ${errorAt.size} mistakes fixed! Score ${points} · ${wrong} wrong stamp(s) · ${escaped} escaped · ${passes} pass(es) of the projector.` });
       }
     } else {
       c.opts.splice(c.sel, 1); c.sel = 0;

@@ -1,11 +1,17 @@
-// 1B. Art: paint a fictional future-temple concept (data/art.json).
+// 1B. Art — "Drawing what you see" (original Spori art studio): teach the grid method by
+// copying the projected reference. The class guesses as you draw; on Hard the projector
+// bulb burns out once and you draw from memory. Data: data/art.json.
 import * as THREE from 'three';
 import data from './data/art.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
+import { classroom } from './classroom';
 
-export const ART = data as unknown as { note: string; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
-  modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number }> };
+export const ART = data as unknown as { note: string; subject: string; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
+  modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number; bulbAtScore?: number; bulbAtSeconds?: number; bulbSeconds?: number }> };
+
+/** Index of the furthest class guess reached for a live score (−1 = none yet). */
+export const guessIndex = (score: number) => ART.guesses.reduce((k, g, i) => (score >= g.at ? i : k), -1);
 
 export type Grid = (string | null)[][];
 export const refGrid = (): Grid => ART.reference.map(r => [...r].map(c => (c === '.' ? null : c)));
@@ -92,7 +98,7 @@ export const artChallenge: ChallengeBody = (root, api) => {
   for (let y = 0; y < H; y++) { cells.push([]); for (let x = 0; x < W; x++) { const c = h('div', { class: 'cell' }); c.dataset.x = String(x); c.dataset.y = String(y); grid.append(c); cells[y].push(c); } }
   const refEl = h('div', { class: 'art-ref', style: `grid-template-columns: repeat(${ref[0].length}, 1fr)` });
   for (const row of ref) for (const c of row) refEl.append(h('div', { class: 'cell', style: c ? `background:${ART.palette.find(p => p.id === c)!.color}` : '' }));
-  const refBox = h('div', { class: 'art-refbox' }, h('div', { class: 'ref-title', text: 'Reference (future concept)' }), refEl);
+  const refBox = h('div', { class: 'art-refbox' }, h('div', { class: 'ref-title', text: 'Projected reference (future concept)' }), refEl);
   const meter = h('div', { class: 'meter' }, h('div', { class: 'meter-fill' }), h('span', { class: 'meter-text' }));
   const palette = h('div', { class: 'palette' }, ...ART.palette.map((p, i) => { const b = btn(p.name, () => { colorIdx = i; paintUI(); }, 'swatch'); b.style.setProperty('--sw', p.color); return b; }));
   const mirrorBtn = btn('Mirror: off', () => { mirror = !mirror; paintUI(); });
@@ -105,9 +111,24 @@ export const artChallenge: ChallengeBody = (root, api) => {
   palette.querySelectorAll('[data-focus]').forEach(b => b.removeAttribute('data-focus')); // colours: right stick (mouse can click)
   api.setControls([['L', 'move brush'], ['R', 'colour'], ['RU', '↑ mirror · ↓ fill bucket'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'check / tools']]);
 
+  const cls = classroom();
+  let guessAt = -1, oohed = false, bulb: 'on' | 'out' | 'done' = 'on', bulbTimer = 0;
   const set = (x: number, y: number, v: string | null) => {
     canvas[y][x] = v;
-    if (mirror) { const mx = W - 1 - x; canvas[y][mx] = v; }
+    if (mirror) { const mx = W - 1 - x; canvas[y][mx] = v; if (v && !oohed && mx !== x) { oohed = true; cls?.react('ooh', 'Ooh — both sides at once!'); } }
+  };
+  const bulbOut = () => {
+    if (bulb !== 'on' || !mode.bulbSeconds) return; bulb = 'out';
+    refBox.classList.add('q1-dark'); cls?.react('gasp', 'The projector bulb just burned out! I’ll get a new one!');
+    api.setStatus(`The projector is dark — keep drawing from memory (${mode.bulbSeconds} s).`);
+    bulbTimer = window.setTimeout(() => { bulb = 'done'; refBox.classList.remove('q1-dark'); cls?.react('nod', 'Got a new bulb — it’s back!'); }, mode.bulbSeconds * 1000);
+  };
+  const classWatch = () => {
+    const s = scoreDrawing(canvas, ref).score;
+    cls?.engagement(Math.min(1, s / mode.pass));
+    const gi = guessIndex(s);
+    if (gi > guessAt) { guessAt = gi; cls?.react(gi === ART.guesses.length - 1 ? 'ooh' : 'nod', ART.guesses[gi].text); }
+    if (mode.bulbAtScore !== undefined && s >= mode.bulbAtScore) bulbOut();
   };
   let ghost: { ox: number; oy: number } | null = null;
   const paintUI = () => {
@@ -121,7 +142,8 @@ export const artChallenge: ChallengeBody = (root, api) => {
     palette.querySelectorAll('.swatch').forEach((b, i) => b.classList.toggle('active', i === colorIdx));
     mirrorBtn.textContent = `Mirror: ${mirror ? 'on' : 'off'}`; bucketBtn.textContent = `Bucket: ${bucket ? 'on' : 'off'}`;
     if (mode.liveMeter) { const s = scoreDrawing(canvas, ref).score; (meter.firstChild as HTMLElement).style.width = `${Math.round(s * 100)}%`; (meter.lastChild as HTMLElement).textContent = `Match ${Math.round(s * 100)}% (need ${Math.round(mode.pass * 100)}%)`; }
-    api.setStatus(`Colour: ${color().name}${mirror ? ' · mirror on' : ''}${bucket ? ' · bucket on (mouse)' : ''}`);
+    if (bulb !== 'out') api.setStatus(`Colour: ${color().name}${mirror ? ' · mirror on' : ''}${bucket ? ' · bucket on (mouse)' : ''}`);
+    classWatch();
     grid.classList.toggle('active', inCanvas);
   };
   const check = () => {
@@ -167,8 +189,13 @@ export const artChallenge: ChallengeBody = (root, api) => {
   const showRef = (v: boolean) => refEl.classList.toggle('hidden-ref', !v);
   let timer = 0;
   if (!mode.showReference) { showRef(true); api.setStatus('Memorise the reference…'); timer = window.setTimeout(() => showRef(false), (mode.previewSeconds ?? 6) * 1000); }
+  const bulbClock = mode.bulbAtSeconds ? window.setTimeout(bulbOut, mode.bulbAtSeconds * 1000) : 0;
   api.onHint(() => {
     if (hintsLeft <= 0) return null; hintsLeft--;
+    if (bulb === 'out') {
+      refBox.classList.remove('q1-dark'); window.setTimeout(() => { if (bulb === 'out') refBox.classList.add('q1-dark'); }, mode.hintSeconds * 1000);
+      return 'You peek at your lesson notes — the reference shows for a moment.';
+    }
     if (mode.showReference) {
       const b = scoreDrawing(canvas, ref); ghost = b.score > 0 ? { ox: b.ox, oy: b.oy } : { ox: Math.floor((W - ref[0].length) / 2), oy: Math.floor((H - ref.length) / 2) };
       paintUI(); window.setTimeout(() => { ghost = null; paintUI(); }, mode.hintSeconds * 1000);
@@ -178,5 +205,5 @@ export const artChallenge: ChallengeBody = (root, api) => {
     return 'The reference is visible again for a few seconds.';
   });
   paintUI();
-  return () => { clearTimeout(timer); window.removeEventListener('pointerup', up); };
+  return () => { clearTimeout(timer); clearTimeout(bulbClock); clearTimeout(bulbTimer); window.removeEventListener('pointerup', up); };
 };

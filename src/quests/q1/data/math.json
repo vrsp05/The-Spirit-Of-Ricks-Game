@@ -50,7 +50,6 @@
    "note": "equal to three shiblons (v.19)"
   }
  ],
- "story": "Market day. One senine of gold (or one senum of silver) buys one measure of barley (Alma 11:7). Count out exact payments and change with the coins on your tray.",
  "coins": [
   {
    "id": "senine",
@@ -73,280 +72,174 @@
    "value": 7
   },
   {
-   "id": "antion",
-   "metal": "gold",
-   "value": 1.5
-  },
-  {
-   "id": "senum",
-   "metal": "silver",
-   "value": 1
-  },
-  {
-   "id": "amnor",
-   "metal": "silver",
-   "value": 2
-  },
-  {
-   "id": "ezrom",
-   "metal": "silver",
-   "value": 4
-  },
-  {
    "id": "onti",
    "metal": "silver",
    "value": 7
-  },
-  {
-   "id": "shiblon",
-   "metal": "silver",
-   "value": 0.5
-  },
-  {
-   "id": "shiblum",
-   "metal": "silver",
-   "value": 0.25
-  },
-  {
-   "id": "leah",
-   "metal": "silver",
-   "value": 0.125
   }
  ],
- "orders": [
+ "story": "Binary, the Nephite way. The computer science students keep tripping on binary; the candidate explains it with the gold coins of Alma 11 (senine 1, seon 2, shum 4, limnah 7 = 1 + 2 + 4). A judge earned one senine a day (Alma 11:3).",
+ "tray": [
+  "senine",
+  "seon",
+  "shum",
+  "limnah"
+ ],
+ "opening": [
   {
-   "id": "farmer3",
-   "tier": "basic",
-   "who": "Barley farmer",
-   "say": "Three measures of barley, please! Pay the farmer in gold.",
-   "target": 3,
-   "coins": [
-    "senine",
-    "seon",
-    "shum",
-    "limnah"
-   ]
+   "who": "Brother Hale (math chair)",
+   "text": "Our computer science students keep tripping on binary. Explain it so it sticks."
   },
   {
-   "id": "weaver5",
-   "tier": "basic",
-   "who": "Weaver",
-   "say": "Five measures for my family. Gold coins, please.",
+   "who": "You (candidate)",
+   "text": "Forget computers for a minute. The Nephites already used binary. Look at their coins: 1, 2, 4… and a limnah is 7."
+  }
+ ],
+ "closing": {
+  "student": "So 101 just means shum, no seon, senine?",
+  "candidate": "That's all binary is: which coins you're holding."
+ },
+ "questions": [
+  {
+   "id": "pay5",
+   "kind": "pay",
+   "who": "Sister Hall",
+   "ask": "Pay 5 with the fewest coins.",
    "target": 5,
-   "coins": [
-    "senine",
-    "seon",
-    "shum",
-    "limnah"
-   ]
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "shum + senine",
+    "seon + seon + senine",
+    "limnah",
+    "shum + seon"
+   ],
+   "correct": "shum + senine",
+   "explain": "4 + 1 = 5 → shum, no seon, senine = 101."
   },
   {
-   "id": "potter6",
-   "tier": "basic",
-   "who": "Potter",
-   "say": "Six measures. I only take silver!",
+   "id": "pay6",
+   "kind": "pay",
+   "who": "Brother Ortiz",
+   "ask": "Pay 6.",
    "target": 6,
-   "coins": [
-    "senum",
-    "amnor",
-    "ezrom",
-    "onti"
-   ]
-  },
-  {
-   "id": "judge7",
-   "tier": "basic",
-   "who": "Judge's scribe",
-   "say": "Pay the judge for seven days of work, one senine of gold a day (Alma 11:3).",
-   "target": 7,
-   "coins": [
-    "senine",
-    "seon",
-    "shum",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "shum + seon",
+    "seon + seon + seon",
+    "shum + senine + senine",
     "limnah"
-   ]
+   ],
+   "correct": "shum + seon",
+   "explain": "4 + 2 = 6 → 110."
   },
   {
-   "id": "fisher9",
-   "tier": "basic",
-   "who": "Fisherman",
-   "say": "Nine measures, quickly — the boats are leaving! Silver only.",
-   "target": 9,
-   "coins": [
-    "senum",
-    "amnor",
-    "ezrom",
-    "onti"
-   ]
-  },
-  {
-   "id": "baker11",
-   "tier": "basic",
-   "who": "Baker",
-   "say": "Eleven measures for the bakery, in gold.",
-   "target": 11,
-   "coins": [
-    "senine",
-    "seon",
-    "shum",
-    "limnah"
-   ]
-  },
-  {
-   "id": "judge10",
-   "tier": "basic",
-   "who": "Judge's scribe",
-   "say": "Ten days of judging at one senum of silver a day.",
-   "target": 10,
-   "coins": [
-    "senum",
-    "amnor",
-    "ezrom",
-    "onti"
-   ]
-  },
-  {
-   "id": "shepherd8",
-   "tier": "basic",
-   "who": "Shepherd",
-   "say": "Eight measures for the flock. Gold, if you please.",
-   "target": 8,
-   "coins": [
-    "senine",
-    "seon",
-    "shum",
-    "limnah"
-   ]
-  },
-  {
-   "id": "change-onti",
-   "tier": "basic",
-   "who": "Merchant",
-   "say": "I paid you an onti for four measures. Give me my change in silver.",
-   "price": 4,
-   "paidWith": "onti",
+   "id": "pay3",
+   "kind": "pay",
+   "who": "Sister Kim",
+   "ask": "Pay 3.",
    "target": 3,
-   "coins": [
-    "senum",
-    "amnor",
-    "ezrom"
-   ]
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "seon + senine",
+    "senine + senine + senine",
+    "shum",
+    "seon + seon"
+   ],
+   "correct": "seon + senine",
+   "explain": "2 + 1 = 3 → 011."
   },
   {
-   "id": "half",
-   "tier": "advanced",
-   "who": "Child",
-   "say": "One and a half measures, please! Small silver coins only.",
-   "target": 1.5,
-   "coins": [
-    "senum",
-    "shiblon",
-    "shiblum",
-    "leah"
-   ]
+   "id": "why7",
+   "kind": "choice",
+   "who": "Brother Lund",
+   "ask": "Why is a limnah worth 7?",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "It's one of every smaller coin: 1 + 2 + 4",
+    "It's 2 + 2 + 2 + 1",
+    "Seven is a holy number",
+    "It's a shum and a half"
+   ],
+   "correct": "It's one of every smaller coin: 1 + 2 + 4",
+   "explain": "Alma 11:10 calls the limnah \"the value of them all\" — 111 in binary."
   },
   {
-   "id": "antion",
-   "tier": "advanced",
-   "who": "Goldsmith",
-   "say": "Three and a half measures — gold coins only.",
-   "target": 3.5,
-   "coins": [
-    "senine",
-    "seon",
-    "antion"
-   ]
+   "id": "pay9",
+   "kind": "pay",
+   "who": "Sister Hall",
+   "ask": "Pay 9 with the fewest coins.",
+   "target": 9,
+   "modes": [
+    "hard"
+   ],
+   "options": [
+    "limnah + seon",
+    "shum + shum + senine",
+    "limnah + senine + senine",
+    "shum + seon + seon + senine"
+   ],
+   "correct": "limnah + seon",
+   "explain": "7 + 2 = 9 — two coins."
   },
   {
-   "id": "quarter",
-   "tier": "advanced",
-   "who": "Herb seller",
-   "say": "Two and a quarter measures of barley.",
-   "target": 2.25,
-   "coins": [
-    "senum",
-    "amnor",
-    "shiblon",
-    "shiblum"
-   ]
+   "id": "pay13",
+   "kind": "pay",
+   "who": "Brother Ortiz",
+   "ask": "Pay 13 with the fewest coins.",
+   "target": 13,
+   "modes": [
+    "hard"
+   ],
+   "options": [
+    "limnah + shum + seon",
+    "shum + shum + shum + senine",
+    "limnah + limnah",
+    "limnah + shum + senine + senine"
+   ],
+   "correct": "limnah + shum + seon",
+   "explain": "7 + 4 + 2 = 13 — three coins."
   },
   {
-   "id": "threequarter",
-   "tier": "advanced",
-   "who": "Scribe",
-   "say": "Three quarters of a measure for my lunch.",
-   "target": 0.75,
-   "coins": [
-    "shiblon",
-    "shiblum",
-    "leah"
-   ]
-  },
-  {
-   "id": "change-limnah",
-   "tier": "advanced",
-   "who": "Traveller",
-   "say": "I paid a limnah for five and a half measures. My change, in gold?",
-   "price": 5.5,
-   "paidWith": "limnah",
-   "target": 1.5,
-   "coins": [
-    "senine",
-    "seon",
-    "antion"
-   ]
-  },
-  {
-   "id": "leah",
-   "tier": "advanced",
-   "who": "Spice trader",
-   "say": "Four and one-eighth measures. Exactly, please.",
-   "target": 4.125,
-   "coins": [
-    "senum",
-    "amnor",
-    "ezrom",
-    "leah"
-   ]
-  },
-  {
-   "id": "change-ezrom",
-   "tier": "advanced",
-   "who": "Carpenter",
-   "say": "I paid an ezrom for two and three-quarter measures. Change, please!",
-   "price": 2.75,
-   "paidWith": "ezrom",
-   "target": 1.25,
-   "coins": [
-    "senum",
-    "shiblon",
-    "shiblum",
-    "leah"
-   ]
+   "id": "zeezrom",
+   "kind": "choice",
+   "who": "Sister Kim",
+   "ask": "Zeezrom offered Amulek six onties (Alma 11:22). An onti is the silver version of a limnah. How many days of a judge's pay is that?",
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "42",
+    "36",
+    "13",
+    "6"
+   ],
+   "correct": "42",
+   "explain": "6 × 7 = 42 days of pay.",
+   "reaction": "Six weeks of work!"
   }
  ],
  "modes": {
   "easy": {
-   "customers": 5,
-   "pass": 3,
-   "patience": 40,
-   "tiers": [
-    "basic"
-   ],
+   "misses": 2,
    "hints": 3,
-   "showValues": true
+   "tray": false
   },
   "hard": {
-   "customers": 6,
-   "pass": 5,
-   "patience": 24,
-   "tiers": [
-    "basic",
-    "advanced"
-   ],
-   "minAdvanced": 3,
-   "hints": 1,
-   "showValues": false
+   "misses": 1,
+   "hints": 2,
+   "tray": true
   }
  }
 }

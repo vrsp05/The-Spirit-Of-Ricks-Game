@@ -1,4 +1,4 @@
-// 1C. Engineering — "Light the Temple": rotate wire tiles so current flows from the
+// 1C. Engineering — "Fix it live" (Austin electronics lab): repair the Spori's projector; rotate wire tiles so current flows from the
 // battery to the bulbs. The circuit is simulated live (real nodal analysis, not pattern
 // matching): wires/closed switches are zero-resistance (merged into super-nodes), bulbs
 // are 1-ohm resistors, the battery fixes +1 / 0. Series bulbs glow dim, parallel bright.
@@ -6,6 +6,7 @@
 import data from './data/circuit.json';
 import type { ChallengeBody } from '../shared/frame';
 import { h, loop } from '../shared/frame';
+import { classroom } from './classroom';
 
 export type Brightness = 'off' | 'dim' | 'bright';
 export interface LevelDef { id: string; title: string; goal: string; rows: string[]; labels: Record<string, string>; expect: { switches: Record<string, boolean>; bulbs: Record<string, Brightness> }[]; hint: string; hardOnly?: boolean }
@@ -168,7 +169,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const mode = CIRCUIT.modes[api.difficulty];
   const levels = mode.levels.map(id => CIRCUIT.levels.find(l => l.id === id)!);
   let li = 0, board!: Board, cur = { x: 0, y: 0 }, moves = 0, par = 0, totalMoves = 0, totalPar = 0, hintsLeft = mode.hints, hintTile: string | null = null;
-  let solvedT = 0, flash = 0, startT = performance.now(), switchState: Record<string, boolean> = {}, needed = new Set<string>();
+  let wasShort = false, solvedT = 0, flash = 0, startT = performance.now(), switchState: Record<string, boolean> = {}, needed = new Set<string>();
   const cv = h('canvas', { class: 'cx-board', 'aria-label': 'Circuit board' }) as HTMLCanvasElement;
   const goal = h('div', { class: 'cx-goal' }), bulbsEl = h('div', { class: 'cx-bulbs' }), info = h('div', { class: 'cx-info' });
   root.append(h('div', { class: 'cx-wrap' }, h('div', { class: 'cx-boardbox' }, cv), h('div', { class: 'cx-side' }, goal, bulbsEl, info)));
@@ -191,11 +192,13 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     bulbsEl.replaceChildren(...Object.entries(want.bulbs).map(([id, w]) => {
       const got = sim.short ? 'off' : sim.bulbs[id]?.brightness ?? 'off';
       return h('div', { class: `cx-bulb ${got === w ? 'ok' : ''}` }, h('span', { class: `dot ${got}` }), `${l.labels[id] ?? id}: `, h('b', { text: got }), ` (wants ${w}) ${got === w ? '✔' : ''}`);
-    }), sim.short ? h('div', { class: 'cx-short', text: '⚡ Short circuit! + is wired straight to −.' }) : "");
+    }), sim.short ? h('div', { class: 'cx-short', text: '⚡ The fuse blew — there’s a short (+ wired straight to −). A new fuse is in; fix the wiring.' }) : "");
     const sw = Object.keys(switchState);
     info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — flip with right stick ↑ / T` }) : "");
-    api.setStatus(sim.short ? 'Sparks! Something connects the battery to itself.' : '');
-    if (!solvedT && testBoard(l, board).pass) { solvedT = 1.4; flash = 1; totalMoves += moves; totalPar += par; api.setStatus(l.expect.length > 1 ? 'It works in every switch position!' : 'The circuit works!'); }
+    api.setStatus(sim.short ? 'Pop! The fuse blew — something connects the plug to itself.' : '');
+    if (sim.short && !wasShort) classroom()?.react('gasp', 'Whoa! The fuse popped!');
+    wasShort = sim.short;
+    if (!solvedT && testBoard(l, board).pass) { solvedT = 1.4; flash = 1; classroom()?.react(li === levels.length - 1 ? 'ooh' : 'nod', li === levels.length - 1 ? 'The lamp is throwing light on the wall!' : undefined); classroom()?.engagement((li + 1) / levels.length); totalMoves += moves; totalPar += par; api.setStatus(l.expect.length > 1 ? 'It works in every switch position!' : 'The circuit works!'); }
   };
   const rotate = (dir: 1 | -1) => {
     if (solvedT) return;
@@ -218,7 +221,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     stop(); const secs = (performance.now() - startT) / 1000;
     const eff = totalPar / Math.max(totalPar, totalMoves);
     api.finish({ pass: true, quality: Math.max(0, 0.45 + 0.4 * eff + (secs < 60 * levels.length ? 0.15 : 0) - api.hintsUsed() * 0.05),
-      summary: `All ${levels.length} temple circuits light up! ${totalMoves} rotations (best possible ${totalPar}), ${Math.round(secs)} s.` });
+      summary: `The projector works again — all ${levels.length} circuits fixed! ${totalMoves} rotations (best possible ${totalPar}), ${Math.round(secs)} s.` });
   };
   api.onHint(() => {
     if (hintsLeft <= 0) return null; const l = levels[li];
@@ -245,5 +248,9 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     return true;
   });
   load();
-  return () => stop();
+  const intro = [
+    window.setTimeout(() => classroom()?.react('gasp', 'It keeps blowing fuses, and the art department needs it.', 'Physical Plant worker'), 300),
+    window.setTimeout(() => classroom()?.react('nod', 'Forget the lesson plan. Show us.', 'Brother Frost (engineering chair)'), 2600),
+  ];
+  return () => { stop(); intro.forEach(clearTimeout); };
 };

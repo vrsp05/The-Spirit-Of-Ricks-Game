@@ -1,111 +1,110 @@
 {
- "label": "GAME PARAPHRASE — fictional text written for this game, not a quotation. Facts checked against byui.edu/speeches/announcement-ricks-college-to-become-byu-idaho (2026-11-13).",
+ "label": "STUDENT SUMMARY — fictional text written for this game by a fictional student, not a quotation. Facts checked against the Church News, Sept. 11, 1999 (\"President Hinckley dedicates new building at Ricks\").",
  "facts": [
-  "The announcement was made on June 21, 2000.",
-  "President Gordon B. Hinckley delivered the announcement.",
-  "Ricks College is in Rexburg, Idaho.",
-  "The school would change from a two-year junior college to a four-year institution.",
-  "Its new name would be Brigham Young University–Idaho.",
-  "The change would be phased in over a period of time."
+  "The Spencer W. Kimball Building was dedicated on September 7, 1999.",
+  "President Gordon B. Hinckley dedicated it and offered the dedicatory prayer.",
+  "It is named for Spencer W. Kimball, the 12th President of the Church.",
+  "It is at Ricks College in Rexburg, Idaho.",
+  "It houses student services (admissions, financial aid) and executive offices."
  ],
  "passages": {
   "easy": {
-   "text": "On June 21, 1999, President Gordon B. Hinckley announced that Ricks College in Rexburg, Montana, would grow from a two-year junior college into a three-year institution. The change would be phased in over a period of time.",
+   "text": "On September 7, 1899, President Gordon B. Hinckley dedicated the new Spencer W. Kimball Building at Ricks College in Rexburg, Utah. The building is named for President Hinckley.",
    "errors": [
     {
-     "word": "1999,",
-     "correct": "2000,",
+     "word": "1899,",
+     "correct": "1999,",
      "options": [
-      "2000,",
-      "2001,",
-      "1998,"
+      "1999,",
+      "1989,",
+      "2009,"
      ],
-     "why": "The announcement was made on June 21, 2000."
+     "why": "The dedication was on September 7, 1999 — the HUD says Fall 1999."
     },
     {
-     "word": "Montana,",
-     "correct": "Idaho,",
+     "word": "Utah.",
+     "correct": "Idaho.",
      "options": [
-      "Idaho,",
-      "Utah,",
-      "Wyoming,"
+      "Idaho.",
+      "Montana.",
+      "Wyoming."
      ],
      "why": "Rexburg is in Idaho."
     },
     {
-     "word": "three-year",
-     "correct": "four-year",
+     "word": "Hinckley.",
+     "correct": "Kimball.",
      "options": [
-      "four-year",
-      "two-year",
-      "five-year"
+      "Kimball.",
+      "Ricks.",
+      "Bednar."
      ],
-     "why": "The school became a four-year institution."
+     "why": "The wall plaque says Spencer W. Kimball Building — President Hinckley dedicated it."
     }
    ]
   },
   "hard": {
-   "text": "On June 21, 1999, President Gordon B. Hinckley announced that Ricks College in Rexburg, Montana, would grow from a two-year junior college into a three-year institution. The school would receives a new name: Brigham Young University–Utah. The change were phased in over a period of time.",
+   "text": "On September 7, 1899, President Gordon B. Hinckley dedicated the new Spencer W. Kimball Building at Ricks University in Rexburg, Utah. The building are named for President Hinckley. It houses admissions, financial aid and the president's office, so students and there families will visit it often.",
    "errors": [
     {
-     "word": "1999,",
-     "correct": "2000,",
+     "word": "1899,",
+     "correct": "1999,",
      "options": [
-      "2000,",
-      "2001,",
-      "1998,"
+      "1999,",
+      "1989,",
+      "2009,"
      ],
-     "why": "The announcement was made on June 21, 2000."
+     "why": "The dedication was on September 7, 1999 — the HUD says Fall 1999."
     },
     {
-     "word": "Montana,",
-     "correct": "Idaho,",
+     "word": "University",
+     "correct": "College",
      "options": [
-      "Idaho,",
-      "Utah,",
-      "Wyoming,"
+      "College",
+      "Academy",
+      "Institute"
+     ],
+     "why": "The campus sign says Ricks College."
+    },
+    {
+     "word": "Utah.",
+     "correct": "Idaho.",
+     "options": [
+      "Idaho.",
+      "Montana.",
+      "Wyoming."
      ],
      "why": "Rexburg is in Idaho."
     },
     {
-     "word": "three-year",
-     "correct": "four-year",
+     "word": "are",
+     "correct": "is",
      "options": [
-      "four-year",
-      "two-year",
-      "five-year"
+      "is",
+      "were",
+      "be"
      ],
-     "why": "The school became a four-year institution."
+     "why": "One building → \"is\"."
     },
     {
-     "word": "receives",
-     "correct": "receive",
+     "word": "Hinckley.",
+     "correct": "Kimball.",
      "options": [
-      "receive",
-      "received",
-      "receiving"
+      "Kimball.",
+      "Ricks.",
+      "Bednar."
      ],
-     "why": "After \"would\", use the base form: would receive."
+     "why": "The wall plaque says Spencer W. Kimball Building — President Hinckley dedicated it."
     },
     {
-     "word": "University–Utah.",
-     "correct": "University–Idaho.",
+     "word": "there",
+     "correct": "their",
      "options": [
-      "University–Idaho.",
-      "University–Rexburg.",
-      "University–West."
+      "their",
+      "they're",
+      "theirs"
      ],
-     "why": "The new name was Brigham Young University–Idaho."
-    },
-    {
-     "word": "were",
-     "correct": "would be",
-     "options": [
-      "would be",
-      "are",
-      "was being"
-     ],
-     "why": "The change would be phased in (future in the past)."
+     "why": "Belonging to the students → \"their\"."
     }
    ]
   }

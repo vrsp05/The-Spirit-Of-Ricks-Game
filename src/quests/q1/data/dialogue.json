@@ -1,20 +1,27 @@
 {
-  "note": "Authored game dialogue for fictional characters. The Bednar character's lines are NOT real quotes.",
+  "note": "Authored game dialogue for fictional characters. The Bednar character's lines are NOT real quotes. Fall 1999: no new university name appears here (team decision 22).",
   "assign": [
-    { "speaker": "President Bednar (game character)", "text": "Thank you for coming. Our college is growing, and our students need more great teachers." },
-    { "speaker": "President Bednar (game character)", "text": "Four candidates are waiting at their department buildings: math at the Romney Building, engineering at the Austin Building, art at the Spori Building, and English at the Snow Building." },
-    { "speaker": "President Bednar (game character)", "text": "Meet each one, see what they can do, and hire them. Then come back and report to me." }
+    { "speaker": "President Bednar (game character)", "text": "Thank you for coming. Our college is growing, and our students will need more great teachers." },
+    { "speaker": "President Bednar (game character)", "text": "Four faculty candidates are waiting in Personnel Services, just down the hall: math, English, art and engineering." },
+    { "speaker": "President Bednar (game character)", "text": "Walk each one to their department for a teaching demonstration. The art studio's projector has been acting up, so start with art before engineering. Then come back and report to me." }
   ],
-  "reminder": "Candidates still waiting: {list}. Their buildings are marked on your map.",
+  "reminder": "Candidates still to hire: {list}. They wait in Personnel Services, down the hall.",
   "readyReminder": "All four are hired? Wonderful — tell me about them.",
   "report": [
-    { "speaker": "President Bednar (game character)", "text": "Let me see the list… math, engineering, art and English. All four hired." },
+    { "speaker": "President Bednar (game character)", "text": "Math, English, art and engineering — and I hear the Spori's projector works again." },
     { "speaker": "President Bednar (game character)", "text": "These teachers will bless many students. Well done." }
   ],
+  "boardTitle": "PERSONNEL SERVICES · Faculty interviews",
   "greetings": {
-    "math": "Hello! I love the money system in Alma 11. Shall we convert a few coins?",
-    "engineering": "Hi there. I sketched a lighting plan for a future temple concept. Help me wire it?",
-    "art": "Welcome! I'm painting a concept for a future temple. Can you match my reference?",
-    "english": "Good to meet you. This announcement paraphrase has mistakes — care to edit it?"
-  }
+    "math": "Hi! I'm due in the Romney Building to teach the computer science students. They're stuck on binary — I have an idea from Alma 11.",
+    "english": "Hello. My demonstration is in the Smith Building — a student's write-up needs a careful red pen.",
+    "art": "Hi there! My demo is up in the old Spori's art studio. I'll be teaching the grid method.",
+    "engineering": "Ready when you are. I'm demonstrating in the Austin Building's electronics lab."
+  },
+  "waiting": {
+    "engineering": "I'm waiting on the art department's demo first — I hear their projector is about to give out."
+  },
+  "busy": "You're already walking the {other} over. Come back for me after that!",
+  "arrive": "Lead the way — the {building} is marked on your map.",
+  "notYet": "I'm not ready yet."
 }

@@ -149,6 +149,7 @@ export class Game {
         location: id => this.location(id),
         position: id => pos3(this.resolve(id)),
         playerPosition: () => ({ x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, space: this.spaceId }),
+        placePlayer: (x, z, yaw) => this.player.place(this.space, x, z, yaw ?? this.player.yaw),
         questGiverPosition: () => pos3(this.resolve(GAME_CONFIG.questGiver.anchor)),
         terrainHeight: (x, z) => terrainHeight(x, z),
         addObject: (obj, at) => { const p = this.resolve(at); obj.position.set(p.x, this.groundAt(p.x, p.z, p.space), p.z); this.renderer.scene.add(obj); return () => obj.removeFromParent(); },

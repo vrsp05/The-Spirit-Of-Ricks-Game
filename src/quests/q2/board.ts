@@ -21,7 +21,9 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
   const color = (id: string) => COLORS[all.findIndex(p => p.id === id) % COLORS.length];
   const W = Math.max(...lvl.footprint.map(r => r.length)), H = lvl.footprint.length;
   let held: { id: string; rot: number; flip: boolean } | null = null;
-  let cursor = { x: Math.floor(W / 2), y: Math.floor(H / 2) }, onBoard = true;
+  let cursor = { x: Math.floor(W / 2), y: Math.floor(H / 2) }, onBoard = false;
+  // controller flow: choose a piece in the trays with the stick (selIdx), ① picks it up, then move/rotate/place on the board
+  let selIdx = 0;
   let hintsLeft = mode.hints, hints = 0, resets = 0, invalid = 0, fadeDecoys = false, hintPiece: string | null = null, hintCells = new Set<string>();
   const history: Placement[][] = [];
   let result: BoardOutcome = { outcome: 'leave', hints: 0, resets: 0, invalid: 0 };
@@ -76,8 +78,8 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
       h('div', { class: 'ch-head' }, h('div', { class: 'ch-playing', text: 'Architectural blueprint' }), h('h2', { class: 'ch-title', text: `Blueprint: ${lvl.label}` }), h('div', { class: `ch-diff ${diff}`, text: diff === 'hard' ? 'Hard' : 'Easy' })),
       h('p', { class: 'ch-intro', text: 'Fill every square of the footprint exactly once — no gaps, no overlaps. Some pieces are decoys and do not belong. This is a stylized plan, not a historical floor plan.' }),
       progress, pieceTools, h('div', { class: 'bp-wrap' }, trayL, site, trayR), msg,
-      h('p', { class: 'small', text: 'Click or drag a piece onto the board. Rotate with the buttons, right-click, mouse wheel, or T/G. Return piece, Esc, or clicking the selected tray piece clears your hand. Enter/Space places the piece.' }),
-      tools, h('div', { class: 'legend-box' }, legend([['L', 'move piece'], ['R', 'choose piece'], ['RU', 'rotate'], ['1', 'place / pick up'], ['2', 'return piece'], ['3', 'hint'], ['4', 'tools']])));
+      h('p', { class: 'small', text: 'Controller: choose a piece with the stick, ① picks it up, move it with the stick, rotate with L / R, ① places it, ② puts it back. Mouse: click a piece, then click the board; right-click or wheel rotates. Keyboard: WASD, Enter, R/F rotate, Esc puts it back.' }),
+      tools, h('div', { class: 'legend-box' }, legend([['L', 'choose piece · move it'], ['1', 'pick up · place'], ['R', 'rotate (Joy-Con L / R)'], ['2', 'put back · choose again'], ['3', 'hint'], ['4', 'tools']])));
     const confirmKey = root.querySelector('.k1 + i');
     if (confirmKey) confirmKey.textContent = 'Enter / Space';
 
@@ -91,6 +93,7 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
       b.classList.toggle('held', isHeld); b.classList.toggle('is-placed', placed);
       b.setAttribute('aria-pressed', String(isHeld)); b.disabled = finished;
       b.classList.toggle('faded', fadeDecoys && !!p.decoy); b.classList.toggle('hinted', hintPiece === id);
+      b.classList.toggle('bp-sel', !held && !finished && order[selIdx]?.id === id);
     };
     const ghostCells = () => {
       if (!held) return { cells: [] as [number, number][], err: null as string | null };
@@ -152,11 +155,12 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
       const cur = board.placed.get(id);
       if (cur) { history.push(board.snapshot()); board.remove(id); opts.save(board.snapshot()); held = { id, rot: cur.rot, flip: cur.flip }; cursor = { x: cur.x, y: cur.y }; }
       else held = { id, rot: 0, flip: false };
-      onBoard = true; say('Move the piece over the footprint and place it, or return it to the tray.'); render(); ctx.world.sound('tick');
+      selIdx = Math.max(0, order.findIndex(p => p.id === id));
+      onBoard = true; say('Move the piece over the footprint with the stick, rotate with L / R, place it with ①. ② puts it back.'); render(); ctx.world.sound('tick');
     };
     const returnPiece = () => {
       if (!held) return;
-      held = null; opts.save(board.snapshot()); say('Piece returned to the tray. No piece selected.'); render();
+      held = null; onBoard = false; opts.save(board.snapshot()); say('Piece returned to the tray. Choose a piece with the stick.'); render();
     };
     const rotate = (direction: 1 | -1 = 1) => { if (held && !finished) { held.rot = (held.rot + direction + 4) % 4; render(); } };
     const flip = () => { if (held && lvl.allowFlip) { held.flip = !held.flip; render(); } };
@@ -171,14 +175,15 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
         }
       }
       if (err) { invalid++; say(`Can't place it there: ${err}`); ctx.world.sound('error'); return; }
-      history.push(board.snapshot()); board.place(p); held = null; hintCells.clear(); hintPiece = null;
+      history.push(board.snapshot()); board.place(p); held = null; onBoard = false; hintCells.clear(); hintPiece = null;
+      { const next = order.findIndex(q => !board.placed.has(q.id)); if (next >= 0) selIdx = next; }
       ctx.world.sound('tick'); opts.save(board.snapshot());
       render();
       board.cellsOf(p).forEach(([x, y], k) => { const c = cells[y][x]; c.classList.remove('drop'); void c.offsetWidth; c.style.animationDelay = `${k * 0.02}s`; c.classList.add('drop'); });
       trolley.classList.add('dropping'); setTimeout(() => trolley.classList.remove('dropping'), 350);
       if (board.isComplete()) { celebrate(); return; }
       if (board.coverage() === 1 && board.hasDecoy()) say('Every square is covered, but a decoy piece doesn’t belong in this plan. Swap it out.');
-      else say('Placed. No piece selected.');
+      else say('Placed. Choose the next piece with the stick.');
       render();
     };
     const undo = () => { const s = history.pop(); if (!s) { say('Nothing to undo.'); return; } board.restore(s); held = null; opts.save(board.snapshot()); render(); };
@@ -218,25 +223,37 @@ export function openBlueprint(ctx: QuestContext, building: string, opts: { allow
     grid.addEventListener('wheel', e => { if (held && e.deltaY !== 0) { e.preventDefault(); rotate(e.deltaY > 0 ? 1 : -1); } }, { passive: false });
     // The shared action layer activates focused controls; suppress native double clicks.
     root.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); });
-    /** Right stick left/right: hold the next/previous piece that isn't placed yet (no tray navigation needed). */
-    const cyclePiece = (dir: 1 | -1) => {
-      const free = order.filter(p => !board.placed.has(p.id)); if (!free.length) { say('All pieces are on the board.'); return; }
-      const i = held ? free.findIndex(p => p.id === held!.id) : -1;
-      const next = free[((i + dir) % free.length + free.length) % free.length];
-      held = { id: next.id, rot: 0, flip: false }; onBoard = true; say('Move the piece with the left stick; ① places it.'); render(); ctx.world.sound('tick');
+    /** Stick in the trays: move to the nearest piece in that direction (by where the pieces are on screen). */
+    const moveSel = (dx: number, dy: number) => {
+      const rects = order.map(p => trayBtns.get(p.id)!.getBoundingClientRect());
+      const c = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 }), from = c(rects[selIdx]);
+      let best = -1, bestScore = Infinity;
+      rects.forEach((r, i) => {
+        if (i === selIdx) return;
+        const to = c(r), vx = to.x - from.x, vy = to.y - from.y, along = vx * dx + vy * dy, across = Math.abs(vx * dy - vy * dx);
+        if (along <= 4) return;
+        const score = along + across * 2.5; if (score < bestScore) { bestScore = score; best = i; }
+      });
+      if (best >= 0) { selIdx = best; ctx.world.sound('tick'); render(); trayBtns.get(order[best].id)!.scrollIntoView({ block: 'nearest' }); }
     };
     panel.onAction((a: PanelAction) => {
       if (finished) { if (a === 'confirm') done('solved'); return true; }
-      if (a === 'alt') { cyclePiece(1); return true; }
-      if (a === 'alt2') { cyclePiece(-1); return true; }
-      if (a === 'rup') { rotate(); return true; }
-      if (a === 'rdown') { rotate(-1); return true; }
       if (a === 'hint') { hint(); return true; }
-      if (!onBoard) return false;
+      if (!held) {
+        // choosing a piece
+        if (a === 'left') moveSel(-1, 0); else if (a === 'right') moveSel(1, 0);
+        else if (a === 'up') moveSel(0, -1); else if (a === 'down') moveSel(0, 1);
+        else if (a === 'confirm') pick(order[selIdx].id);
+        else return a === 'alt' || a === 'alt2' || a === 'rup' || a === 'rdown';
+        return true;
+      }
+      // holding a piece: move it, rotate with L / R (right stick ← →, R / F, T / G), ① places, ② puts it back
+      if (a === 'alt' || a === 'rup') { rotate(1); return true; }
+      if (a === 'alt2' || a === 'rdown') { rotate(-1); return true; }
       if (a === 'left') cursor.x = Math.max(0, cursor.x - 1); else if (a === 'right') cursor.x = Math.min(W - 1, cursor.x + 1);
       else if (a === 'up') cursor.y = Math.max(0, cursor.y - 1); else if (a === 'down') cursor.y = Math.min(H - 1, cursor.y + 1);
       else if (a === 'confirm') { tryPlace(); return true; }
-      else if (a === 'back') { if (!held) return false; returnPiece(); return true; }
+      else if (a === 'back') { returnPiece(); return true; }
       else return false;
       render(); return true;
     });

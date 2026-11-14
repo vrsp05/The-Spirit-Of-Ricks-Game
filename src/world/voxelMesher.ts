@@ -167,10 +167,9 @@ export function meshBuilding(poly: Vec2[], style: BuildingStyle, opts: { constru
       quad(base, gAvg, '#8f877c');
       if (opts.construction) {
         for (let y = gAvg; y < wallTop - 0.01; y += fh) quad(y, Math.min(wallTop, y + fh), ((i + j + Math.round(y / fh)) & 1) ? '#7f6f58' : wall);
-      } else if (!opts.detailed) {
-        quad(gAvg, Math.min(wallTop, gAvg + 1.6), wall); if (wallTop > gAvg + 1.6) quad(gAvg + 1.6, wallTop, wall);
-        const winY = gAvg + fh * 0.45; if (wallTop - gAvg > 2 && ((i + j) & 1)) quad(winY, Math.min(wallTop, winY + 1), style.glass);
       } else {
+        // every building gets the same full-height window bands cut into the wall (a small window drawn on top
+        // of the wall was coplanar with it and flickered — z-fighting)
         for (let f = 0; f < levels; f++) {
           const y0 = gAvg + f * fh, y1 = y0 + fh;
           const glass = ((i + j) % 2 === 0);

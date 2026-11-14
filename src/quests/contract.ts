@@ -65,6 +65,8 @@ export interface QuestWorld {
   /** Resolved game-space position of an anchor (ground height included). */
   position(id: string): { x: number; y: number; z: number; space: string };
   playerPosition(): { x: number; y: number; z: number; space: string };
+  /** Move the player within the current space (e.g. stand beside the board during a classroom demo). */
+  placePlayer(x: number, z: number, yaw?: number): void;
   questGiverPosition(): { x: number; y: number; z: number; space: string };
   terrainHeight(x: number, z: number): number;
   /** Add a decorative object at a location; returned handle removes it. */

@@ -72,3 +72,9 @@ Open `?dev=1` and use **Toggle mock 1/2** to show on-screen controllers. They en
 - Read joysticks on **ADC1** pins only; ADC2 is unavailable while the radio is active. Power the joystick potentiometers from 3.3 V, never 5 V.
 - Debounce buttons (about 5–10 ms) and use internal pull-ups.
 - A reference sketch will be written **after** the transport is chosen. Pins must be verified against the exact board.
+
+## Nintendo Switch Joy-Cons
+Code: `src/input/joycon.ts` (mapping, tested in `tests/joycon.test.ts`), wired up in `GamepadHub`. Any Joy-Con works (the OLED Switch ships standard Joy-Cons). Pair over Bluetooth: hold the sync button on the rail until the lights run, then pick "Joy-Con (L)/(R)" in the OS Bluetooth settings.
+- Chrome / Edge / Safari report a "standard" mapping. Both Joy-Cons connected appear as one "Joy-Con L+R" pad (upright, two sticks); a single Joy-Con appears held sideways (one stick).
+- Firefox reports raw HID buttons; a single Joy-Con held sideways is supported best-effort (stick from the hat switch).
+- Layout (Nintendo positions): A = interact/confirm (button 1), B = back + jump (2), X or − = map (3), Y or + = pause (4), ZR/R = sprint (hold), left-stick click = sprint toggle, right-stick click/ZL = camera reset, D-pad = menus. A single sideways Joy-Con: SL/SR turn the camera.

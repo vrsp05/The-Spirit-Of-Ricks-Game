@@ -1,10 +1,19 @@
 // Transport adapters. Both feed ControllerDevice, so the action layer does not
 // care which transport the team selects.
 import { GAME_CONFIG } from '../config/game.config';
-import type { InputManager } from './actions';
+import type { ButtonName, InputManager, SourceFrame } from './actions';
 import {
   BLE_LED_CHAR_UUID, BLE_REPORT_CHAR_UUID, BLE_SERVICE_UUID, ControllerDevice, decodeReport,
 } from './controllerProtocol';
+import { joyConKind, readJoyCon, type JoyConKind } from './joycon';
+
+/** A Joy-Con (or L+R pair): sticks go through the usual calibration/dead zone, buttons use the Nintendo layout. */
+class JoyConDevice extends ControllerDevice {
+  extra = new Set<ButtonName>(); pressed: boolean[] = [];
+  constructor(id: string, label: string, public joy: JoyConKind) { super(id, label, 'joy-con'); }
+  poll(f: SourceFrame) { super.poll(f); if (!this.stale) this.extra.forEach(b => f.buttons.add(b)); }
+  raw() { return { axes: this.rawAxes.slice(), buttons: this.pressed.slice() }; }
+}
 
 /** Candidate A: BLE HID gamepad (or any gamepad) via the browser Gamepad API. */
 export class GamepadHub {
@@ -19,10 +28,14 @@ export class GamepadHub {
     for (const gp of pads) {
       if (!gp) continue;
       let d = this.devices.get(gp.index);
+      const joy = joyConKind(gp);
+      if (d && (d instanceof JoyConDevice) !== !!joy) { this.input.remove(d.id); d = undefined; }   // a different pad took this slot
       if (!d) {
-        d = new ControllerDevice(`gamepad-${gp.index}`, `Gamepad ${gp.index + 1}: ${gp.id.slice(0, 40)}`, 'gamepad');
+        d = joy ? new JoyConDevice(`gamepad-${gp.index}`, `Joy-Con ${joy === 'pair' ? 'L+R' : joy === 'left' ? '(L), sideways' : '(R), sideways'}`, joy)
+          : new ControllerDevice(`gamepad-${gp.index}`, `Gamepad ${gp.index + 1}: ${gp.id.slice(0, 40)}`, 'gamepad');
         this.devices.set(gp.index, d); this.input.add(d);
       }
+      if (d instanceof JoyConDevice) { const r = readJoyCon(gp, d.joy); d.extra = r.buttons; d.pressed = gp.buttons.map(x => x.pressed); d.ingestNormalized(r.axes, 0); continue; }
       const ax = [gp.axes[0] ?? 0, -(gp.axes[1] ?? 0), gp.axes[2] ?? 0, -(gp.axes[3] ?? 0)];
       let bits = 0;
       GAME_CONFIG.input.gamepadButtonIndices.forEach((idx, bit) => { if (gp.buttons[idx]?.pressed) bits |= 1 << bit; });

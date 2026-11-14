@@ -817,17 +817,18 @@ export class Game {
   }
   showControls() {
     const rows = [
-      ['Move', 'W A S D / arrows', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)'], ['Jump', 'Space', 'Button 2'],
-      ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick'],
-      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset'],
-      ['Interact / confirm', 'E · Enter · Space', 'Button 1'], ['Back', 'Esc · Backspace', 'Button 2'],
-      ['Map / objective', 'M', 'Button 3'], ['Pause', 'Esc', 'Button 4'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1'],
+      ['Move', 'W A S D / arrows', 'Left stick', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)', 'Hold ZR / R · stick click (toggle)'], ['Jump', 'Space', 'Button 2', 'B'],
+      ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick', 'A · left stick'],
+      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick · R-stick click / ZL reset'],
+      ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
+      ['Map / objective', 'M', 'Button 3', 'X or −'], ['Pause', 'Esc', 'Button 4', 'Y or +'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
+      ['One Joy-Con (sideways)', '', '', 'Stick moves · SL / SR turn the camera'],
     ];
-    const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
+    const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th><th>Joy-Con</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
     const s = this.ui.menu('Controls', [{ label: 'Back', action: () => this.ui.pop(s) }], { html, onBack: () => this.ui.pop(s) });
   }
   showControllers() {
-    const html = `<div class="ctrl-status"></div><p class="sub">Two controllers can play at once; either one moves the same player. Transport (custom BLE vs. BLE HID gamepad) is not decided yet — see docs/controller-protocol.md.</p>`;
+    const html = `<div class="ctrl-status"></div><p class="sub">Two controllers can play at once; either one moves the same player. Transport (custom BLE vs. BLE HID gamepad) is not decided yet — see docs/controller-protocol.md.</p><p class="sub">Nintendo Switch Joy-Cons: pair them with this computer over Bluetooth (hold the small sync button on the rail), then press any button. Both together play like one controller; a single Joy-Con works held sideways. Chrome, Edge or Safari recommended.</p>`;
     const items = [
       ...this.ble.map((b, i) => ({ label: `Pair BLE controller ${i + 1} (custom protocol)`, action: () => { b.pair().catch(e => this.ui.toast(String(e.message ?? e))); } })),
       { label: 'Calibrate connected controllers (centre sticks first)', action: () => { this.allControllers().forEach(c => c.calibrate()); this.ui.toast('Calibrated.'); } },

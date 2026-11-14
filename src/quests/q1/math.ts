@@ -7,6 +7,7 @@ import data from './data/math.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
+import { chalk, text } from './room3d';
 
 export interface Coin { id: string; metal: 'gold' | 'silver'; value: number }
 export interface Question { id: string; kind: 'pay' | 'choice'; who: string; ask: string; target?: number; modes: string[]; options: string[]; correct: string; explain: string; reaction?: string; bits?: number[]; boardNote?: string }
@@ -67,13 +68,58 @@ export const mathChallenge: ChallengeBody = (root, api) => {
       h('div', { class: `q1-bin-col ${b[k] && !blank ? 'on' : ''} ${hintCoins.includes(id) ? 'hl' : ''}` }, h('span', { class: 'bit', text: blank ? '?' : b[k] ? '✔' : '·' }), h('span', { text: `${id} (${coin(id).value})` }), h('span', { text: blank ? '?' : String(b[k]) }))),
       h('div', { class: 'q1-bin-num', text: blank ? '= ? ? ?' : reveal ? `= ${b.join(' ')} → ${value}${revealExtra}` : `= ${b.join(' ')}${extra ? ' + limnah' : ''}` }));
   };
+  // ---- 3D classroom surfaces (chalkboard + coin poster) ----
+  const room = cls?.room ?? null;
+  const drawPoster = () => {
+    const p = room?.get('poster'); if (!p) return;
+    const g = p.g; g.fillStyle = '#efe3c2'; g.fillRect(0, 0, p.w, p.h); g.strokeStyle = '#7a5a2a'; g.lineWidth = 14; g.strokeRect(7, 7, p.w - 14, p.h - 14);
+    const serif = 'Georgia, serif';
+    let y = text(p, 'ALMA 11', p.w / 2, 40, 64, '#5a3a12', 'center', serif);
+    y = text(p, 'Nephite gold coins', p.w / 2, y, 40, '#5a3a12', 'center', serif) + 20;
+    for (const id of ['senine', 'seon', 'shum', 'limnah']) {
+      g.fillStyle = '#d9a52b'; g.beginPath(); g.arc(110, y + 38, 36, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#6b4a0e'; g.lineWidth = 5; g.stroke();
+      text(p, String(coin(id).value), 110, y + 14, 44, '#3a2600', 'center', serif);
+      text(p, id, 175, y + 8, 46, '#2a211a', 'left', serif);
+      text(p, id === 'limnah' ? '“the value of them all”' : id === 'senine' ? 'a judge’s pay for one day' : `${coin(id).value} senines`, 175, y + 52, 26, '#5a4a3a', 'left', serif);
+      y += 110;
+    }
+    y += 10; text(p, 'An onti (silver) is worth the same as a limnah: 7.', p.w / 2, y, 26, '#5a3a12', 'center', serif, p.w - 60);
+    p.refresh();
+  };
+  const drawBoard = () => {
+    const b = room?.get('board'); if (!b) return;
+    chalk(b);
+    const cur = q();
+    if (phase === 'intro' || !cur) {
+      let y = text(b, 'Binary, the Nephite way', b.w / 2, 30, 56, '#ffe08a', 'center');
+      for (const l of MATH.howItWorks.slice(0, 3)) y = text(b, '• ' + l, 70, y + 4, 30, '#f1efe6', 'left', undefined, b.w - 140);
+    } else {
+      const y = text(b, `${cur.who}:`, 70, 36, 38, '#ffe08a');
+      text(b, `“${cur.ask}”`, 70, y, cur.ask.length > 70 ? 34 : 44, '#f1efe6', 'left', undefined, b.w - 140);
+    }
+    const held = usesTray() && phase === 'ask' ? hand : [];
+    const bs = reveal ?? bits(held), blank = !reveal && !held.length && phase !== 'intro';
+    const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.25, b.w * 0.42, b.w * 0.59], top = b.h * 0.56;
+    cols.forEach((id, k) => {
+      const hl = hintCoins.includes(id);
+      if (hl) { b.g.strokeStyle = '#9cff57'; b.g.lineWidth = 6; b.g.setLineDash([16, 10]); b.g.strokeRect(cx[k] - 95, top - 20, 190, 230); b.g.setLineDash([]); }
+      text(b, blank ? '?' : bs[k] ? '✔' : '·', cx[k], top, 84, bs[k] && !blank ? '#ffd34d' : '#f1efe6', 'center');
+      text(b, `${id} (${coin(id).value})`, cx[k], top + 100, 34, '#f1efe6', 'center');
+      text(b, blank ? '?' : String(bs[k]), cx[k], top + 145, 44, '#f1efe6', 'center');
+    });
+    const value = bs[0] * 4 + bs[1] * 2 + bs[2];
+    const num = blank ? '= ? ? ?' : reveal ? `= ${bs.join(' ')} → ${value}` : `= ${bs.join(' ')}`;
+    text(b, num, b.w * 0.70, top + 40, 72, '#ffd34d');
+    if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.70, top + 130, 34, '#ffe08a', 'left', undefined, b.w * 0.28);
+    b.refresh();
+  };
   const renderScore = () => score.textContent = `Question ${Math.min(qi + 1, qs.length)} of ${qs.length} · misses ${misses} / ${mode.misses} allowed`;
   const renderIntro = () => {
     qEl.replaceChildren(h('b', { text: 'How it works: ' }), 'binary with Nephite gold coins');
     reveal = [1, 0, 1]; revealExtra = '  (shum + senine)';
     work.replaceChildren(h('ul', { class: 'q1-bin-how' }, ...MATH.howItWorks.map(t => h('li', { text: t }))),
       (() => { const b = btn('Start the lesson ▶', () => startLesson(), 'sel'); b.removeAttribute('data-focus'); return b; })());
-    fb.textContent = ''; renderBoard(); renderScore();
+    fb.textContent = ''; renderBoard(); renderScore(); drawBoard();
   };
   const startLesson = () => { phase = 'ask'; reveal = null; revealExtra = ''; load(); };
   const renderQ = () => {
@@ -91,7 +137,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
       })));
     }
     if (phase === 'review') { const b = btn(qi + 1 < qs.length ? 'Next question ▶' : 'Finish the lesson ▶', () => next(), 'q1-next'); b.removeAttribute('data-focus'); work.append(b); }
-    renderBoard(); renderScore();
+    renderBoard(); renderScore(); drawBoard();
   };
   const load = () => {
     hand = []; gone = new Set(); hintCoins = []; hintStep = 0; sel = 0; busy = false; phase = 'ask'; reveal = null; revealExtra = ''; fb.textContent = ''; fb.className = 'q1-bin-fb';
@@ -155,6 +201,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   });
   api.onAction(a => {
     if (busy) return true;
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
     if (phase === 'intro') { if (a === 'confirm') startLesson(); return a !== 'back' && a !== 'hint'; }
     if (phase === 'review') { if (a === 'confirm') next(); return a !== 'back' && a !== 'hint'; }
     const n = usesTray() ? MATH.tray.length : opts.length;
@@ -162,11 +209,13 @@ export const mathChallenge: ChallengeBody = (root, api) => {
     if (a === 'right' || a === 'down' || a === 'alt') { sel = (sel + 1) % n; renderQ(); return true; }
     if (a === 'confirm') { usesTray() ? add() : choose(); return true; }
     if (a === 'back') { if (usesTray() && hand.length) { hand.pop(); renderQ(); } return true; }
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
     if (a === 'rup' || a === 'rdown') { if (usesTray()) { hand = []; renderQ(); } return true; }
     return false;
   });
 
   MATH.opening.forEach((l, i) => later(() => cls?.react(i ? 'nod' : 'confused', l.text, l.who), 200 + i * 2200));
+  drawPoster();
   renderIntro();
   return () => { busy = true; dead = true; };
 };

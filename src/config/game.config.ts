@@ -33,6 +33,11 @@ export const GAME_CONFIG = {
     'q1.lobby.english':      { x: 7.0, z: 1.2, space: 'kimball-office', yaw: Math.PI, label: 'Personnel Services, Kimball Building' },
     'q1.lobby.art':          { x: 5.0, z: 7.0, space: 'kimball-office', yaw: 0, label: 'Personnel Services, Kimball Building' },
     'q1.lobby.engineering':  { x: 7.0, z: 7.0, space: 'kimball-office', yaw: 0, label: 'Personnel Services, Kimball Building' },
+    // Quest 1 classrooms (room-local centres). Each opens from its department building's demo door.
+    'q1.room.math':          { x: 0, z: 0, space: 'q1-room-math', label: 'Romney Building — math classroom' },
+    'q1.room.english':       { x: 0, z: 0, space: 'q1-room-english', label: 'Smith Building — English classroom' },
+    'q1.room.art':           { x: 0, z: 0, space: 'q1-room-art', label: 'Spori Building — art studio' },
+    'q1.room.engineering':   { x: 0, z: 0, space: 'q1-room-engineering', label: 'Austin Building — electronics lab' },
     'q1.lobby.board':        { x: 6.2, z: -0.6, space: 'kimball-office', label: 'Personnel Services hiring board' },
     'candidate.math':        { x: -12, z: -318, building: 'romney', offset: 3.5, label: 'Romney Building' },
     'candidate.engineering': { x: -82, z: 108, building: 'austin', offset: 3.5, label: 'Austin Building' },
@@ -125,6 +130,11 @@ export const GAME_CONFIG = {
 
   interiors: {
     'kimball-office': { label: 'Kimball Building — President’s office & Personnel Services', width: 20, depth: 22, exteriorDoor: 'door-kimball', eras: null as EraId[] | null },
+    // CONTRACT ADDITION (Q1): teaching-demo classrooms (Fall 1999 only).
+    'q1-room-math': { label: 'Romney Building — math classroom', width: 16, depth: 14, exteriorDoor: 'candidate.math', eras: ['ricks1999'] as EraId[] | null },
+    'q1-room-english': { label: 'Smith Building — English classroom', width: 16, depth: 14, exteriorDoor: 'candidate.english', eras: ['ricks1999'] as EraId[] | null },
+    'q1-room-art': { label: 'Spori Building — art studio', width: 16, depth: 14, exteriorDoor: 'candidate.art', eras: ['ricks1999'] as EraId[] | null },
+    'q1-room-engineering': { label: 'Austin Building — electronics lab', width: 16, depth: 14, exteriorDoor: 'candidate.engineering', eras: ['ricks1999'] as EraId[] | null },
     'stc-first-floor': { label: 'Science and Technology Center — first floor (approximation)', width: 48, depth: 30, exteriorDoor: 'door.stc.main', eras: ['presentFinale'] as EraId[] | null },
   },
 

@@ -6,6 +6,7 @@ import data from './data/classroom.json';
 import type { ChallengeApi, ChallengeBody, ChallengeResult } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import type { QuestContext } from '../contract';
+import type { Room3D } from './room3d';
 
 export type Cue = 'nod' | 'confused' | 'ooh' | 'gasp' | 'applause';
 export interface RoomDef {
@@ -17,6 +18,8 @@ export interface RoomDef {
 export const CLASSROOM = data as unknown as { rooms: Record<string, RoomDef>; lines: Record<Cue, string[]>; passLine: string };
 
 export interface Classroom {
+  /** The 3D classroom when the demo runs in the room (null for the old full-screen layout). */
+  room: Room3D | null;
   react(cue: Cue, text?: string, who?: string): void;
   /** 0..1, visual only. */
   engagement(f: number): void;
@@ -28,7 +31,7 @@ export const classroom = (): Classroom | null => current;
 
 const SOUND: Partial<Record<Cue, 'tick' | 'error' | 'cheer' | 'pop' | 'chime'>> = { nod: 'tick', confused: 'error', applause: 'cheer', gasp: 'pop' };
 
-export function withClassroom(ctx: QuestContext, roomId: string, body: ChallengeBody): ChallengeBody {
+export function withClassroom(ctx: QuestContext, roomId: string, body: ChallengeBody, room3d: Room3D | null = null): ChallengeBody {
   injectStyles();
   const room = CLASSROOM.rooms[roomId];
   return (root, api) => {
@@ -43,12 +46,20 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       speech,
       h('div', { class: 'q1-eng' }, h('span', { text: 'Class engagement' }), h('div', { class: 'q1-eng-bar' }, fill)));
     const stage = h('div', { class: 'q1-stage' });
-    root.append(strip, stage);
+    if (room3d) {
+      const viewBtn = btn(`👁 View: ${room3d.viewLabel(room3d.current)} (T)`, () => { room3d.nextView(); viewBtn.textContent = `👁 View: ${room3d.viewLabel(room3d.current)} (T)`; }, 'q1-viewbtn');
+      viewBtn.removeAttribute('data-focus');
+      (root as HTMLElement & { q1ViewBtn?: HTMLElement }).q1ViewBtn = viewBtn;
+      const mini = h('div', { class: 'q1-mini' }, h('span', { class: 'q1-place', text: room.place }), speech, h('div', { class: 'q1-eng' }, h('span', { text: 'Class' }), h('div', { class: 'q1-eng-bar' }, fill)), viewBtn);
+      root.append(mini, stage);
+      root.closest('.panel')?.classList.add('q1-inroom-panel');
+    } else root.append(strip, stage);
 
     let eng = 0.15, speechTimer = 0;
     const setEng = (f: number) => { eng = Math.max(0, Math.min(1, f)); fill.style.width = `${Math.round(eng * 100)}%`; };
     const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
     const cls: Classroom = {
+      room: room3d,
       react(cue, text, who) {
         const speaker = who ?? (cue === 'applause' ? '' : room.students[Math.floor(Math.random() * room.students.length)].name);
         const line = text ?? pick(CLASSROOM.lines[cue]);
@@ -57,6 +68,12 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
         const all = cue === 'applause' || cue === 'ooh' || cue === 'gasp';
         const targets = all ? people : [people[Math.floor(Math.random() * people.length)]];
         if (who === room.chair) chair.pose(cue); else targets.forEach(p => p.pose(cue));
+        if (room3d && line && !line.startsWith('*')) {
+          const idx = speaker ? room3d.studentIndex(speaker) : -1;
+          const t3 = who === room.chair ? room3d.who('chair') : idx >= 0 ? room3d.who(idx) : all ? room3d.who('random') : speaker && speaker !== 'You' && !speaker.startsWith('You') ? room3d.who('random') : [];
+          if (t3[0]) room3d.bubble(t3[0], line);
+          if (all || cue === 'nod') room3d.hop(all ? room3d.who('all') : t3);
+        } else if (room3d && cue === 'applause') room3d.hop(room3d.who('all'));
         const snd = SOUND[cue]; if (snd) ctx.world.sound(snd);
         if (cue === 'nod' || cue === 'ooh') cls.bump(0.12); else if (cue === 'confused') cls.bump(-0.08);
         clearTimeout(speechTimer); speechTimer = window.setTimeout(() => { speech.className = 'q1-speech'; }, 2600);
@@ -139,6 +156,33 @@ function injectStyles() {
 .q1-follow-who{font:700 13px monospace;color:#7a4f1a}.q1-follow h3{margin:6px 0 12px;font-family:Georgia,serif;color:#2a211a}
 .q1-follow-opts{display:flex;flex-direction:column;gap:8px}
 @media (prefers-reduced-motion:reduce){.q1-person,.q1-stage.q1-flash{animation:none!important}}
+/* In-room demos: the 3D classroom stays visible; only a strip along the bottom */
+.screen.fullscreen.q1-inroom{background:transparent!important;pointer-events:none}
+.screen.fullscreen.q1-inroom .panel{pointer-events:auto;top:auto!important;bottom:0;height:auto!important;max-height:46dvh;background:rgba(20,15,11,.86)!important;background-image:none!important;padding:8px max(14px,calc((100vw - 1240px)/2))!important;gap:4px;border-top:3px solid #0b0b0b!important}
+.screen.fullscreen.q1-inroom.q1-closeup .panel{max-height:60dvh;background:rgba(20,15,11,.80)!important}
+.q1-closeup .cx-board{max-height:38dvh!important;width:auto!important;max-width:100%}
+.q1-closeup .cx-wrap{align-items:flex-start}
+.q1-closeup .art-canvas{max-height:40dvh!important;aspect-ratio:20/24;width:auto!important}
+.q1-closeup .art-refbox{display:none}
+.q1-inroom .ch-intro,.q1-inroom .legend-box{display:none}
+.q1-inroom .ch-head{padding:3px 8px}.q1-inroom .ch-title{font-size:16px!important}
+.q1-inroom .ch-footer{padding:4px!important}
+.q1-mini{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.q1-mini .q1-place{font:700 12px monospace;color:#2a211a;background:rgba(255,250,235,.85);padding:3px 8px;border-radius:4px}
+.q1-mini .q1-speech{flex:1;min-width:240px;opacity:1;font-size:14px;padding:3px 10px}
+.q1-mini .q1-eng{color:#f3ecdc}
+.q1-viewbtn{padding:4px 10px!important;font-size:12px!important}
+.q1-inroom .q1-bin-q,.q1-inroom .q1-bin-board,.q1-inroom .q1-bin-how,.q1-inroom .ch-status{display:none}
+.screen.fullscreen.q1-inroom:not(.q1-closeup) .panel{max-height:36dvh}
+.q1-inroom .ch-result{padding:6px}.q1-inroom .ch-result h2{font-size:18px!important}
+.q1-inroom .art-reveal{max-height:28dvh}
+/* English in-room: keep the paper strip laid out but invisible (it drives timing) */
+.q1-measure{position:absolute!important;left:0;right:0;top:0;visibility:hidden;pointer-events:none;height:0;overflow:hidden}
+.q1-measure .rp-press{height:90px}
+.q1-inroom .rp-choice{position:static;margin:4px 0}.q1-inroom .rp-toast{position:static}
+/* Art: dark chalkboard so white stone shows up */
+.q1-demo .art-canvas .cell{background-color:#34463d}
+.q1-demo .art-canvas{background:#1d2a24}
 /* Math: binary board */
 .q1-bin{display:grid;gap:12px}
 .q1-bin-q{font:18px/1.4 Georgia,serif;color:#2a211a;background:#fffaf0;border:2px solid #3a2c22;border-radius:6px;padding:10px 14px}
@@ -163,7 +207,7 @@ function injectStyles() {
 .q1-bin-score{font:13px monospace;text-align:center;color:inherit}
 /* Art: projector */
 .art-refbox.q1-dark .art-ref{filter:brightness(.06)}
-.art-refbox.q1-dark .ref-title::after{content:" — bulb out!";color:#b04a3a}
+.art-refbox.q1-dark .ref-title::after{content:" — shorted out!";color:#b04a3a}
 `;
   document.head.append(s);
 }

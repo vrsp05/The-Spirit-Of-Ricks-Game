@@ -7,6 +7,7 @@ import data from './data/circuit.json';
 import type { ChallengeBody } from '../shared/frame';
 import { h, loop } from '../shared/frame';
 import { classroom } from './classroom';
+import { chalk, text } from './room3d';
 
 export type Brightness = 'off' | 'dim' | 'bright';
 export interface LevelDef { id: string; title: string; goal: string; rows: string[]; labels: Record<string, string>; expect: { switches: Record<string, boolean>; bulbs: Record<string, Brightness> }[]; hint: string; hardOnly?: boolean }
@@ -169,7 +170,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const mode = CIRCUIT.modes[api.difficulty];
   const levels = mode.levels.map(id => CIRCUIT.levels.find(l => l.id === id)!);
   let li = 0, board!: Board, cur = { x: 0, y: 0 }, moves = 0, par = 0, totalMoves = 0, totalPar = 0, hintsLeft = mode.hints, hintTile: string | null = null;
-  let wasShort = false, solvedT = 0, flash = 0, startT = performance.now(), switchState: Record<string, boolean> = {}, needed = new Set<string>();
+  let wasShort = false, shortSignalled = false, solvedT = 0, flash = 0, startT = performance.now(), switchState: Record<string, boolean> = {}, needed = new Set<string>();
   const cv = h('canvas', { class: 'cx-board', 'aria-label': 'Circuit board' }) as HTMLCanvasElement;
   const goal = h('div', { class: 'cx-goal' }), bulbsEl = h('div', { class: 'cx-bulbs' }), info = h('div', { class: 'cx-info' });
   root.append(h('div', { class: 'cx-wrap' }, h('div', { class: 'cx-boardbox' }, cv), h('div', { class: 'cx-side' }, goal, bulbsEl, info)));
@@ -184,6 +185,8 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     par = board.tiles.reduce((s, r, y) => s + r.reduce((q, t, x) => q + (needed.has(`${x},${y}`) ? stepsToSolved(t) : 0), 0), 0); moves = 0; hintTile = null; solvedT = 0;
     const firstWire = board.tiles.flatMap((r, y) => r.map((t, x) => ({ t, x, y }))).find(o => o.t.kind === 'wire'); cur = firstWire ? { x: firstWire.x, y: firstWire.y } : { x: 0, y: 0 };
     goal.replaceChildren(h('div', { class: 'cx-lvl', text: `Circuit ${li + 1} / ${levels.length}` }), h('div', { class: 'cx-title', text: l.title }), h('p', { text: l.goal }));
+    const wb = classroom()?.room?.get('board');
+    if (wb) { chalk(wb, '#22303a'); let y = text(wb, 'PROJECTOR REPAIR', wb.w / 2, 30, 52, '#ffe08a', 'center'); y = text(wb, `Circuit ${li + 1} of ${levels.length}: ${l.title}`, wb.w / 2, y + 10, 38, '#f1efe6', 'center'); text(wb, l.goal, wb.w / 2, y + 16, 32, '#cfe6ff', 'center', undefined, wb.w - 120); wb.refresh(); }
     update();
   };
   const update = () => {
@@ -199,6 +202,15 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     api.setStatus(sim.short ? 'Pop! The fuse blew — something connects the plug to itself.' : '');
     if (sim.short && !wasShort) classroom()?.react('gasp', 'Whoa! The fuse popped!');
     wasShort = sim.short;
+    const room = classroom()?.room;
+    if (room) {
+      const find = (re: RegExp) => Object.entries(l.labels).find(([, v]) => re.test(v))?.[0];
+      const lampId = find(/^Lamp/), fanId = find(/^Fan/);
+      room.signal('lamp', sim.short || !lampId ? 'off' : sim.bulbs[lampId]?.brightness ?? 'off');
+      room.signal('fan', sim.short || !fanId ? 'off' : sim.bulbs[fanId]?.brightness ?? 'off');
+      if (sim.short && !shortSignalled) room.signal('fuse', true);
+      shortSignalled = sim.short;
+    }
     if (!solvedT && testBoard(l, board).pass) { solvedT = 1.4; flash = 1; classroom()?.react(li === levels.length - 1 ? 'ooh' : 'nod', li === levels.length - 1 ? 'The lamp is throwing light on the wall!' : undefined); classroom()?.engagement((li + 1) / levels.length); totalMoves += moves; totalPar += par; api.setStatus(l.expect.length > 1 ? 'It works in every switch position!' : 'The circuit works!'); }
   };
   const rotate = (dir: 1 | -1) => {
@@ -244,13 +256,14 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     else if (a === 'up') cur.y = (cur.y + board.h - 1) % board.h; else if (a === 'down') cur.y = (cur.y + 1) % board.h;
     else if (a === 'confirm' || a === 'alt') { if (board.tiles[cur.y][cur.x].kind === 'switch') flip(); else rotate(1); }
     else if (a === 'back' || a === 'alt2') rotate(-1);
+    else if (a === 'rdown' && classroom()?.room) { const r = classroom()!.room!; r.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${r.viewLabel(r.current)} (G)`; }
     else if (a === 'rup' || a === 'rdown') flip();
     else return false;
     return true;
   });
   load();
   const intro = [
-    window.setTimeout(() => classroom()?.react('gasp', 'It keeps blowing fuses, and the art department needs it.', 'Physical Plant worker'), 300),
+    window.setTimeout(() => classroom()?.react('gasp', 'It shorted out in the middle of the art demo. The art department needs it back.', 'Physical Plant worker'), 300),
     window.setTimeout(() => classroom()?.react('nod', 'Forget the lesson plan. Show us.', 'Brother Frost (engineering chair)'), 2600),
   ];
   return () => { stop(); intro.forEach(clearTimeout); };

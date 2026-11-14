@@ -19,7 +19,7 @@
     "engineering": "Ready when you are. I'm demonstrating in the Austin Building's electronics lab."
   },
   "waiting": {
-    "engineering": "I'm waiting on the art department's demo first — I hear their projector is about to give out."
+    "engineering": "I'm waiting on the art department's demo first — I hear their old projector is about to short out — that's what I'll be fixing."
   },
   "busy": "You're already walking the {other} over. Come back for me after that!",
   "arrive": "Lead the way — the {building} is marked on your map.",

@@ -6,6 +6,7 @@ import data from './data/english.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h, loop } from '../shared/frame';
 import { classroom } from './classroom';
+import { text } from './room3d';
 
 export interface EnglishError { word: string; correct: string; options: string[]; why: string }
 export const ENGLISH = data as unknown as {
@@ -44,7 +45,39 @@ export const englishChallenge: ChallengeBody = (root, api) => {
   const hud = h('div', { class: 'rp-hud' });
   const toast = h('div', { class: 'rp-toast' });
   const facts = h('div', { class: 'eng-facts rp-facts' }, h('div', { class: 'ref-title', text: 'Fact sheet (Church News, 1999)' }), h('ul', {}, ...ENGLISH.facts.map(f => h('li', { text: f }))));
-  root.append(h('div', { class: 'eng-label', text: ENGLISH.label.split(' Facts')[0] }), hud, h('div', { class: 'rp-stage' }, press, choice, toast), facts);
+  const room = classroom()?.room ?? null;
+  if (room) {
+    // In the classroom: the paper strip is mirrored onto the 3D projector screen; the DOM strip
+    // stays laid out (invisible) for timing and hit-testing. Choices and the HUD sit in the bottom strip.
+    const stampBtn = btn('✒ Stamp the word on the lamp line (E)', () => stamp(), 'primary'); stampBtn.removeAttribute('data-focus');
+    root.append(hud, h('div', { class: 'rp-stage q1-measure' }, press), stampBtn, choice, toast);
+  } else root.append(h('div', { class: 'eng-label', text: ENGLISH.label.split(' Facts')[0] }), hud, h('div', { class: 'rp-stage' }, press, choice, toast), facts);
+  const drawClipping = () => {
+    const p = room?.get('poster'); if (!p) return;
+    const g = p.g; g.fillStyle = '#f4efe2'; g.fillRect(0, 0, p.w, p.h); g.fillStyle = '#c0392b'; g.beginPath(); g.arc(p.w / 2, 30, 14, 0, 7); g.fill();
+    let y = text(p, 'CHURCH NEWS · Sept. 11, 1999', p.w / 2, 60, 30, '#222', 'center', 'Georgia, serif');
+    y = text(p, 'Fact sheet', p.w / 2, y + 4, 40, '#222', 'center', 'Georgia, serif') + 10;
+    for (const f of ENGLISH.facts) y = text(p, '• ' + f, 40, y + 8, 27, '#222', 'left', 'Georgia, serif', p.w - 80);
+    p.refresh();
+  };
+  const drawScreen = () => {
+    const sc = room?.get('board'); if (!sc || !stripW) return;
+    const g = sc.g, k = sc.w / Math.max(1, press.clientWidth);
+    g.fillStyle = '#f7f5ee'; g.fillRect(0, 0, sc.w, sc.h);
+    g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, sc.h * 0.25, sc.w, sc.h * 0.5);
+    const fs = parseFloat(getComputedStyle(spans[0]).fontSize) * k, cy = sc.h / 2;
+    g.font = `${fs}px Georgia, serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
+    spans.forEach((sp, i) => {
+      const x0 = (x + offsets[i]) * k; if (x0 > sc.w || x0 + widths[i] * k < 0) return;
+      const fixedW = sp.classList.contains('rp-fixed'), stamped = sp.classList.contains('rp-stamped'), glow = sp.classList.contains('rp-glow');
+      if (glow) { g.fillStyle = 'rgba(255,220,80,.55)'; g.fillRect(x0 - 4, cy - fs * 0.7, widths[i] * k + 8, fs * 1.4); }
+      g.fillStyle = fixedW ? '#1f7a2e' : stamped ? '#c0392b' : '#1a1a1a'; g.fillText(sp.textContent ?? '', x0, cy);
+      if (fixedW) { g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.ellipse(x0 + widths[i] * k / 2, cy, widths[i] * k / 2 + 10, fs * 0.75, 0, 0, 7); g.stroke(); }
+    });
+    const lx = lineX() * k; g.fillStyle = 'rgba(220,40,30,.85)'; g.fillRect(lx - 3, 0, 6, sc.h);
+    g.font = `bold ${Math.round(fs * 0.5)}px monospace`; g.fillText('LAMP', lx + 10, 30);
+    sc.refresh();
+  };
   api.setControls([['1', 'STAMP / choose'], ['L', 'pick correction'], ['2', 'cancel'], ['R', 'scroll speed'], ['RU', 'pause scrolling'], ['3', 'hint'], ['4', 'tools']]);
 
   let offsets: number[] = [], widths: number[] = [], stripW = 0;
@@ -102,6 +135,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
 
   const stop = loop(dt => {
     if (!stripW) { measure(); x = press.clientWidth * 0.6; }
+    drawScreen();
     pulse = Math.max(0, pulse - dt * 4); line.style.setProperty('--p', String(pulse));
     if (choosing || paused || over) return;
     const prev = x; x -= mode.speed * SPEEDS[speedIdx] * dt;
@@ -136,11 +170,14 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     if (a === 'confirm') { stamp(); return true; }
     if (a === 'alt' || a === 'right') { speedIdx = Math.min(SPEEDS.length - 1, speedIdx + 1); renderHud(); return true; }
     if (a === 'alt2' || a === 'left') { speedIdx = Math.max(0, speedIdx - 1); renderHud(); return true; }
+    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
     if (a === 'rup' || a === 'rdown') { paused = !paused; renderHud(); return true; }
     if (a === 'up' || a === 'down' || a === 'back') return true;
     return false;
   });
   press.addEventListener('pointerdown', () => stamp());
+  drawClipping();
+  if (room) api.setControls([['1', 'stamp the word on the lamp line'], ['R', 'scroll speed'], ['RU', 'view'], ['3', 'hint']]);
   renderHud();
   return () => stop();
 };

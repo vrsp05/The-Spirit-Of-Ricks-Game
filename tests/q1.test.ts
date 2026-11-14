@@ -94,8 +94,9 @@ describe('art scoring', () => {
     expect(g[0][6]).toBe(null); expect(floodFill(g, 0, 0, 'b')).toBe(0);
   });
   it('thresholds are 60% (Easy) and 85% (Hard)', () => { expect(ART.modes.easy.pass).toBe(0.6); expect(ART.modes.hard.pass).toBe(0.85); });
-  it('the bulb burns out only on Hard; class guesses advance with the score', () => {
-    expect(ART_DATA.modes.easy.bulbSeconds).toBeUndefined(); expect(ART_DATA.modes.hard.bulbSeconds).toBe(15);
+  it('the projector always shorts out — later on Easy than on Hard — and stays dead', () => {
+    expect(ART_DATA.modes.easy.shortAtSeconds).toBeGreaterThan(ART_DATA.modes.hard.shortAtSeconds!);
+    expect(ART_DATA.modes.hard.shortAtSeconds).toBeGreaterThan(0);
     expect(guessIndex(0)).toBe(-1); expect(guessIndex(1)).toBe(ART_DATA.guesses.length - 1);
     for (let i = 1; i < ART_DATA.guesses.length; i++) expect(ART_DATA.guesses[i].at).toBeGreaterThan(ART_DATA.guesses[i - 1].at);
   });

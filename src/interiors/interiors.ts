@@ -46,6 +46,12 @@ const LAYOUTS: Record<string, Partial<InteriorDef>> = {
       { text: ['Faculty interviews today'], x: 7.2, z: -1.7, ry: 0 },
     ],
   },
+  // CONTRACT ADDITION (Q1): teaching-demo classrooms. Furniture, boards and people are placed
+  // by the Q1 module (src/quests/q1/room3d.ts); only floor/wall colours live here.
+  'q1-room-math': { floor: '#9c8f78', wall: '#e9e2cf', signs: [{ text: ['Romney · Math & Computer Science'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-english': { floor: '#6f6a8a', wall: '#e6dccb', signs: [{ text: ['Smith Building · English'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-art': { floor: '#7a5a3a', wall: '#cbbfa8', signs: [{ text: ['Spori Building · Art studio'], x: 0, z: 6.9, ry: Math.PI }] },
+  'q1-room-engineering': { floor: '#4a4a4a', wall: '#d9d6cc', signs: [{ text: ['Austin Building · Electronics lab'], x: 0, z: 6.9, ry: Math.PI }] },
   'dev-quest-room': {
     floor: '#b9a68a', wall: '#e6dccb',
     props: [{ x0: -5, z0: -4, x1: 5, z1: -2.6, h: 0.9, color: '#6f5037' }, { x0: -7.4, z0: -5.8, x1: 7.4, z1: -5.5, h: 2.6, color: '#f7f7f2' }],

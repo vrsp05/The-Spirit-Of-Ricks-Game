@@ -55,7 +55,8 @@
       "liveMeter": true,
       "showReference": true,
       "hintSeconds": 2.5,
-      "hints": 3
+      "hints": 3,
+      "shortAtSeconds": 90
     },
     "hard": {
       "pass": 0.85,
@@ -63,9 +64,7 @@
       "showReference": true,
       "hintSeconds": 3,
       "hints": 2,
-      "bulbAtScore": 0.4,
-      "bulbAtSeconds": 45,
-      "bulbSeconds": 15
+      "shortAtSeconds": 40
     }
   },
   "subject": "temple",
@@ -132,5 +131,6 @@
   "subjects": {
     "temple": "Projected reference (future temple concept)",
     "tabernacle": "Projected reference (Rexburg Stake Tabernacle, 1911)"
-  }
+  },
+  "projectorNote": "The overhead projector always shorts out partway through the demo (Easy after 90 s, Hard after 40 s) and stays dead; the player finishes from memory. The engineering demo repairs that circuit."
 }

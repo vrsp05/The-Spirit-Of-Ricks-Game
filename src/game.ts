@@ -1,5 +1,6 @@
 // Game orchestrator: wires world, player, input, UI, quests, interiors, save and finale.
 import * as THREE from 'three';
+import './interiors/campusInteriors';   // registers campus building interiors + their doors (before the world is built)
 import { ATMOSPHERE } from './config/atmosphere';
 import { MusicPlayer } from './fx/music';
 import { Ambience } from './fx/ambience';
@@ -276,7 +277,8 @@ export class Game {
     const bl = this.location(qg.anchor); bednar.root.rotation.y = bl.yaw ?? 0;
 
     for (const [id, def] of this.interiors.defs) {
-      const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string };
+      const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string; building?: string };
+      const open = () => !cfg.building || this.world.buildingStanding(cfg.building) || this.gateBuilt(cfg.building);
       const anchor = this.location(def.exteriorDoor);
       const d = this.world.doorPlacement(anchor);
       const door = makeDoor(true);
@@ -286,7 +288,7 @@ export class Game {
       // The door visual sits on the wall; the interaction point is just outside.
       this.interactions.add({
         id: `core:door-${id}`, kind: 'door', at: { x: d.x + d.nx * 1.8, z: d.z + d.nz * 1.8 }, radius: 2.6,
-        eras: cfg.eras, prompt: `Enter: ${def.label}`,
+        eras: cfg.eras, prompt: `Enter: ${def.label}`, enabled: open,
         onInteract: () => this.enterInterior(id),
       });
       this.interactions.add({ id: `core:doorvis-${id}`, kind: 'generic', at: { x: d.x, z: d.z }, radius: 0, eras: cfg.eras, visual: door, prompt: '', onInteract: () => {} });
@@ -600,7 +602,7 @@ export class Game {
     if (this.player.vehicle) this.exitCart();
     playSound('door');
     await this.ui.fade(() => {
-      this.spaceId = id; this.world.exterior.visible = false; this.interiors.show(id);
+      this.spaceId = id; this.world.exterior.visible = false; this.interiors.show(id, this.world.era);
       const p = this.interiors.entryPoint(id);
       this.player.place(this.interiors.space(id), p.x, p.z, Math.PI);
       this.cameraRig.reset(Math.PI); this.cameraRig.pitch = 0.9; this.cameraRig.distance = 9; this.cameraRig.snap(this.player.position);
@@ -682,7 +684,7 @@ export class Game {
     this.applyColor(true);
     if (!d.player) { const sp = this.resolve('spawn'); d.player = { space: 'exterior', x: sp.x, z: sp.z, yaw: this.location('spawn').yaw ?? 0 }; }
     if (d.player.space !== 'exterior' && this.interiors.defs.has(d.player.space)) {
-      this.spaceId = d.player.space; this.world.exterior.visible = false; this.interiors.show(d.player.space);
+      this.spaceId = d.player.space; this.world.exterior.visible = false; this.interiors.show(d.player.space, d.era);
       this.player.place(this.interiors.space(d.player.space), d.player.x, d.player.z, d.player.yaw);
     } else {
       this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true;

@@ -5,11 +5,14 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/game.config';
 import type { Space } from '../player/PlayerController';
 import { textCanvas } from '../world/World';
+import { CAMPUS_LAYOUTS } from './campusInteriors';
+import type { EraId } from '../world/eras';
 
 interface Rect { x0: number; z0: number; x1: number; z1: number; h?: number; color?: string }
 export interface InteriorDef {
   id: string; label: string; width: number; depth: number; exteriorDoor: string;
   floor: string; wall: string; walls: Rect[]; props: Rect[]; signs: { text: string[]; x: number; z: number; ry: number }[];
+  blockers?: Rect[]; decorate?: (g: THREE.Group) => void; onEra?: (era: EraId) => void;
 }
 
 // Layout extras per interior. STC layout is an APPROXIMATION (no verified floor
@@ -81,9 +84,10 @@ export class InteriorManager {
   constructor(scene: THREE.Scene) {
     let n = 0;
     for (const [id, cfg] of Object.entries(GAME_CONFIG.interiors)) {
-      const L = LAYOUTS[id] ?? {};
+      const L = (LAYOUTS[id] ?? CAMPUS_LAYOUTS[id] ?? {}) as Partial<InteriorDef>;
       const def: InteriorDef = { id, label: cfg.label, width: cfg.width, depth: cfg.depth, exteriorDoor: cfg.exteriorDoor,
-        floor: L.floor ?? '#b9a68a', wall: L.wall ?? '#e6dccb', walls: L.walls ?? [], props: L.props ?? [], signs: L.signs ?? [] };
+        floor: L.floor ?? '#b9a68a', wall: L.wall ?? '#e6dccb', walls: L.walls ?? [], props: L.props ?? [], signs: L.signs ?? [],
+        blockers: L.blockers, decorate: L.decorate, onEra: L.onEra };
       this.defs.set(id, def);
       this.origins.set(id, new THREE.Vector3(20000 + n++ * 300, 0, 20000));
       const g = this.build(def); g.visible = false; this.groups.set(id, g); scene.add(g);
@@ -133,7 +137,7 @@ export class InteriorManager {
 
   space(id: string): Space {
     const d = this.defs.get(id)!, o = this.origin(id);
-    const rects: Rect[] = [...d.walls, ...d.props];
+    const rects: Rect[] = [...d.walls, ...d.props, ...(d.blockers ?? [])];
     return {
       id, interior: true,
       groundY: () => 0,
@@ -146,7 +150,15 @@ export class InteriorManager {
       occluderTop: () => 0,
     };
   }
-  show(id: string | null) { for (const [k, g] of this.groups) g.visible = k === id; }
+  private decorated = new Set<string>();
+  /** Show one interior (null = none). Furniture/people are built on first entry; era-dependent bits refresh. */
+  show(id: string | null, era?: EraId) {
+    for (const [k, g] of this.groups) g.visible = k === id;
+    if (!id) return;
+    const d = this.defs.get(id), g = this.groups.get(id);
+    if (d?.decorate && g && !this.decorated.has(id)) { this.decorated.add(id); d.decorate(g); }
+    if (d?.onEra && era) d.onEra(era);
+  }
 }
 
 function shade(hex: string, f: number) { const c = new THREE.Color(hex).multiplyScalar(f); return '#' + c.getHexString(); }

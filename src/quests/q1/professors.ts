@@ -198,7 +198,7 @@ export function createProfessors(): QuestModule {
     const def = BODIES[c.challenge];
     const r = await runChallenge(ctx, { title: def.title, playingAs: c.label, intro: def.intro, allowSkip: ctx.config.allowSkipChallenge,
       body: withClassroom(ctx, c.id, def.body, room), passText: def.pass, failText: def.fail,
-      className: `ch-${c.challenge} q1-demo ${room ? 'q1-inroom' : ''} ${room && (c.id === 'art' || c.id === 'engineering') ? 'q1-closeup' : ''}` });
+      className: `ch-${c.challenge} q1-demo ${room ? 'q1-inroom' : ''} ${room && (c.id === 'art' || c.id === 'engineering') ? 'q1-pad' : ''}` });
     room?.stop();
     ctx.ui.setBanner(null); ctx.world.releaseCamera();
     if (r.outcome === 'pass' && room) { despawnFollower(); room.showCeiling(true); await outro(c, room); }

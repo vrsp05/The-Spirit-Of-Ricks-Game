@@ -195,6 +195,13 @@ function injectStyles() {
 .q1-eng-choice{display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:#f3ecdc;min-height:34px}
 .q1-eng-choice button{text-transform:none!important}.q1-eng-choice button.sel{outline:3px solid #ffd34d!important}
 .q1-page{width:100%;max-width:1000px;display:block;margin:0 auto 8px;border:3px solid #0b0b0b}
+/* Art & Engineering in the room: you work on the 3D board; the DOM grid is just a small mouse pad */
+.screen.fullscreen.q1-inroom.q1-pad .panel{max-height:40dvh}
+.q1-pad .art-wrap,.q1-pad .cx-wrap{display:flex;gap:14px;align-items:flex-start}
+.q1-pad .art-canvas{height:22dvh!important;width:calc(22dvh * 20 / 24)!important;max-height:none!important;opacity:.85}
+.q1-pad .art-refbox{display:none}
+.q1-pad .cx-board{height:20dvh!important;width:auto!important;max-height:none!important;opacity:.85}
+.q1-pad .art-wrap>div:first-child::before,.q1-pad .cx-boardbox::before{content:"mouse pad";display:block;font:700 10px monospace;color:#a9a08c;text-transform:uppercase}
 /* Math: binary board */
 .q1-bin{display:grid;gap:12px}
 .q1-bin-q{font:18px/1.4 Georgia,serif;color:#2a211a;background:#fffaf0;border:2px solid #3a2c22;border-radius:6px;padding:10px 14px}

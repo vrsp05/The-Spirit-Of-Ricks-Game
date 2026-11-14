@@ -132,7 +132,8 @@ export const artChallenge: ChallengeBody = (root, api) => {
     const cs = Math.floor(Math.min((b.w - 60) / W, (b.h - 60) / H)), ox = (b.w - cs * W) / 2, oy = (b.h - cs * H) / 2;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const v = canvas[y][x]; b.g.fillStyle = v ? colorOf(v) : 'rgba(255,255,255,.06)'; b.g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2);
-      if (x === cx && y === cy) { b.g.strokeStyle = '#ffd34d'; b.g.lineWidth = 4; b.g.strokeRect(ox + x * cs - 2, oy + y * cs - 2, cs + 2, cs + 2); }
+      if (ghost) { const r = ref[y - ghost.oy]?.[x - ghost.ox]; if (r) { b.g.strokeStyle = colorOf(r); b.g.lineWidth = 3; b.g.strokeRect(ox + x * cs + 2, oy + y * cs + 2, cs - 6, cs - 6); } }
+      if (x === cx && y === cy) { b.g.strokeStyle = '#ffd34d'; b.g.lineWidth = 5; b.g.strokeRect(ox + x * cs - 3, oy + y * cs - 3, cs + 4, cs + 4); }
     }
     b.refresh();
   };

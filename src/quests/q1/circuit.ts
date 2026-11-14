@@ -228,7 +228,11 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const stop = loop((dt, t) => {
     if (flash > 0) flash = Math.max(0, flash - dt * 1.5);
     if (solvedT) { solvedT -= dt; if (solvedT <= 0) { li++; if (li >= levels.length) return finish(); load(); } }
-    if (board) drawBoard(cv, levels[li] ?? levels[levels.length - 1], board, simulate(board, switchState), cur, hintTile, t, flash, switchState);
+    if (board) {
+      drawBoard(cv, levels[li] ?? levels[levels.length - 1], board, simulate(board, switchState), cur, hintTile, t, flash, switchState);
+      const peg = classroom()?.room?.get('peg');
+      if (peg && cv.width) { peg.g.fillStyle = '#c9a46a'; peg.g.fillRect(0, 0, peg.w, peg.h); const k = Math.min(peg.w / cv.width, peg.h / cv.height); peg.g.drawImage(cv, (peg.w - cv.width * k) / 2, (peg.h - cv.height * k) / 2, cv.width * k, cv.height * k); peg.refresh(); }
+    }
   });
   const finish = () => {
     stop(); const secs = (performance.now() - startT) / 1000;

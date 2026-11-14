@@ -23,12 +23,12 @@ const VIEWS: Record<RoomId, Record<string, ViewDef>> = {
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
   art: {
-    board: { label: 'Drawing board', from: { x: 0, y: 1.9, z: 0.6 }, to: { x: 0, y: 0.55, z: -6.8 } },
+    board: { label: 'Drawing board', from: { x: 0, y: 2.25, z: -2.5 }, to: { x: 0, y: 1.45, z: -6.8 } },
     poster: { label: 'Projected reference', from: { x: 0.2, y: 2.2, z: -1.6 }, to: { x: -7.8, y: 0.3, z: -1.6 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
   engineering: {
-    bench: { label: 'Lab bench', from: { x: 1.4, y: 3.1, z: 0.6 }, to: { x: 1.4, y: -0.5, z: -4.6 } },
+    bench: { label: 'Lab bench', from: { x: 0.3, y: 2.3, z: -0.6 }, to: { x: 0.3, y: 1.35, z: -4.8 } },
     board: { label: 'Wall board', from: { x: 0, y: 2.3, z: -1.6 }, to: { x: 0, y: 2.1, z: -6.8 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
@@ -99,7 +99,9 @@ export class Room3D {
     } else if (this.id === 'engineering') {
       this.surface('board', 6, 2.2, 160, 0, 2.2, -6.86, 0);
       this.box(7.0, 1.0, 1.6, '#16181b', 0, -4.3);                            // black lab bench
-      this.buildProjector(0, -4.3, 1.0);
+      this.box(3.2, 2.1, 0.1, '#c9a46a', -0.9, -4.85, 1.0);                  // pegboard on the bench
+      this.surface('peg', 3.0, 1.95, 220, -0.9, 2.0, -4.78, 0);
+      this.buildProjector(0.9, -4.3, 1.0);
       const fuse = this.box(0.8, 1.0, 0.25, '#6b6f73', 7.6, -3.5, 1.4, -Math.PI / 2); this.props.set('fuse', fuse);
       const lamp = this.ctx.world.voxel(0.25, 0.25, 0.1, '#3a3a3a'); lamp.position.set(0, 0.7, 0.15); fuse.add(lamp); this.props.set('fuseLamp', lamp);
       for (const x of [-6, 6]) { this.box(0.9, 0.55, 0.6, '#2a3a2a', x, -4.3, 1.0); }  // oscilloscopes

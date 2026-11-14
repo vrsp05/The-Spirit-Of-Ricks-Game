@@ -7,7 +7,7 @@ import data from './data/english.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
-import { text, type Surface } from './room3d';
+import { text, type Hotspot, type Surface } from './room3d';
 
 export interface EnglishError { word: string; correct: string; options: string[]; why: string }
 export const ENGLISH = data as unknown as {
@@ -91,6 +91,31 @@ export const englishChallenge: ChallengeBody = (root, api) => {
       }
       if (i === flashBad && flashT > 0) { g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.ellipse(q.x + q.w / 2, q.y + FONT / 2, q.w / 2 + 12, FONT * 0.8, 0, 0, 7); g.stroke(); }
     });
+    // clicking a word on the page marks it
+    const spots: Hotspot[] = over ? [] : tokens.map((_, i) => ({ x: pos[i].x - 6, y: pos[i].y - 6, w: pos[i].w + 12, h: FONT + 14, on: () => { if (choosing) return; cur = i; mark(); } }));
+    // correction bubble in red ink, right above the chosen word, with a tail pointing at it
+    if (choosing && !over) {
+      const c = choosing, q = pos[c.i], BF = 34, padX = 18, gap = 26, items = [...c.opts, '✕'];
+      g.font = `italic ${BF}px ${SERIF}`;
+      const ws = items.map(o => g.measureText(o).width), bw = ws.reduce((a, b) => a + b, 0) + gap * (items.length - 1) + padX * 2, bh = BF + 26;
+      const bx = Math.max(30, Math.min(p.w - bw - 30, q.x + q.w / 2 - 40)), by = Math.max(8, q.y - bh - 24), tx = Math.max(bx + 24, Math.min(bx + bw - 24, q.x + q.w / 2));
+      g.fillStyle = '#ffffff'; g.strokeStyle = '#c0392b'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(bx + 12, by); g.lineTo(bx + bw - 12, by); g.quadraticCurveTo(bx + bw, by, bx + bw, by + 12); g.lineTo(bx + bw, by + bh - 12); g.quadraticCurveTo(bx + bw, by + bh, bx + bw - 12, by + bh);
+      g.lineTo(tx + 14, by + bh); g.lineTo(tx, by + bh + 20); g.lineTo(tx - 14, by + bh);
+      g.lineTo(bx + 12, by + bh); g.quadraticCurveTo(bx, by + bh, bx, by + bh - 12); g.lineTo(bx, by + 12); g.quadraticCurveTo(bx, by, bx + 12, by); g.closePath(); g.fill(); g.stroke();
+      let x = bx + padX;
+      items.forEach((o, k) => {
+        const sel = k === c.sel;
+        if (sel) { g.fillStyle = 'rgba(255,211,77,.55)'; g.fillRect(x - 8, by + 8, ws[k] + 16, bh - 16); }
+        g.fillStyle = k === items.length - 1 ? '#777' : '#c0392b'; g.textBaseline = 'top'; g.fillText(o, x, by + 13);
+        const ox = x;
+        spots.unshift({ x: ox - 8, y: by, w: ws[k] + 16, h: bh, on: () => { if (k === items.length - 1) { choosing = null; renderAll(); } else { c.sel = k; pick(); } } });
+        x += ws[k] + gap;
+      });
+      g.font = `${FONT}px ${SERIF}`;
+    }
+    if (pos.length) { const ys = pos.map(q => q.y); room?.setRegion('page', 'board', { x: MX - 20, y: Math.min(...ys) - 16, w: p.w - MX * 2 + 40, h: Math.max(...ys) - Math.min(...ys) + FONT + 32 }); }
+    room?.setHotspots('board', spots);
     p.refresh();
   };
 
@@ -171,7 +196,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
       else if (a === 'confirm') { pick(); return true; }
       else if (a === 'back') { choosing = null; renderAll(); return true; }
       else return a === 'rdown';
-      renderStrip(); return true;
+      renderAll(); return true;
     }
     if (a === 'left' || a === 'alt2') { move(-1, 0); return true; }
     if (a === 'right' || a === 'alt') { move(1, 0); return true; }

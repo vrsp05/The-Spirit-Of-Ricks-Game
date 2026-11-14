@@ -1,6 +1,6 @@
 # Q1 demos: in-world layout plan (for review)
 
-**Status:** proposal, not built. It covers the `[plan]` items in `feedback-2026-11-14.md`.
+**Status:** built (Nov 14, 2026), following the approved mockup. Changes from the first draft: views are a `G  < name >  T` switcher (no tabs); Hint, Brief and More… are written in chalk on the board itself; the English bubble has a tail; the projector is bigger than its circuit board. A small window explains teaching demos the first time any demo starts.
 
 ## The problem
 The demo happens on the board, but you play it in a black bar at the bottom of the screen. The two feel unrelated, and the bar crams buttons, words and sentences together.

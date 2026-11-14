@@ -9,16 +9,20 @@ import { CLASSROOM } from './classroom';
 type V3 = { x: number; y: number; z: number };
 export type RoomId = 'math' | 'english' | 'art' | 'engineering';
 export interface Surface { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; w: number; h: number; refresh(): void }
+/** A clickable rectangle on a surface, in canvas pixels. `on` gets the canvas point; drag = pointer moved while held. */
+export interface Hotspot { x: number; y: number; w: number; h: number; on: (pt: { x: number; y: number }, kind: 'down' | 'drag', button: number) => void; drag?: boolean }
+/** The game camera's vertical field of view (mirrored so clicks can be traced onto board surfaces). */
+const GAME_FOV = 55;
 interface ViewDef { label: string; from: V3; to: V3 }
 
 const VIEWS: Record<RoomId, Record<string, ViewDef>> = {
   math: {
-    board: { label: 'Chalkboard', from: { x: 0, y: 1.8, z: 0.9 }, to: { x: 0, y: 1.25, z: -6.8 } },
+    board: { label: 'Chalkboard', from: { x: 0, y: 2.0, z: -0.9 }, to: { x: 0, y: 1.85, z: -6.8 } },
     poster: { label: 'Coin poster', from: { x: -1.9, y: 1.9, z: -1.6 }, to: { x: -7.8, y: 1.5, z: -1.6 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
   english: {
-    board: { label: 'Projector screen', from: { x: 0, y: 1.8, z: 0.9 }, to: { x: 0, y: 1.25, z: -6.8 } },
+    board: { label: 'Projector screen', from: { x: 0, y: 2.0, z: -0.9 }, to: { x: 0, y: 1.85, z: -6.8 } },
     poster: { label: 'Fact clipping', from: { x: -2.4, y: 1.9, z: -1.6 }, to: { x: -7.8, y: 1.4, z: -1.6 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
@@ -28,7 +32,7 @@ const VIEWS: Record<RoomId, Record<string, ViewDef>> = {
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
   engineering: {
-    bench: { label: 'Lab bench', from: { x: 0.3, y: 2.3, z: -0.6 }, to: { x: 0.3, y: 1.35, z: -4.8 } },
+    bench: { label: 'Lab bench', from: { x: 0.3, y: 2.8, z: -1.15 }, to: { x: 0.3, y: 1.25, z: -4.4 } },
     board: { label: 'Wall board', from: { x: 0, y: 2.3, z: -1.6 }, to: { x: 0, y: 2.1, z: -6.8 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
@@ -54,6 +58,11 @@ export class Room3D {
   private fanSpeed = 0;
   private ceiling!: THREE.Group;
   private fuseT = 0;
+  private meshes = new Map<string, THREE.Mesh>();
+  private hot = new Map<string, Hotspot[]>();          // key `${surface}:${layer}`
+  private overlays = new Map<string, (s: Surface) => void>();
+  private pointerOff: (() => void) | null = null;
+  private regions = new Map<string, { surface: string; x: number; y: number; w: number; h: number }>();
   current = '';
   active = false;
 
@@ -74,15 +83,16 @@ export class Room3D {
     const m = this.ctx.world.voxel(w, h, d, color); m.position.y = h / 2;
     const g = new THREE.Group(); g.add(m); return this.place(g, x, z, y, ry);
   }
-  private surface(name: string, w: number, h: number, px: number, x: number, y: number, z: number, ry: number) {
+  private surface(name: string, w: number, h: number, px: number, x: number, y: number, z: number, ry: number, rx = 0) {
     const canvas = document.createElement('canvas'); canvas.width = Math.round(w * px); canvas.height = Math.round(h * px);
     const g = canvas.getContext('2d')!;
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+    mesh.rotation.x = rx;
     const grp = new THREE.Group(); grp.add(mesh);
     this.place(grp, x, z, y, ry);
-    const s: Surface = { canvas, g, w: canvas.width, h: canvas.height, refresh: () => { tex.needsUpdate = true; } };
-    this.surfaces.set(name, s);
+    const s: Surface = { canvas, g, w: canvas.width, h: canvas.height, refresh: () => { this.overlays.get(name)?.(s); tex.needsUpdate = true; } };
+    this.surfaces.set(name, s); this.meshes.set(name, mesh);
     if (name === 'board') { chalk(s, this.id === 'english' ? '#f7f5ee' : this.id === 'engineering' ? '#22303a' : this.id === 'art' ? '#34463d' : '#2f4a3c'); s.refresh(); }
     else { g.fillStyle = this.id === 'art' ? '#4f5a63' : '#efe3c2'; g.fillRect(0, 0, canvas.width, canvas.height); s.refresh(); }
     return s;
@@ -99,9 +109,11 @@ export class Room3D {
     } else if (this.id === 'engineering') {
       this.surface('board', 6, 2.2, 160, 0, 2.2, -6.86, 0);
       this.box(7.0, 1.0, 1.6, '#16181b', 0, -4.3);                            // black lab bench
-      this.box(3.2, 2.1, 0.1, '#c9a46a', -0.9, -4.85, 1.0);                  // pegboard on the bench
-      this.surface('peg', 3.0, 1.95, 220, -0.9, 2.0, -4.78, 0);
-      this.buildProjector(0.9, -4.3, 1.0);
+      // the projector's circuit board, pulled out and lying on the bench on a low stand, tilted toward the class
+      this.box(1.8, 0.3, 0.9, '#3a2f22', -0.95, -4.35, 1.0);
+      this.surface('peg', 1.7, 1.15, 400, -0.95, 1.72, -4.3, 0, -Math.PI / 2 + 0.75);
+      this.box(0.6, 0.04, 0.08, '#b98a3c', 0.25, -4.3, 1.04);                 // ribbon cable to the projector
+      this.buildProjector(1.6, -4.3, 1.0);
       const fuse = this.box(0.8, 1.0, 0.25, '#6b6f73', 7.6, -3.5, 1.4, -Math.PI / 2); this.props.set('fuse', fuse);
       const lamp = this.ctx.world.voxel(0.25, 0.25, 0.1, '#3a3a3a'); lamp.position.set(0, 0.7, 0.15); fuse.add(lamp); this.props.set('fuseLamp', lamp);
       for (const x of [-6, 6]) { this.box(0.9, 0.55, 0.6, '#2a3a2a', x, -4.3, 1.0); }  // oscilloscopes
@@ -168,19 +180,87 @@ export class Room3D {
     if (this.id === 'art') { this.box(1.6, 1.4, 0.4, '#b9b2a2', 6.8, -5.8); this.box(0.6, 0.9, 0.6, '#eae4d8', -6.6, 5.6); }
     void dark;
   }
+  /** The art studio's overhead projector (bigger than its circuit board): base with glass stage, arm and head. */
   private buildProjector(x: number, z: number, y: number) {
-    const body = this.box(0.9, 0.5, 0.9, '#2f3338', x + 1.5, z, y);
-    const head = this.ctx.world.voxel(0.25, 0.9, 0.25, '#2f3338'); head.position.set(0, 0.9, -0.2); body.add(head);
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), new THREE.MeshBasicMaterial({ color: '#444' }));
-    lamp.position.set(0, 0.62, 0); body.add(lamp); this.props.set('lamp', lamp);
+    const body = this.box(2.0, 0.72, 1.6, '#4a5058', x, z, y);
+    const arm = this.ctx.world.voxel(0.18, 1.3, 0.18, '#3a3f45'); arm.position.set(0.75, 1.4, -0.72); body.add(arm);
+    const head = this.ctx.world.voxel(0.7, 0.34, 0.6, '#3a3f45'); head.position.set(0.45, 2.05, -0.6); body.add(head);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.04, 1.2), new THREE.MeshBasicMaterial({ color: '#444' }));   // the glass stage lights up
+    lamp.position.set(-0.15, 0.77, 0.05); body.add(lamp); this.props.set('lamp', lamp);
     const fan = new THREE.Group(); const blade = this.ctx.world.voxel(0.5, 0.06, 0.08, '#9aa'); fan.add(blade); const b2 = blade.clone(); b2.rotation.y = Math.PI / 2; fan.add(b2);
-    fan.position.set(0.5, 0.3, 0); fan.rotation.z = Math.PI / 2; body.add(fan); this.props.set('fan', fan);
+    fan.position.set(1.12, 0.38, 0.2); fan.rotation.z = Math.PI / 2; body.add(fan); this.props.set('fan', fan);
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.8), new THREE.MeshBasicMaterial({ color: '#fff6c0', transparent: true, opacity: 0 }));
     const gg = new THREE.Group(); gg.add(glow); this.place(gg, 0, -6.84, 2.3); this.props.set('wallGlow', glow);
   }
 
   // ---------- API used by demos ----------
   get(name: string) { return this.surfaces.get(name) ?? null; }
+
+  // ---------- playing on the surfaces: clicks traced from the screen onto the board ----------
+  /** Replace the clickable areas of one layer on a surface ('body' = the demo, 'ui' = chalk tools). */
+  setHotspots(surface: string, spots: Hotspot[], layer = 'body') { this.hot.set(`${surface}:${layer}`, spots); }
+  /** Something drawn on top of a surface every time it refreshes (the chalk Hint / Brief / More). */
+  setOverlay(surface: string, fn: ((s: Surface) => void) | null) { if (fn) this.overlays.set(surface, fn); else this.overlays.delete(surface); this.get(surface)?.refresh(); }
+  private camera() {
+    if (!this.cam) return null;
+    const c = new THREE.PerspectiveCamera(GAME_FOV, window.innerWidth / Math.max(1, window.innerHeight), 0.1, 100);
+    c.position.copy(this.cam.from); c.lookAt(this.cam.to); c.updateMatrixWorld(); return c;
+  }
+  /** Which surface (and which canvas pixel on it) is under a screen point. */
+  pick(clientX: number, clientY: number): { name: string; x: number; y: number } | null {
+    const c = this.camera(); if (!c) return null;
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1), c);
+    const list = [...this.meshes.entries()].filter(([, m]) => m.visible);
+    const hit = ray.intersectObjects(list.map(([, m]) => m), false)[0];
+    if (!hit?.uv) return null;
+    const name = list.find(([, m]) => m === hit.object)![0], s = this.surfaces.get(name)!;
+    return { name, x: hit.uv.x * s.w, y: (1 - hit.uv.y) * s.h };
+  }
+  /** Name an area a demo drew (for tutorial highlights), in canvas pixels on a surface. */
+  setRegion(name: string, surface: string, r: { x: number; y: number; w: number; h: number }) { this.regions.set(name, { surface, ...r }); }
+  /** Screen rectangle of a named region, or null if it isn't known / visible. */
+  screenRegion(name: string) { const r = this.regions.get(name); return r ? this.screenRect(r.surface, r) : null; }
+  /** Screen rectangle (client px) covering a canvas-pixel rectangle on a surface: for tutorial highlights. */
+  screenRect(surface: string, r: { x: number; y: number; w: number; h: number }) {
+    const c = this.camera(), m = this.meshes.get(surface), s = this.surfaces.get(surface); if (!c || !m || !s) return null;
+    const geo = m.geometry as THREE.PlaneGeometry, W = geo.parameters.width, H = geo.parameters.height;
+    m.updateMatrixWorld();
+    const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([px, py]) => {
+      const v = new THREE.Vector3((px / s.w - 0.5) * W, (0.5 - py / s.h) * H, 0).applyMatrix4(m.matrixWorld).project(c);
+      return { x: (v.x + 1) / 2 * window.innerWidth, y: (1 - v.y) / 2 * window.innerHeight };
+    });
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  }
+  private spotAt(clientX: number, clientY: number) {
+    const p = this.pick(clientX, clientY); if (!p) return null;
+    for (const layer of ['ui', 'body']) {
+      const spot = (this.hot.get(`${p.name}:${layer}`) ?? []).find(h => p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h);
+      if (spot) return { spot, pt: { x: p.x, y: p.y } };
+    }
+    return null;
+  }
+  /** Mouse on the 3D boards while a demo runs (only clicks that land on the game canvas). */
+  private listen(on: boolean) {
+    this.pointerOff?.(); this.pointerOff = null; document.body.style.cursor = '';
+    if (!on) return;
+    let held: Hotspot | null = null;
+    // the click lands on the game canvas, or on the demo's transparent full-screen layer above it (not on the strip or a pop-up)
+    const onCanvas = (e: MouseEvent) => { const t = e.target as HTMLElement | null; return !!t && (t.tagName === 'CANVAS' || t.classList.contains('q1-inroom')); };
+    let btn = 0;
+    const down = (e: PointerEvent) => { if (!onCanvas(e) || (e.button !== 0 && e.button !== 2)) return; const s = this.spotAt(e.clientX, e.clientY); if (!s) return; btn = e.button; held = s.spot.drag ? s.spot : null; s.spot.on(s.pt, 'down', btn); };
+    const move = (e: PointerEvent) => {
+      if (!onCanvas(e)) { document.body.style.cursor = ''; return; }
+      const s = this.spotAt(e.clientX, e.clientY);
+      document.body.style.cursor = s ? (s.spot.drag ? 'crosshair' : 'pointer') : '';
+      if (held && e.buttons & 3 && s?.spot.drag) s.spot.on(s.pt, 'drag', btn);   // (demos re-register spots as they redraw)
+    };
+    const up = () => { held = null; };
+    const menu = (e: MouseEvent) => { if (onCanvas(e)) e.preventDefault(); };
+    window.addEventListener('contextmenu', menu);
+    window.addEventListener('pointerdown', down); window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    this.pointerOff = () => { window.removeEventListener('contextmenu', menu); window.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+  }
   /** Room-local point → world coordinates. */
   w(x: number, y: number, z: number): V3 { return { x: this.base.x + x, y: this.base.y + y, z: this.base.z + z }; }
   /** Students turn to look at the door (true) or back at the board (false). */
@@ -207,9 +287,9 @@ export class Room3D {
     if (!this.cam) this.cam = { from: this.target.from.clone(), to: this.target.to.clone() };
   }
   nextView() { const vs = this.views(); this.view(vs[(vs.indexOf(this.current) + 1) % vs.length]); return this.current; }
-  start(firstView: string) { this.active = true; this.cam = null; this.view(firstView); this.showCeiling(true); }
+  start(firstView: string) { this.active = true; this.cam = null; this.view(firstView); this.showCeiling(true); this.listen(true); }
   showCeiling(on: boolean) { if (this.ceiling) this.ceiling.visible = on; }
-  stop() { this.active = false; this.cam = null; this.target = null; this.ctx.world.releaseCamera(); }
+  stop() { this.active = false; this.cam = null; this.target = null; this.ctx.world.releaseCamera(); this.listen(false); this.hot.clear(); this.overlays.clear(); this.regions.clear(); }
   /** Where the candidate stands to teach (world coords + facing the class). */
   teachSpot() { return { x: this.base.x + (this.id === 'engineering' ? -4.6 : -5.2), y: this.base.y, z: this.base.z + (this.id === 'engineering' ? -3.0 : -5.4), ry: 0 }; }
 
@@ -251,7 +331,7 @@ export class Room3D {
       this.ctx.world.focusCamera(this.cam.from, this.cam.to);
     }
   }
-  destroy() { this.removers.forEach(r => r()); this.removers = []; this.surfaces.clear(); }
+  destroy() { this.listen(false); this.removers.forEach(r => r()); this.removers = []; this.surfaces.clear(); this.meshes.clear(); }
 }
 
 // ---------- drawing helpers for surfaces ----------

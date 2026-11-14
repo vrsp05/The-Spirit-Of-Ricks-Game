@@ -75,6 +75,7 @@ export function createProfessors(): QuestModule {
     if (m) drawCoinPoster(m); if (e) drawFactClipping(e); if (a) drawProjectedRef(a, !hired().art);
     rooms.get('art')?.signal('beam', !hired().art);
   };
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__q1rooms = rooms;   // test hook (dev builds only)
   const destroyRooms = () => { rooms.forEach(r => r.destroy()); rooms.clear(); };
   const roomAnchor = (c: Candidate) => `q1.room.${c.id}`;
 

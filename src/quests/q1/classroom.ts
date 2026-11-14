@@ -6,7 +6,8 @@ import data from './data/classroom.json';
 import type { ChallengeApi, ChallengeBody, ChallengeResult } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import type { QuestContext } from '../contract';
-import type { Room3D } from './room3d';
+import type { Hotspot, Room3D } from './room3d';
+import { coach, type CoachStep } from './coach';
 
 export type Cue = 'nod' | 'confused' | 'ooh' | 'gasp' | 'applause';
 export interface RoomDef {
@@ -52,39 +53,110 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       speech,
       h('div', { class: 'q1-eng' }, h('span', { text: 'Class engagement' }), h('div', { class: 'q1-eng-bar' }, fill)));
     const stage = h('div', { class: 'q1-stage' });
-    // ---- views: one tab per camera view (click to jump), T = next, G = previous ----
-    const tabs = h('div', { class: 'q1-views', title: 'Camera view: T next · G previous' });
-    const paintTabs = () => { if (!room3d) return; tabs.replaceChildren(h('span', { class: 'q1-views-lbl', text: 'View' }), ...room3d.views().map(v => {
-      const b = btn(room3d.viewLabel(v), () => { room3d.view(v); paintTabs(); }, v === room3d.current ? 'on' : ''); b.removeAttribute('data-focus'); return b; }),
-      h('span', { class: 'q1-views-keys', text: 'T / G' })); };
-    const stepView = (d: 1 | -1) => { if (!room3d) return; const vs = room3d.views(); room3d.view(vs[(vs.indexOf(room3d.current) + d + vs.length) % vs.length]); paintTabs(); };
-    // ---- "How this works" card (dismissable; the Brief button reopens it) ----
-    let card: HTMLElement | null = null;
-    const closeCard = () => { card?.remove(); card = null; api.refocus(); };
-    const openCard = () => {
-      if (card) return closeCard();
-      const ok = btn('Got it ▸', () => closeCard(), 'q1-card-ok'); ok.removeAttribute('data-focus');
-      card = h('div', { class: 'q1-card', role: 'dialog', 'aria-label': 'How this works' },
-        h('div', { class: 'q1-card-tag', text: 'How this works' }),
-        h('p', {}, h('b', { text: `You're playing as ${playingAs}. ` }), 'This is their teaching demonstration, and you deliver it: the lesson moves forward as you work through it.'),
-        h('p', {}, h('b', { text: 'The lesson: ' }), room.brief.teach),
-        h('p', {}, h('b', { text: 'How to play: ' }), room.brief.how),
-        h('div', { class: 'q1-card-foot' }, h('span', { text: 'Reopen any time with Brief (B).' }), ok));
-      (root.closest('.screen') ?? document.body).append(card);
+    // ---- views: G  < Chalkboard >  T ----
+    const viewName = h('span', { class: 'q1-vn' });
+    const arrow = (sym: string, key: string, d: 1 | -1) => { const b = h('button', { class: 'q1-ar', 'aria-label': d > 0 ? 'Next view' : 'Previous view' }, h('small', { text: key }), h('b', { text: sym })); b.addEventListener('click', () => stepView(d)); return b; };
+    const switcher = h('div', { class: 'q1-vw', title: 'Camera view' }, arrow('<', 'G', -1), viewName, arrow('>', 'T', 1));
+    const paintView = () => { if (room3d) viewName.textContent = room3d.viewLabel(room3d.current); };
+    const stepView = (d: 1 | -1) => { if (!room3d) return; const vs = room3d.views(); room3d.view(vs[(vs.indexOf(room3d.current) + d + vs.length) % vs.length]); paintView(); };
+    // ---- pop-ups: first-demo intro, "How this works" card ----
+    let card: HTMLElement | null = null, cardClose: (() => void) | null = null;
+    const host = () => root.closest('.screen') ?? document.body;
+    const closeCard = () => { card?.remove(); card = null; const f = cardClose; cardClose = null; f?.(); api.refocus(); };
+    const popup = (cls: string, tag: string, paras: (HTMLElement | string)[][], okLabel: string, foot: string, then?: () => void) => {
+      if (card) closeCard();
+      const ok = btn(okLabel, () => closeCard(), 'q1-card-ok'); ok.removeAttribute('data-focus');
+      card = h('div', { class: `q1-card ${cls}`, role: 'dialog', 'aria-label': tag }, h('div', { class: 'q1-card-tag', text: tag }), ...paras.map(p => h('p', {}, ...p)),
+        h('div', { class: 'q1-card-foot' }, h('span', { text: foot }), ok));
+      cardClose = then ?? null; host().append(card);
+    };
+    // ---- tutorial coach marks (first time in each room this session, after the card) ----
+    const domRect = (sel: string) => () => { const e = host().querySelector(sel) as HTMLElement | null; return e && e.offsetParent ? e.getBoundingClientRect() : null; };
+    const reg = (name: string) => () => room3d?.screenRegion(name) ?? null;
+    const STEPS: Record<string, CoachStep[]> = {
+      math: [
+        { text: 'This is the student’s question. You answer it as the teacher.', target: reg('question') },
+        { text: 'These are the Nephite gold coins from Alma 11: senine 1, seon 2, shum 4, limnah 7. Click a coin on the board to put it down.', target: reg('answers') },
+        { text: 'Each column is one coin. ✔ means it’s in your hand (1); empty means it isn’t (0). That row of 1s and 0s is binary.', target: reg('columns') },
+        { text: 'Stuck? Hint, Brief and More are written on the board. The class’s reactions show down here.', target: reg('tools') },
+      ],
+      english: [
+        { text: 'This is Brother Price’s write-up of the dedication. Click any word that looks wrong.', target: reg('page') },
+        { text: 'Pick the correction in the red bubble. Your progress shows here: fix every mistake to finish proofreading.', target: domRect('.q1-eng-hud') },
+        { text: 'Not sure of a fact? Press G / T to look at the Church News clipping on the wall.', target: domRect('.q1-vw') },
+        { text: 'Hint, Brief and More are written on the screen.', target: reg('tools') },
+      ],
+      art: [
+        { text: 'Paint right on the board, square by square. Click and drag to paint; right-click erases.', target: reg('canvas') },
+        { text: 'The picture to copy is projected on the side wall. Press G / T to look at it.', target: domRect('.q1-vw') },
+        { text: 'Pick colours here, and Check painting when it looks close.', target: domRect('.art-side') },
+        { text: 'Hint, Brief and More are written on the board.', target: reg('tools') },
+      ],
+      engineering: [
+        { text: 'This is the projector’s circuit board, opened up on the bench. Click a tile to turn it (right-click turns it back).', target: reg('circuit') },
+        { text: 'Get power from + through the lamp and back to −. The lamp and fan show here when they work.', target: domRect('.cx-side') },
+        { text: 'Press G / T to switch between the bench and the wall board with the goal.', target: domRect('.q1-vw') },
+        { text: 'Hint, Brief and More are written on the circuit board.', target: reg('tools') },
+      ],
+    };
+    let stopCoach: (() => void) | null = null;
+    const startCoach = () => { const steps = STEPS[roomId]; if (!room3d || !steps || !root.isConnected) return; stopCoach = coach(host() as HTMLElement, steps, () => { stopCoach = null; api.refocus(); }); };
+    const openCard = (then?: () => void) => {
+      if (card) { closeCard(); return; }
+      popup('', 'How this works', [
+        [h('b', { text: `You're playing as ${playingAs}. ` }), 'This is their teaching demonstration, and you deliver it: the lesson moves forward as you work through it.'],
+        [h('b', { text: 'The lesson: ' }), room.brief.teach],
+        [h('b', { text: 'How to play: ' }), room.brief.how]], 'Got it ▸', 'Reopen any time with Brief (B).', then);
+    };
+    /** The very first demo of the quest: a small window explaining what a teaching demo is. */
+    const openIntro = () => popup('q1-intro', 'Your first teaching demonstration', [
+      [h('b', { text: `You're now playing as ${playingAs}. ` }), 'They are giving a teaching demonstration to a real class, and you deliver it for them.'],
+      ['Complete the challenge, and the demonstration is delivered successfully: the class learns it, and the department chair can recommend the candidate to President Bednar.']],
+      'Start ▸', 'Each department has its own demo.', () => openCard(startCoach));
+    // ---- chalk Hint / Brief / More written on the board (clickable) ----
+    const more = h('div', { class: 'q1-more' });
+    const toggleMore = (on?: boolean) => more.classList.toggle('open', on ?? !more.classList.contains('open'));
+    const hintNow = () => (host().querySelector('.ch-hintbtn') as HTMLButtonElement | null)?.click();
+    const TOOLS: Record<string, { surface: string; corner: 'bl' | 'tr' | 'tl'; size: number; color: string; font?: string }[]> = {
+      math: [{ surface: 'board', corner: 'bl', size: 32, color: '#cfe6c8' }],
+      art: [{ surface: 'board', corner: 'bl', size: 32, color: '#cfe6c8' }],
+      english: [{ surface: 'board', corner: 'tr', size: 30, color: '#2f5d8a', font: '"Marker Felt", "Comic Sans MS", cursive' }],
+      engineering: [{ surface: 'peg', corner: 'bl', size: 26, color: '#cfe6c8' }, { surface: 'board', corner: 'tl', size: 30, color: '#cfe6c8' }],
+    };
+    const drawTools = () => {
+      if (!room3d) return;
+      for (const [ti, t] of (TOOLS[roomId] ?? []).entries()) room3d.setOverlay(t.surface, sfc => {
+        const g = sfc.g, items: [string, () => void][] = [['Hint', hintNow], ['Brief', () => openCard()], ['More…', () => toggleMore()]];
+        g.font = `${t.size}px ${t.font ?? '"Comic Sans MS", "Chalkboard SE", cursive'}`; g.textBaseline = 'top'; g.textAlign = 'left';
+        const ws = items.map(([l]) => g.measureText(l).width), gap = t.size * 1.1, total = ws.reduce((a, b) => a + b, 0) + gap * (items.length - 1);
+        let x = t.corner === 'tr' ? sfc.w - 50 - total : t.corner === 'tl' ? 46 : 40;
+        const y = t.corner === 'bl' ? sfc.h - t.size - 26 : 30;
+        const spots: Hotspot[] = [];
+        items.forEach(([label, act], k) => {
+          g.fillStyle = t.color; g.fillText(label, x, y);
+          g.strokeStyle = t.color; g.lineWidth = 2; g.setLineDash([5, 6]); g.beginPath(); g.moveTo(x, y + t.size * 1.12); g.lineTo(x + ws[k], y + t.size * 1.12); g.stroke(); g.setLineDash([]);
+          spots.push({ x: x - 8, y: y - 8, w: ws[k] + 16, h: t.size * 1.4 + 8, on: act });
+          x += ws[k] + gap;
+        });
+        room3d.setHotspots(t.surface, spots, 'ui');
+        if (ti === 0) room3d.setRegion('tools', t.surface, { x: (t.corner === 'tr' ? sfc.w - 50 - total : t.corner === 'tl' ? 46 : 40) - 14, y: y - 14, w: total + 28, h: t.size * 1.5 + 22 });
+      });
     };
     if (room3d) {
-      paintTabs();
-      const briefBtn = btn('ⓘ Brief', () => openCard(), 'q1-briefbtn'); briefBtn.removeAttribute('data-focus');
-      const mini = h('div', { class: 'q1-mini' }, h('span', { class: 'q1-place', text: room.place }), speech, h('div', { class: 'q1-eng' }, h('span', { text: 'Class' }), h('div', { class: 'q1-eng-bar' }, fill)), tabs, briefBtn);
-      if (!briefSeen.has(roomId)) { briefSeen.add(roomId); window.setTimeout(openCard, 400); }
-      const onKey = (e: KeyboardEvent) => { if (e.code === 'KeyB' && !e.repeat && root.isConnected) openCard(); };
+      paintView();
+      const mini = h('div', { class: 'q1-mini' }, h('span', { class: 'q1-place', text: room.place }), speech, h('div', { class: 'q1-eng' }, h('span', { text: 'Class' }), h('div', { class: 'q1-eng-bar' }, fill)), switcher);
+      if (!ctx.progress.get<boolean>('demoIntroSeen', false)) { ctx.progress.set('demoIntroSeen', true); briefSeen.add(roomId); window.setTimeout(openIntro, 400); }
+      else if (!briefSeen.has(roomId)) { briefSeen.add(roomId); window.setTimeout(() => openCard(startCoach), 400); }
+      const onKey = (e: KeyboardEvent) => { if (!root.isConnected || e.repeat) return; if (e.code === 'KeyB' && !stopCoach) openCard(); if (e.code === 'Tab') toggleMore(); };
       window.addEventListener('keydown', onKey);
-      (root as HTMLElement & { q1Cleanup?: () => void }).q1Cleanup = () => { window.removeEventListener('keydown', onKey); card?.remove(); card = null; };
+      (root as HTMLElement & { q1Cleanup?: () => void }).q1Cleanup = () => { window.removeEventListener('keydown', onKey); card?.remove(); card = null; cardClose = null; more.remove(); stopCoach?.(); };
       root.append(mini, stage);
-      // one compact top row: the frame's Hint / Skip / Leave buttons join the room row (no extra rows to scroll)
+      // Skip / Leave live in the "More…" pop-up (opened from the chalk on the board, or Tab)
       const footer = root.parentElement?.querySelector(':scope > .ch-footer.tools-zone');
-      if (footer) mini.append(footer);
+      const closeMore = btn('Close', () => toggleMore(false)); closeMore.removeAttribute('data-focus');
+      if (footer) { more.append(footer, closeMore); host().append(more); }
       root.closest('.panel')?.classList.add('q1-inroom-panel');
+      drawTools();
     } else root.append(strip, stage);
 
     let eng = 0.15, speechTimer = 0;
@@ -122,6 +194,7 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       ...api,
       onAction: fn => api.onAction(a => {
         if (card && (a === 'confirm' || a === 'back')) { closeCard(); return true; }
+        if (more.classList.contains('open') && a === 'back') { toggleMore(false); return true; }
         if (room3d && (a === 'rup' || a === 'rdown')) { stepView(a === 'rup' ? 1 : -1); return true; }
         return fn(a);
       }),
@@ -221,11 +294,31 @@ body:has(.q1-inroom) .hud-help{visibility:hidden}
 .q1-mini .ch-footer button,.q1-mini .q1-viewbtn{padding:3px 8px!important;font-size:11px!important;white-space:nowrap}
 .q1-inroom .ch-hint:empty{display:none}
 body:has(.q1-inroom) .hud-top,body:has(.q1-inroom) .hud-mini,body:has(.q1-inroom) .hud-pointer,body:has(.q1-inroom) .hud-coins{visibility:hidden}
-.q1-views{display:flex;align-items:center;gap:3px;flex:none}
-.q1-views-lbl,.q1-views-keys{font:700 10px monospace;color:#cbbfa6;margin:0 3px}
-.q1-views button{padding:3px 7px!important;font-size:11px!important;white-space:nowrap;opacity:.75}
-.q1-views button.on{opacity:1;outline:2px solid #ffd34d!important}
-.q1-briefbtn{padding:3px 8px!important;font-size:11px!important;white-space:nowrap}
+.screen.fullscreen.q1-inroom .panel.q1-inroom-panel{background:#7a5634!important;border-top:4px solid #4f3820!important;box-shadow:inset 0 6px 0 rgba(255,255,255,.06)}
+.q1-mini{gap:16px!important}
+.q1-mini .q1-speech{background:#fffaf0!important;color:#2a211a;border:0!important;border-radius:3px;transform:rotate(-.4deg);max-width:56%;font:14px/1.35 Georgia,serif;padding:6px 12px!important;box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.q1-mini .q1-eng{color:#f1e6d0}
+.q1-vw{display:flex;align-items:flex-end;gap:8px;margin-left:auto;flex:none}
+.screen .q1-vw button.q1-ar,.screen .q1-vw button.q1-ar:hover,.screen .q1-vw button.q1-ar:focus{all:unset;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 2px!important;color:#fff3c4!important;cursor:pointer;border:0!important;background:none!important;box-shadow:none!important;min-height:0!important;min-width:0!important}
+.q1-ar small{font:11px monospace;color:#2a211a;background:#efe3c2;border-radius:3px;padding:0 5px}
+.q1-ar b{font:500 22px system-ui,sans-serif;line-height:1}
+.q1-ar:hover b{color:#ffd34d}
+.q1-vn{font:15px Georgia,serif;color:#fff3c4;min-width:150px;text-align:center;padding-bottom:2px}
+.q1-inroom .q1-bin-work,.q1-inroom .q1-eng-line,.q1-inroom .q1-eng-choice,.q1-inroom .art-wrap>div:first-child,.q1-inroom .art-refbox,.q1-inroom .cx-boardbox{display:none!important}
+.q1-inroom .q1-bin-fb,.q1-inroom .q1-bin-score,.q1-inroom .q1-eng-hud,.q1-inroom .cx-side,.q1-inroom .art-side{color:#fbf1dc}
+.q1-inroom .ch-hint{background:#fff3a8;color:#2a211a;border-radius:3px;display:inline-block;padding:3px 10px!important;margin:4px 0 0!important}
+.q1-more{position:absolute;left:50%;bottom:30dvh;transform:translateX(-50%);display:none;flex-direction:column;align-items:stretch;gap:8px;pointer-events:auto;background:#fffaf0;border:3px solid #3a2c22;border-radius:10px;padding:12px 14px;z-index:6;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.q1-more.open{display:flex}
+.q1-more .ch-footer{display:flex!important;flex-direction:column;gap:6px;padding:0!important;border:0!important;background:none!important}
+.q1-more .tools-label,.q1-more .ch-hintbtn{display:none!important}
+.q1-intro{border-color:#7a4f1a}
+.q1-coach{position:fixed;inset:0;z-index:20;pointer-events:auto}
+.q1-coach-hole{position:absolute;border:3px solid #ffd34d;border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.58);pointer-events:none;transition:all .25s}
+.q1-coach-note{position:absolute;background:#fffaf0;color:#2a211a;border:3px solid #3a2c22;border-radius:10px;padding:10px 14px;font:15px/1.45 Georgia,serif;box-shadow:0 8px 22px rgba(0,0,0,.45)}
+.q1-coach-note p{margin:4px 0 8px}
+.q1-coach-step{font:700 11px monospace;letter-spacing:.06em;text-transform:uppercase;color:#7a4f1a}
+.q1-coach-row{display:flex;justify-content:space-between;gap:10px}
+.q1-coach-row button{padding:4px 10px!important;font-size:12px!important}
 .q1-card{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:min(560px,calc(100vw - 32px));pointer-events:auto;background:#fffaf0;color:#2a211a;border:3px solid #3a2c22;border-radius:10px;padding:14px 18px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:15px/1.45 Georgia,serif;z-index:5;animation:q1up .3s ease-out}
 .q1-card p{margin:6px 0}
 .q1-card-tag{font:700 12px monospace;letter-spacing:.06em;text-transform:uppercase;color:#7a4f1a}

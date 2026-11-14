@@ -140,6 +140,13 @@ export const artChallenge: ChallengeBody = (root, api) => {
       if (x === cx && y === cy) { b.g.strokeStyle = '#ffd34d'; b.g.lineWidth = 5; b.g.strokeRect(ox + x * cs - 3, oy + y * cs - 3, cs + 4, cs + 4); }
     }
     b.refresh();
+    room?.setRegion('canvas', 'board', { x: ox - 10, y: oy - 10, w: cs * W + 20, h: cs * H + 20 });
+    // paint straight onto the board: click / drag (right button erases)
+    room?.setHotspots('board', [{ x: ox, y: oy, w: cs * W, h: cs * H, drag: true, on: (pt, kind, button) => {
+      const x = Math.min(W - 1, Math.floor((pt.x - ox) / cs)), y = Math.min(H - 1, Math.floor((pt.y - oy) / cs)); cx = x; cy = y;
+      if (kind === 'down' && bucket) { fill(button === 2 ? null : color().id); return; }
+      set(x, y, button === 2 ? null : color().id); paintUI();
+    } }]);
   };
   let guessAt = -1, oohed = false, bulb: 'on' | 'out' = 'on', finished = false;
   const set = (x: number, y: number, v: string | null) => {

@@ -83,6 +83,13 @@ Read these first; they win over this brief if they disagree:
   - the view button and a pass colour flash;
   - **Hard only:** the chair says "One more question before I decide," asks a multiple-choice follow-up, and recommends you only after a correct answer.
 
+### 2b. Playing on the board (in-world layout)
+- **You click the board itself.** `Room3D.pick` traces the mouse from the screen onto the board, screen or bench surface (it mirrors the game camera: Q1's `focusCamera` position and the 55° field of view), and demos register clickable areas with `setHotspots`: math answers and coins, English words and the red correction bubble (with a tail), art cells (drag to paint, right-click erases), engineering tiles.
+- **Hint, Brief and More…** are chalk words drawn on the board (`setOverlay`), clickable; More… opens Skip / Leave (Tab also opens it).
+- **The lectern** (bottom strip): a paper index card with the class's line, the Class meter, and the view switcher `G  < Chalkboard >  T`. Demo-specific status sits below it.
+- **First demo ever:** a small window explains that you're playing the candidate and that completing the challenge delivers the demonstration. Then the room's How this works card, then tutorial coach marks (`q1/coach.ts`, once per room per session) that highlight board regions the demos mark with `setRegion`.
+- **Engineering bench:** the projector (2.0 m wide) sits on the bench beside its opened circuit board (1.7 × 1.15 m on a tilted stand).
+
 ### 3. The four demos
 
 | Demo | Room | What's in the world | What's in the strip |

@@ -7,7 +7,7 @@ import data from './data/math.json';
 import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
-import { chalk, text, type Surface } from './room3d';
+import { chalk, text, type Hotspot, type Surface } from './room3d';
 
 export interface Coin { id: string; metal: 'gold' | 'silver'; value: number }
 export interface Question { id: string; kind: 'pay' | 'choice'; who: string; ask: string; target?: number; modes: string[]; options: string[]; correct: string; explain: string; reaction?: string; bits?: number[]; boardNote?: string }
@@ -72,7 +72,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
 
   const qEl = h('div', { class: 'q1-bin-q' });
   const board = h('div', { class: 'q1-bin-board' });
-  const work = h('div', {});
+  const work = h('div', { class: 'q1-bin-work' });
   const fb = h('div', { class: 'q1-bin-fb', 'aria-live': 'polite' });
   const score = h('div', { class: 'q1-bin-score' });
   root.append(h('div', { class: 'q1-bin' }, qEl, board, fb, work, score));
@@ -94,26 +94,73 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   const drawBoard = () => {
     const b = room?.get('board'); if (!b) return;
     chalk(b);
-    const cur = q(), tutorial = phase === 'intro' || !cur;
+    const g = b.g, cur = q(), tutorial = phase === 'intro' || !cur;
     const who = tutorial ? tut.who : cur.who, ask = tutorial ? tut.ask : cur.ask;
-    if (tutorial) text(b, 'TUTORIAL', b.w - 60, 28, 28, '#9cff57', 'right');
-    let y = text(b, `${who}:`, 80, 28, 32, '#ffe08a');
-    y = text(b, `“${ask}”`, 80, y, ask.length > 60 ? 32 : 40, '#f1efe6', 'left', undefined, b.w - 260);
-    // the shum · seon · senine board, centred under the question with room to breathe
+    const L = b.w * 0.6;                                   // left: the question and the binary columns; right: what you click
+    if (tutorial) text(b, 'TUTORIAL', L - 20, 28, 26, '#9cff57', 'right');
+    let y = text(b, `${who}:`, 60, 28, 30, '#ffe08a');
+    y = text(b, `“${ask}”`, 60, y, ask.length > 60 ? 30 : 38, '#f1efe6', 'left', undefined, L - 120);
     const held = phase === 'intro' ? hand : usesTray() && phase === 'ask' ? hand : [];
     const bs = reveal ?? bits(held), blank = !reveal && !held.length;
-    const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.25, b.w * 0.385, b.w * 0.52], top = Math.max(y + 24, b.h * 0.4);
+    const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.1, b.w * 0.2, b.w * 0.3], top = Math.max(y + 22, b.h * 0.38);
     cols.forEach((id, k) => {
-      const hl = hintCoins.includes(id);
-      if (hl) { b.g.strokeStyle = '#9cff57'; b.g.lineWidth = 6; b.g.setLineDash([16, 10]); b.g.strokeRect(cx[k] - 85, top - 12, 170, 186); b.g.setLineDash([]); }
-      text(b, blank ? '?' : bs[k] ? '✔' : '·', cx[k], top, 72, bs[k] && !blank ? '#ffd34d' : '#f1efe6', 'center');
-      text(b, `${id} (${coin(id).value})`, cx[k], top + 84, 30, '#f1efe6', 'center');
-      text(b, blank ? '?' : String(bs[k]), cx[k], top + 120, 40, '#f1efe6', 'center');
+      if (hintCoins.includes(id)) { g.strokeStyle = '#9cff57'; g.lineWidth = 5; g.setLineDash([14, 9]); g.strokeRect(cx[k] - 66, top - 10, 132, 160); g.setLineDash([]); }
+      text(b, blank ? '?' : bs[k] ? '✔' : '·', cx[k], top, 64, bs[k] && !blank ? '#ffd34d' : '#f1efe6', 'center');
+      text(b, `${id} (${coin(id).value})`, cx[k], top + 76, 26, '#f1efe6', 'center');
+      text(b, blank ? '?' : String(bs[k]), cx[k], top + 106, 36, '#f1efe6', 'center');
     });
     const value = bs[0] * 4 + bs[1] * 2 + bs[2];
-    const num = blank ? '= ? ? ?' : reveal ? `= ${bs.join(' ')} → ${value}` : `= ${bs.join(' ')}`;
-    text(b, num, b.w * 0.62, top + 34, 64, '#ffd34d');
-    if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.62, top + 116, 30, '#ffe08a', 'left', undefined, b.w * 0.34);
+    text(b, blank ? '= ? ? ?' : reveal ? `= ${bs.join(' ')} → ${value}` : `= ${bs.join(' ')}`, b.w * 0.37, top + 30, 50, '#ffd34d');
+    if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.37, top + 96, 26, '#ffe08a', 'left', undefined, L - b.w * 0.37 - 10);
+    // ---- right column: chalk answers / coins / buttons you click ----
+    const X = b.w * 0.63, RW = b.w - X - 40, spots: Hotspot[] = [];
+    g.strokeStyle = 'rgba(241,239,230,.25)'; g.lineWidth = 3; g.beginPath(); g.moveTo(X - 24, 30); g.lineTo(X - 24, b.h - 30); g.stroke();
+    const chalkBtn = (label: string, by: number, bh: number, on: boolean, act: () => void, color = '#f1efe6') => {
+      g.strokeStyle = on ? '#ffd34d' : color; g.lineWidth = on ? 5 : 3; if (!on) g.setLineDash([12, 8]); g.strokeRect(X, by, RW, bh); g.setLineDash([]);
+      text(b, label, X + 18, by + (bh - 32) / 2, 30, on ? '#ffd34d' : color, 'left', undefined, RW - 30);
+      spots.push({ x: X, y: by, w: RW, h: bh, on: act });
+    };
+    const coinsRow = (onPick: (k: number) => void, hinted: string | null) => {
+      MATH.tray.forEach((id, k) => {
+        const r = 46, ccx = X + r + 6 + k * ((RW - 2 * r - 12) / 3), ccy = 92;
+        g.fillStyle = 'rgba(255,211,77,.12)'; g.beginPath(); g.arc(ccx, ccy, r, 0, 7); g.fill();
+        g.strokeStyle = k === sel ? '#ffd34d' : '#f1efe6'; g.lineWidth = k === sel ? 6 : 3; g.beginPath(); g.arc(ccx, ccy, r, 0, 7); g.stroke();
+        if (hinted === id) { g.strokeStyle = '#9cff57'; g.lineWidth = 4; g.setLineDash([10, 7]); g.beginPath(); g.arc(ccx, ccy, r + 10, 0, 7); g.stroke(); g.setLineDash([]); }
+        text(b, String(coin(id).value), ccx, ccy - 28, 36, '#ffd34d', 'center'); text(b, id, ccx, ccy + 12, 20, '#f1efe6', 'center');
+        spots.push({ x: ccx - r, y: ccy - r, w: r * 2, h: r * 2, on: () => { sel = k; onPick(k); } });
+      });
+      text(b, 'Click a coin to put it down', X, 152, 22, '#cfd8cf');
+      const total = comboValue(hand);
+      text(b, hand.length ? `Hand: ${hand.join(' + ')} = ${total}` : 'Hand: empty', X, 190, 28, '#f1efe6', 'left', undefined, RW);
+    };
+    if (phase === 'intro') {
+      const step = tut.steps[tutStep];
+      coinsRow(() => tutAdd(), step?.coin ?? null);
+      if (!step) chalkBtn('Start the lesson ▸', b.h - 150, 70, true, () => startLesson(), '#9cff57');
+    } else if (cur && usesTray()) {
+      coinsRow(() => { if (phase === 'ask') add(); }, hintCoins[0] ?? null);
+      if (phase === 'ask' && hand.length) chalkBtn('Take back the last coin', b.h - 230, 60, false, () => { hand.pop(); renderQ(); });
+      if (phase === 'review' && !failed) chalkBtn(qi + 1 < qs.length ? 'Next question ▸' : 'Finish the lesson ▸', b.h - 150, 70, true, () => next(), '#9cff57');
+    } else if (cur) {
+      const n = opts.length, bh = 64, gap = 14, y0 = 34;
+      opts.forEach((o, k) => {
+        const by = y0 + k * (bh + gap), isRight = o === cur.correct;
+        if (phase === 'review') {
+          const col = isRight ? '#9cff57' : k === sel ? '#ff8a7a' : 'rgba(241,239,230,.45)';
+          g.strokeStyle = col; g.lineWidth = isRight ? 5 : 3; g.strokeRect(X, by, RW, bh);
+          text(b, `${isRight ? '✔ ' : k === sel ? '✗ ' : ''}${o}`, X + 18, by + 16, 30, col, 'left', undefined, RW - 30);
+        } else if (gone.has(o)) {
+          g.strokeStyle = 'rgba(241,239,230,.25)'; g.lineWidth = 2; g.strokeRect(X, by, RW, bh);
+          text(b, o, X + 18, by + 16, 30, 'rgba(241,239,230,.3)', 'left', undefined, RW - 30);
+          g.strokeStyle = 'rgba(241,239,230,.5)'; g.beginPath(); g.moveTo(X + 12, by + bh / 2); g.lineTo(X + RW - 12, by + bh / 2); g.stroke();
+        } else chalkBtn(o, by, bh, k === sel, () => { sel = k; choose(); });
+      });
+      if (phase === 'review' && !failed) chalkBtn(qi + 1 < qs.length ? 'Next question ▸' : 'Finish the lesson ▸', y0 + n * (bh + gap) + 6, 62, true, () => next(), '#9cff57');
+    }
+    room?.setRegion('question', 'board', { x: 40, y: 20, w: L - 60, h: y - 10 });
+    room?.setRegion('columns', 'board', { x: cx[0] - 80, y: top - 16, w: b.w * 0.37 + 300 - cx[0], h: 170 });
+    room?.setRegion('answers', 'board', { x: X - 10, y: 24, w: RW + 20, h: phase === 'intro' || usesTray() ? 200 : 330 });
+    room?.setHotspots('board', spots);
     b.refresh();
   };
   const renderScore = () => score.textContent = phase === 'intro' ? 'Tutorial — not scored' : `Question ${Math.min(qi + 1, qs.length)} of ${qs.length} · misses ${misses} / ${mode.misses} allowed`;

@@ -92,11 +92,13 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       finish: (r: ChallengeResult) => {
         if (finished) return; finished = true;
         if (!r.pass) { cls.react('confused', 'Let’s take a short break and try that again.', room.chair); window.setTimeout(() => api.finish(r), 900); return; }
-        setEng(1); stage.classList.add('q1-flash'); cls.react('applause', CLASSROOM.passLine.replace('{chair}', room.chair), room.chair);
+        setEng(1); stage.classList.add('q1-flash');
         const end = (res: ChallengeResult) => window.setTimeout(() => api.finish(res), 1100);
-        if (api.difficulty !== 'hard') { end(r); return; }
+        const applaud = () => cls.react('applause', CLASSROOM.passLine.replace('{chair}', room.chair), room.chair);
+        if (api.difficulty !== 'hard') { applaud(); end(r); return; }
+        cls.react('nod', 'Good. One more question before I decide.', room.chair);
         window.setTimeout(() => followUp(stage, room, api, ok => {
-          if (ok) end({ ...r, summary: `${r.summary} You also answered the chair's follow-up question.` });
+          if (ok) { applaud(); end({ ...r, summary: `${r.summary} You also answered the chair's follow-up question.` }); }
           else api.finish({ pass: false, quality: 0, summary: `The demo went well, but the follow-up answer was off. The answer was: ${room.followUp.correct}` });
         }), 1300);
       },

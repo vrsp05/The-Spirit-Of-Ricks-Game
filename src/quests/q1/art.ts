@@ -173,12 +173,18 @@ export const artChallenge: ChallengeBody = (root, api) => {
   };
   const check = () => {
     const { score } = scoreDrawing(canvas, ref);
-    if (score >= mode.pass) { finished = true; clearTimeout(bulbClock); }
+    let poppedAtEnd = false;
+    if (score >= mode.pass) {
+      finished = true; clearTimeout(bulbClock);
+      // The projector always shorts out during the art demo — if you finished first, it pops right at the end.
+      if (bulb === 'on') { poppedAtEnd = true; bulb = 'out'; refBox.classList.add('q1-dark'); drawProjected(false); room?.signal('fuse', true); cls?.react('gasp', 'Pop! The projector just shorted out — right at the end!'); }
+    }
     const pass = score >= mode.pass, secs = Math.round((performance.now() - t0) / 1000);
     const snapshot = canvas.map(r => [...r]);
-    api.finish({ pass, quality: Math.min(1, score) * 0.85 + (secs < 120 ? 0.15 : secs < 240 ? 0.07 : 0) - api.hintsUsed() * 0.05,
+    const done = () => api.finish({ pass, quality: Math.min(1, score) * 0.85 + (secs < 120 ? 0.15 : secs < 240 ? 0.07 : 0) - api.hintsUsed() * 0.05,
       summary: `Your painting matches ${Math.round(score * 100)}% of the reference (needed ${Math.round(mode.pass * 100)}%) · ${secs} s.`,
       extra: pass ? el => voxelReveal(el, snapshot) : undefined });
+    if (poppedAtEnd) window.setTimeout(done, 1600); else done();
   };
   // mouse
   let drag: 'paint' | 'erase' | null = null;

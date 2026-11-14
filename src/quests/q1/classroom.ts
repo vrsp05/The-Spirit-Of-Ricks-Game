@@ -14,6 +14,7 @@ export interface RoomDef {
   students: { name: string; shirt: string; hair: string; skin: string }[];
   props: string[];
   followUp: { q: string; options: string[]; correct: string };
+  intro: { title: string; whisper: string; chair: string; verdict: string; thanks: string };
 }
 export const CLASSROOM = data as unknown as { rooms: Record<string, RoomDef>; lines: Record<Cue, string[]>; passLine: string };
 
@@ -158,7 +159,7 @@ function injectStyles() {
 @media (prefers-reduced-motion:reduce){.q1-person,.q1-stage.q1-flash{animation:none!important}}
 /* In-room demos: the 3D classroom stays visible; only a strip along the bottom */
 .screen.fullscreen.q1-inroom{background:transparent!important;pointer-events:none}
-.screen.fullscreen.q1-inroom .panel{pointer-events:auto;top:auto!important;bottom:0;height:auto!important;max-height:46dvh;background:rgba(20,15,11,.86)!important;background-image:none!important;padding:8px max(14px,calc((100vw - 1240px)/2))!important;gap:4px;border-top:3px solid #0b0b0b!important}
+.screen.fullscreen.q1-inroom .panel{animation:q1up .45s ease-out;pointer-events:auto;top:auto!important;bottom:0;height:auto!important;max-height:46dvh;background:rgba(20,15,11,.86)!important;background-image:none!important;padding:8px max(14px,calc((100vw - 1240px)/2))!important;gap:4px;border-top:3px solid #0b0b0b!important}
 .screen.fullscreen.q1-inroom.q1-closeup .panel{max-height:60dvh;background:rgba(20,15,11,.80)!important}
 .q1-closeup .cx-board{max-height:38dvh!important;width:auto!important;max-width:100%}
 .q1-closeup .cx-wrap{align-items:flex-start}
@@ -183,6 +184,7 @@ function injectStyles() {
 /* Art: dark chalkboard so white stone shows up */
 .q1-demo .art-canvas .cell{background-color:#34463d}
 .q1-demo .art-canvas{background:#1d2a24}
+@keyframes q1up{from{translate:0 60px;opacity:0}to{translate:0 0;opacity:1}}
 /* Math: binary board */
 .q1-bin{display:grid;gap:12px}
 .q1-bin-q{font:18px/1.4 Georgia,serif;color:#2a211a;background:#fffaf0;border:2px solid #3a2c22;border-radius:6px;padding:10px 14px}

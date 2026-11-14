@@ -13,14 +13,14 @@ import dialogue from './data/dialogue.json';
 import type { QuestContext, QuestModule } from '../contract';
 import { runChallenge, type ChallengeBody } from '../shared/frame';
 import { bednarSteps, shoulderCam } from '../shared/scenes';
-import { withClassroom } from './classroom';
+import { CLASSROOM, withClassroom } from './classroom';
 import { Room3D, type RoomId } from './room3d';
 import { mathChallenge } from './math';
 import { artChallenge } from './art';
 import { circuitChallenge } from './circuit';
 import { englishChallenge } from './english';
 
-export interface Candidate { id: 'math' | 'engineering' | 'art' | 'english'; label: string; anchor: string; lobby: string; building: string; challenge: 'math' | 'art' | 'circuit' | 'english'; shirt: string; requires?: string }
+export interface Candidate { id: 'math' | 'engineering' | 'art' | 'english'; label: string; anchor: string; lobby: string; building: string; challenge: 'math' | 'art' | 'circuit' | 'english'; shirt: string; requires?: string; wait?: [number, number] }
 
 const BODIES: Record<Candidate['challenge'], { body: ChallengeBody; title: string; intro: string; pass: string; fail: string }> = {
   math: { body: mathChallenge, title: 'Binary, the Nephite way', intro: 'The computer science students keep tripping on binary. Use the gold coins of Alma 11 to explain it so it sticks — answer each student’s question.', pass: 'Hired: math candidate!', fail: 'The class is still lost' },
@@ -32,6 +32,7 @@ const D = dialogue as {
   assign: { speaker: string; text: string }[]; report: { speaker: string; text: string }[];
   reminder: string; readyReminder: string; greetings: Record<string, string>; waiting: Record<string, string>;
   busy: string; arrive: string; notYet: string; boardTitle: string;
+  walk: Record<string, string[]>; othersWait: string; waitingOutside: Record<string, string>;
 };
 
 export function createProfessors(): QuestModule {
@@ -42,6 +43,9 @@ export function createProfessors(): QuestModule {
   const quality = () => ctx.progress.get<Record<string, number>>('quality', {});
   const attempts = () => ctx.progress.get<Record<string, number>>('attempts', {});
   const escorting = () => ctx.progress.get<string | null>('escort', null);
+  const firstPicked = () => ctx.progress.get<boolean>('firstPicked', false);
+  /** Where a candidate waits outside their building once the first candidate has been picked up. */
+  const waitAt = (c: Candidate) => { const p = ctx.world.position(c.anchor), [dx, dz] = c.wait ?? [2.6, 0]; return { x: p.x + dx, z: p.z + dz }; };
   const remaining = () => cands().filter(c => !hired()[c.id]);
   const byId = (id: string) => cands().find(c => c.id === id)!;
   const locked = (c: Candidate) => !!c.requires && !hired()[c.requires];
@@ -75,7 +79,7 @@ export function createProfessors(): QuestModule {
     const c = byId(id), p = ctx.world.playerPosition();
     follower = ctx.world.npc({ label: c.label, sub: `→ ${c.building}`, shirt: c.shirt, pants: '#2c2540' });
     removeFollower = ctx.world.addObject(follower, { x: 0, z: 0 });
-    follower.position.set(p.x + 1.2, p.y, p.z + 1.2); followerSpace = p.space;
+    follower.position.set(p.x + 1.4, p.y, p.z); followerSpace = p.space; lastP = { x: p.x, z: p.z };
   };
   const despawnFollower = () => { removeFollower?.(); removeFollower = null; follower = null; };
 
@@ -91,50 +95,116 @@ export function createProfessors(): QuestModule {
       return;
     }
     const next = rem.find(c => !locked(c)) ?? rem[0];
+    if (firstPicked()) {
+      ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.anchor));
+      ctx.ui.setObjective(`Hire the professors (${n}/4) — the ${next.label} is waiting outside the ${next.building}`, waitAt(next));
+      return;
+    }
     ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.lobby));
     ctx.ui.setObjective(`Hire the professors (${n}/4) — pick up a candidate in Personnel Services (Kimball Building)`, next.lobby);
   };
 
-  async function lobbyTalk(c: Candidate) {
+  // ---------- walk-and-talk ----------
+  let talkTimers: number[] = [];
+  const say = (text: string) => { if (!follower) return; const lbl = ctx.world.label(text.length > 60 ? text.slice(0, 58) + '…' : text); lbl.position.set(0, 3.3, 0); follower.add(lbl); window.setTimeout(() => lbl.removeFromParent(), 5200); };
+  const startTalk = (c: Candidate) => { talkTimers.forEach(clearTimeout); talkTimers = (D.walk[c.id] ?? []).map((t, i) => window.setTimeout(() => { if (escorting() === c.id && !demoRoom) say(t); }, 4000 + i * 9000)); };
+
+  async function lobbyTalk(c: Candidate, outside = false) {
     if (hired()[c.id]) { ctx.ui.toast(`${c.label} is already hired.`); return; }
     const esc = escorting();
     if (esc === c.id) { await ctx.ui.dialogue([{ speaker: c.label, text: D.arrive.replace('{building}', c.building) }]); return; }
     if (esc) { await ctx.ui.dialogue([{ speaker: c.label, text: D.busy.replace('{other}', byId(esc).label) }]); return; }
     if (locked(c)) { await ctx.ui.dialogue([{ speaker: c.label, text: D.waiting[c.id] ?? D.notYet }]); return; }
-    const cp = ctx.world.position(c.lobby), pp = ctx.world.playerPosition();
+    void outside;
+    const pp = ctx.world.playerPosition();
+    const cp = outside ? { ...waitAt(c), y: pp.y } : ctx.world.position(c.lobby);
     const cam = shoulderCam(cp, pp);
-    await ctx.cutscene({ id: `q1-greet-${c.id}`, steps: [
-      { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 0.9 }, look: cam.look, say: { speaker: c.label, text: D.greetings[c.id] ?? 'Hello!' } },
-    ], onDone: () => { ctx.progress.set('escort', c.id); } });
-    spawnFollower();
+    const lines = [D.greetings[c.id] ?? 'Hello!'];
+    if (outside) lines.unshift(D.waitingOutside[c.id] ?? 'Hi!');
+    await ctx.cutscene({ id: `q1-greet-${c.id}`, steps: lines.map((t, i) => ({
+      ...(i === 0 ? { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 0.9 } } : {}), look: cam.look, say: { speaker: c.label, text: t } })),
+      onDone: () => { ctx.progress.set('escort', c.id); } });
+    const first = !firstPicked();
+    ctx.progress.set('firstPicked', true);
+    spawnFollower(); startTalk(c);
     ctx.ui.toast(`The ${c.label} is following you to the ${c.building}.`);
+    if (first) window.setTimeout(() => ctx.ui.toast(D.othersWait), 2500);
     updateObjective();
   }
 
-  async function demo(c: Candidate) {
+  let demoBusy = false, lastSpace = '', lastP = { x: 0, z: 0 }, dirX = 0, dirZ = 1;
+  /** The classroom walk-in: students turn to the door, the candidate walks to the front,
+   *  the chair sets the problem, and the title is chalked on the board. Short on repeat visits. */
+  const walkIn = async (c: Candidate, room: Room3D, full: boolean) => {
+    const I = CLASSROOM.rooms[c.id].intro, spot = room.teachSpot();
+    const door = room.w(0, 0, 5.2), doorEye = room.w(4.6, 3.2, 6.4), classLook = room.w(-1, 1.2, -1.5);
+    // aisle route along the west wall so the candidate doesn't walk through desks
+    const path = [door, room.w(-6.6, 0, 4.6), room.w(-6.6, 0, spot.z - room.w(0, 0, 0).z + 0.4), { x: spot.x, y: spot.y, z: spot.z }];
+    const along = (k: number) => {
+      const seg = path.slice(1).map((p, i) => Math.hypot(p.x - path[i].x, p.z - path[i].z)), total = seg.reduce((a, b) => a + b, 0);
+      let d = k * total, i = 0; while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+      const a = path[i], b = path[i + 1], t = seg[i] ? Math.min(1, d / seg[i]) : 1;
+      return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, ry: Math.atan2(b.x - a.x, b.z - a.z) };
+    };
+    const boardLook = c.id === 'engineering' ? room.w(0, 1.6, -5.4) : room.w(0, 1.6, -6.8);
+    const boardEye = c.id === 'engineering' ? room.w(1.4, 3.1, 0.6) : room.w(0, 1.8, 0.9);
+    const chairNpc = room.who('chair')[0], chairPos = chairNpc.position;
+    const steps: Parameters<QuestContext['cutscene']>[0]['steps'] = [];
+    if (full) {
+      steps.push({ camera: { from: doorEye, to: room.w(3.6, 2.8, 5.0), dur: 1.4 }, look: classLook, dur: 2.2,
+        run: () => { room.faceDoor(true); room.bubble(room.who(1)[0], I.whisper); if (follower) { follower.position.set(door.x, door.y, door.z); follower.rotation.y = Math.PI; } } });
+      steps.push({ camera: { from: room.w(-1.6, 2.7, -6.0), to: room.w(-2.6, 2.4, -6.2), dur: 3.0 }, look: room.w(-6.4, 1.1, 1.5), dur: 3.0,
+        run: () => room.faceDoor(false),
+        tick: (_dt, k) => { if (follower) { const q = along(k); follower.position.set(q.x, spot.y, q.z); follower.rotation.y = q.ry; } } });
+      steps.push({ camera: { from: room.w(-2.6, 2.4, -6.2), to: room.w(2.2, 2.6, 0.8), dur: 1.2 }, look: { x: chairPos.x, y: chairPos.y + 1.8, z: chairPos.z },
+        run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } room.bubble(chairNpc, I.chair, 6); room.hop([chairNpc]); },
+        say: { speaker: CLASSROOM.rooms[c.id].chair, text: I.chair } });
+    }
+    steps.push({ camera: { from: full ? room.w(2.2, 2.6, 0.8) : room.w(0.8, 2.4, 3), to: boardEye, dur: 1.4 }, look: boardLook, dur: 2.0,
+      run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } },
+      tick: (_dt, k) => room.writeTitle(I.title, k * 1.25) });
+    room.showCeiling(true);
+    await ctx.cutscene({ id: `q1-walkin-${c.id}${full ? '' : '-short'}`, steps, cleanup: () => room.faceDoor(false) });
+  };
+  const outro = async (c: Candidate, room: Room3D) => {
+    const I = CLASSROOM.rooms[c.id].intro, spot = room.teachSpot();
+    room.standHired(c.label, c.shirt);
+    await ctx.cutscene({ id: `q1-outro-${c.id}`, steps: [
+      { camera: { from: room.w(0, 2.6, -5.5), to: room.w(1.6, 2.4, -4.6), dur: 1.2 }, look: room.w(-2, 1.4, 2), run: () => { room.hop(room.who('all')); ctx.world.sound('cheer'); },
+        say: { speaker: CLASSROOM.rooms[c.id].chair, text: I.verdict } },
+      { look: { x: spot.x, y: spot.y + 1.7, z: spot.z }, camera: { from: room.w(1.6, 2.4, -4.6), to: { x: spot.x + 2.6, y: spot.y + 2.0, z: spot.z + 3.0 }, dur: 1.0 }, say: { speaker: c.label, text: I.thanks } },
+    ] });
+  };
+
+  async function demo(c: Candidate, opts: { auto?: boolean } = {}) {
+    if (demoBusy) return;
     if (hired()[c.id]) { ctx.ui.toast(`${c.label} is already hired.`); return; }
     if (escorting() !== c.id) {
       ctx.ui.toast(locked(c) ? (D.waiting[c.id] ?? D.notYet) : `Pick up the ${c.label} in Personnel Services (Kimball Building) first.`);
       return;
     }
+    demoBusy = true;
     const room = rooms.get(c.id) ?? null;
-    const spot = room?.teachSpot();
-    if (follower && spot) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; }
     demoRoom = room;
-    const pp = ctx.world.playerPosition();
-    const cam = shoulderCam(spot ?? pp, { x: (spot?.x ?? pp.x) + 1.2, y: pp.y, z: (spot?.z ?? pp.z) + 8 });
-    await ctx.cutscene({ id: `q1-demo-${c.id}`, steps: [
-      { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 1.0 }, look: cam.look, say: { speaker: 'Teaching demonstration', text: `You are now the ${c.label} — ${c.building}.` } },
-    ] });
+    if (room) await walkIn(c, room, (attempts()[c.id] ?? 0) === 0 && opts.auto !== false);
+    else {
+      const pp = ctx.world.playerPosition(), cam = shoulderCam(pp, { x: pp.x + 1, y: pp.y, z: pp.z + 8 });
+      await ctx.cutscene({ id: `q1-demo-${c.id}`, steps: [{ camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 1.0 }, look: cam.look, say: { speaker: 'Teaching demonstration', text: `You are now the ${c.label} — ${c.building}.` } }] });
+    }
     room?.start(c.id === 'engineering' ? 'bench' : 'board');
-    ctx.ui.setBanner(`Playing as: ${c.label}`);
+    ctx.ui.setBanner(`You are now the ${c.label}`);
+    window.setTimeout(() => { if (demoRoom === room) ctx.ui.setBanner(`Playing as: ${c.label}`); }, 2600);
     ctx.progress.set('attempts', { ...attempts(), [c.id]: (attempts()[c.id] ?? 0) + 1 });
     const def = BODIES[c.challenge];
     const r = await runChallenge(ctx, { title: def.title, playingAs: c.label, intro: def.intro, allowSkip: ctx.config.allowSkipChallenge,
       body: withClassroom(ctx, c.id, def.body, room), passText: def.pass, failText: def.fail,
       className: `ch-${c.challenge} q1-demo ${room ? 'q1-inroom' : ''} ${room && (c.id === 'art' || c.id === 'engineering') ? 'q1-closeup' : ''}` });
-    room?.stop(); demoRoom = null;
+    room?.stop();
     ctx.ui.setBanner(null); ctx.world.releaseCamera();
+    if (r.outcome === 'pass' && room) { despawnFollower(); room.showCeiling(true); await outro(c, room); }
+    else if (r.outcome === 'skip' && room) room.standHired(c.label, c.shirt);
+    room?.showCeiling(false);
+    demoRoom = null; demoBusy = false;
     if (r.outcome === 'pass' || r.outcome === 'skip') {
       ctx.progress.set('hired', { ...hired(), [c.id]: true });
       if (c.id === 'art') ctx.progress.set('projectorBroken', true);
@@ -156,16 +226,23 @@ export function createProfessors(): QuestModule {
         ctx.addInteractable({
           id: `lobby-${cand.id}`, kind: 'npc', at: cand.lobby, radius: 2.2, eras: ['ricks1999'],
           visual: ctx.world.npc({ label: cand.label, sub: 'Personnel Services', shirt: cand.shirt, pants: '#2c2540' }),
-          enabled: () => ctx.isActive() && !hired()[cand.id] && escorting() !== cand.id,
+          enabled: () => ctx.isActive() && !firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
           prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
           objective: () => ctx.isActive() && !escorting() && !hired()[cand.id] && !locked(cand),
           onInteract: () => lobbyTalk(cand),
         });
-        // Teaching spot inside the department classroom (the building's demo door leads in)
-        const mark = new THREE.Group();
-        const ring = ctx.world.voxel(1.6, 0.06, 1.6, '#ffd34d'); ring.position.y = 0.03; mark.add(ring);
+        // Waiting outside their building after the first pickup
         ctx.addInteractable({
-          id: `demo-${cand.id}`, kind: 'generic', at: { x: 0, z: -2.6, space: `q1-room-${cand.id}` }, radius: 2.6, eras: ['ricks1999'], visual: mark,
+          id: `outside-${cand.id}`, kind: 'npc', at: waitAt(cand), radius: 2.6, eras: ['ricks1999'],
+          visual: ctx.world.npc({ label: cand.label, sub: `waiting · ${cand.building}`, shirt: cand.shirt, pants: '#2c2540' }),
+          enabled: () => ctx.isActive() && firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
+          prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
+          objective: () => ctx.isActive() && firstPicked() && !escorting() && !hired()[cand.id] && !locked(cand),
+          onInteract: () => lobbyTalk(cand, true),
+        });
+        // Teaching spot inside the department classroom (the building's demo door leads in)
+        ctx.addInteractable({
+          id: `demo-${cand.id}`, kind: 'generic', at: { x: 0, z: -2.6, space: `q1-room-${cand.id}` }, radius: 2.6, eras: ['ricks1999'],
           enabled: () => ctx.isActive() && escorting() === cand.id,
           prompt: () => `Start the ${short(cand).toLowerCase()} teaching demonstration`,
           objective: () => ctx.isActive() && escorting() === cand.id,
@@ -185,16 +262,22 @@ export function createProfessors(): QuestModule {
     },
     update(dt) {
       rooms.forEach(r => r.update(dt));
+      const here = ctx.isActive() ? ctx.world.playerPosition().space : '';
+      if (here !== lastSpace) {
+        const was = lastSpace; lastSpace = here;
+        const esc = escorting();
+        if (esc && here === `q1-room-${esc}` && was !== here && !hired()[esc] && !demoBusy) window.setTimeout(() => demo(byId(esc), { auto: true }), 700);
+      }
       if (!follower || demoRoom) return;
       const p = ctx.world.playerPosition();
-      const dx = p.x - follower.position.x, dz = p.z - follower.position.z, d = Math.hypot(dx, dz);
-      if (p.space !== followerSpace || d > 25) { follower.position.set(p.x - 1.4, p.y, p.z + 1.4); followerSpace = p.space; return; }
-      if (d > 1.8) {
-        const k = Math.min(1, (d - 1.6) * dt * 3.5);
-        follower.position.x += dx * k; follower.position.z += dz * k;
-      }
+      if (p.space !== followerSpace || Math.hypot(p.x - follower.position.x, p.z - follower.position.z) > 25) { follower.position.set(p.x + 1.4, p.y, p.z); followerSpace = p.space; lastP = { x: p.x, z: p.z }; return; }
+      // walk beside the player (not between the player and the camera): offset to the side of travel
+      const mx = p.x - lastP.x, mz = p.z - lastP.z, ml = Math.hypot(mx, mz);
+      if (ml > 0.02) { dirX = mx / ml; dirZ = mz / ml; lastP = { x: p.x, z: p.z }; }
+      const tx = p.x + dirZ * 1.5 + dirX * 0.3, tz = p.z - dirX * 1.5 + dirZ * 0.3;
+      const dx = tx - follower.position.x, dz = tz - follower.position.z, d = Math.hypot(dx, dz);
+      if (d > 0.15) { const k = Math.min(1, dt * 5); follower.position.x += dx * k; follower.position.z += dz * k; follower.rotation.y = Math.atan2(dirX, dirZ); }
       follower.position.y += (p.y - follower.position.y) * Math.min(1, dt * 8);
-      follower.rotation.y = Math.atan2(dx, dz);
     },
     objective: () => `Hire the professors (${4 - (ctx ? remaining().length : 4)}/4)`,
     briefing: () => D.assign,

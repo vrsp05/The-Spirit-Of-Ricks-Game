@@ -62,19 +62,20 @@ export const englishChallenge: ChallengeBody = (root, api) => {
   };
   const drawScreen = () => {
     const sc = room?.get('board'); if (!sc || !stripW) return;
-    const g = sc.g, k = sc.w / Math.max(1, press.clientWidth);
+    const g = sc.g, k = (sc.w / Math.max(1, press.clientWidth)) * 2.2, lineDom = lineX(), lineCv = sc.w * 0.32;
+    const X = (domX: number) => lineCv + (domX - lineDom) * k;   // zoomed around the lamp line
     g.fillStyle = '#f7f5ee'; g.fillRect(0, 0, sc.w, sc.h);
     g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, sc.h * 0.25, sc.w, sc.h * 0.5);
     const fs = parseFloat(getComputedStyle(spans[0]).fontSize) * k, cy = sc.h / 2;
     g.font = `${fs}px Georgia, serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
     spans.forEach((sp, i) => {
-      const x0 = (x + offsets[i]) * k; if (x0 > sc.w || x0 + widths[i] * k < 0) return;
+      const x0 = X(x + offsets[i]); if (x0 > sc.w || x0 + widths[i] * k < 0) return;
       const fixedW = sp.classList.contains('rp-fixed'), stamped = sp.classList.contains('rp-stamped'), glow = sp.classList.contains('rp-glow');
       if (glow) { g.fillStyle = 'rgba(255,220,80,.55)'; g.fillRect(x0 - 4, cy - fs * 0.7, widths[i] * k + 8, fs * 1.4); }
       g.fillStyle = fixedW ? '#1f7a2e' : stamped ? '#c0392b' : '#1a1a1a'; g.fillText(sp.textContent ?? '', x0, cy);
       if (fixedW) { g.strokeStyle = '#c0392b'; g.lineWidth = 4; g.beginPath(); g.ellipse(x0 + widths[i] * k / 2, cy, widths[i] * k / 2 + 10, fs * 0.75, 0, 0, 7); g.stroke(); }
     });
-    const lx = lineX() * k; g.fillStyle = 'rgba(220,40,30,.85)'; g.fillRect(lx - 3, 0, 6, sc.h);
+    const lx = lineCv; g.fillStyle = 'rgba(220,40,30,.85)'; g.fillRect(lx - 3, 0, 6, sc.h);
     g.font = `bold ${Math.round(fs * 0.5)}px monospace`; g.fillText('LAMP', lx + 10, 30);
     sc.refresh();
   };

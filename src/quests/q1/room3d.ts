@@ -13,12 +13,12 @@ interface ViewDef { label: string; from: V3; to: V3 }
 
 const VIEWS: Record<RoomId, Record<string, ViewDef>> = {
   math: {
-    board: { label: 'Chalkboard', from: { x: 0, y: 1.7, z: -0.4 }, to: { x: 0, y: 1.05, z: -6.8 } },
+    board: { label: 'Chalkboard', from: { x: 0, y: 1.8, z: 0.9 }, to: { x: 0, y: 1.25, z: -6.8 } },
     poster: { label: 'Coin poster', from: { x: -1.9, y: 1.9, z: -1.6 }, to: { x: -7.8, y: 1.5, z: -1.6 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
   english: {
-    board: { label: 'Projector screen', from: { x: 0, y: 1.8, z: -0.4 }, to: { x: 0, y: 1.15, z: -6.8 } },
+    board: { label: 'Projector screen', from: { x: 0, y: 1.8, z: 0.9 }, to: { x: 0, y: 1.25, z: -6.8 } },
     poster: { label: 'Fact clipping', from: { x: -2.4, y: 1.9, z: -1.6 }, to: { x: -7.8, y: 1.4, z: -1.6 } },
     class: { label: 'Class', from: { x: 0.6, y: 3.0, z: -6.0 }, to: { x: 0, y: 1.1, z: 3 } },
   },
@@ -34,7 +34,9 @@ const VIEWS: Record<RoomId, Record<string, ViewDef>> = {
   },
 };
 
-const DESKS: [number, number][] = [[-4.5, 0.4], [-1.5, 0.4], [1.5, 0.4], [4.5, 0.4], [-3, 2.9], [0, 2.9], [3, 2.9]];
+// Seats at two-person tables in rows, centre aisle (like a typical lecture room)
+const DESKS: [number, number][] = [[-4.1, 0.6], [-2.3, 0.6], [2.3, 0.6], [4.1, 0.6], [-4.1, 3.2], [2.3, 3.2], [4.1, 3.2], [-2.3, 3.2]];
+const TABLES: [number, number][] = [[-3.2, 0.6], [3.2, 0.6], [-3.2, 3.2], [3.2, 3.2]];
 
 export class Room3D {
   readonly id: RoomId;
@@ -50,6 +52,7 @@ export class Room3D {
   private cam: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;
   private target: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;
   private fanSpeed = 0;
+  private ceiling!: THREE.Group;
   private fuseT = 0;
   current = '';
   active = false;
@@ -79,19 +82,22 @@ export class Room3D {
     const grp = new THREE.Group(); grp.add(mesh);
     this.place(grp, x, z, y, ry);
     const s: Surface = { canvas, g, w: canvas.width, h: canvas.height, refresh: () => { tex.needsUpdate = true; } };
-    this.surfaces.set(name, s); return s;
+    this.surfaces.set(name, s);
+    if (name === 'board') { chalk(s, this.id === 'english' ? '#f7f5ee' : this.id === 'engineering' ? '#22303a' : this.id === 'art' ? '#34463d' : '#2f4a3c'); s.refresh(); }
+    else { g.fillStyle = this.id === 'art' ? '#4f5a63' : '#efe3c2'; g.fillRect(0, 0, canvas.width, canvas.height); s.refresh(); }
+    return s;
   }
   private build() {
     const room = CLASSROOM.rooms[this.id];
     const dark = (c: string) => c;
     // front wall surface (board / screen)
     if (this.id === 'english') {
-      this.box(7.4, 0.15, 0.2, '#555', 0, -6.82, 4.0);                       // screen roller
-      this.surface('board', 7, 3.1, 200, 0, 2.3, -6.86, 0);
+      this.box(7.4, 0.15, 0.2, '#555', 0, -6.82, 3.45);                      // screen roller
+      this.surface('board', 7, 2.4, 200, 0, 2.2, -6.86, 0);
       this.box(0.9, 0.9, 0.9, '#3b3f46', 3.0, -3.4);                         // projector cart (off to the side)
       const head = this.box(0.7, 0.35, 0.7, '#22262b', 3.0, -3.4, 0.9); this.props.set('projector', head);
     } else if (this.id === 'engineering') {
-      this.surface('board', 6, 2.6, 160, 0, 2.3, -6.86, 0);
+      this.surface('board', 6, 2.2, 160, 0, 2.2, -6.86, 0);
       this.box(7.0, 1.0, 1.6, '#16181b', 0, -4.3);                            // black lab bench
       this.buildProjector(0, -4.3, 1.0);
       const fuse = this.box(0.8, 1.0, 0.25, '#6b6f73', 7.6, -3.5, 1.4, -Math.PI / 2); this.props.set('fuse', fuse);
@@ -99,7 +105,7 @@ export class Room3D {
       for (const x of [-6, 6]) { this.box(0.9, 0.55, 0.6, '#2a3a2a', x, -4.3, 1.0); }  // oscilloscopes
     } else {
       this.box(7.4, 0.12, 0.25, '#5b4636', 0, -6.82, 0.75);                  // chalk tray
-      this.surface('board', 7, 3, 200, 0, 2.3, -6.86, 0);
+      this.surface('board', 7, 2.5, 200, 0, 2.2, -6.86, 0);
     }
     // west wall surface (poster / clipping / projected reference)
     if (this.id === 'math') this.surface('poster', 2.6, 3.2, 220, -7.88, 2.1, -1.6, Math.PI / 2);
@@ -115,13 +121,42 @@ export class Room3D {
       const cg = new THREE.Group(); cg.add(cone); this.place(cg, 0, 0, 0);
       this.props.set('beam', cone);
     }
+    // front wall like a lecture room: boards spanning the wall with a wood ledge, pull-down screen case above
+    if (this.id !== 'engineering') {
+      const side = this.id === 'english' ? '#f4f4f0' : this.id === 'art' ? '#34463d' : '#2f4a3c';
+      for (const x of [-5.75, 5.75]) this.box(4.3, 2.45, 0.08, side, x, -6.9, 0.98);
+      this.box(15.6, 0.1, 0.22, '#7a5a3a', 0, -6.8, 0.92);
+      this.box(15.6, 0.1, 0.06, '#8a6a4a', 0, -6.93, 3.44);
+      if (this.id !== 'english') this.box(4.4, 0.14, 0.2, '#e8e8e2', 0, -6.75, 3.47);
+    }
+    // gray window shades along the east wall
+    for (const z of [-4.6, -1.6, 1.4, 4.4]) this.box(0.06, 2.7, 2.7, '#6e7074', 7.9, z, 0.9);
+    // ceiling (drop ceiling, light panels, hanging projector) — shown only during scenes/demos
+    this.ceiling = new THREE.Group();
+    const cc = document.createElement('canvas'); cc.width = 512; cc.height = 448; const cg2 = cc.getContext('2d')!;
+    cg2.fillStyle = '#ecebe6'; cg2.fillRect(0, 0, 512, 448); cg2.strokeStyle = '#c9c7bf'; cg2.lineWidth = 3;
+    for (let x = 0; x <= 512; x += 32) { cg2.beginPath(); cg2.moveTo(x, 0); cg2.lineTo(x, 448); cg2.stroke(); }
+    for (let y = 0; y <= 448; y += 64) { cg2.beginPath(); cg2.moveTo(0, y); cg2.lineTo(512, y); cg2.stroke(); }
+    const ct = new THREE.CanvasTexture(cc); ct.colorSpace = THREE.SRGBColorSpace;
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(16, 14), new THREE.MeshBasicMaterial({ map: ct, side: THREE.DoubleSide }));
+    ceil.rotation.x = Math.PI / 2; ceil.position.y = 3.62; this.ceiling.add(ceil);
+    for (const [x, z] of [[-4, -4], [4, -4], [-4, 0.5], [4, 0.5], [-4, 4.5], [4, 4.5], [0, -1.8], [0, 2.6]]) {
+      const l = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.2), new THREE.MeshBasicMaterial({ color: '#fffdf4', side: THREE.DoubleSide }));
+      l.rotation.x = Math.PI / 2; l.position.set(x, 3.6, z); this.ceiling.add(l);
+    }
+    if (this.id !== 'engineering') {
+      const rod = this.ctx.world.voxel(0.06, 0.5, 0.06, '#d8d8d8'); rod.position.set(0, 3.35, -1.2); this.ceiling.add(rod);
+      const proj = this.ctx.world.voxel(0.7, 0.22, 0.6, '#e4e4e0'); proj.position.set(0, 3.05, -1.2); this.ceiling.add(proj);
+    }
+    this.ceiling.visible = false; this.place(this.ceiling, 0, 0);
     // teacher desk + desks for students
     if (this.id !== 'engineering') this.box(1.8, 0.85, 0.8, '#5a3a22', 3.6, -4.8);
-    const deskColor = this.id === 'art' ? '#a07850' : this.id === 'engineering' ? '#16181b' : '#7b5a3e';
+    // two-person tables + chairs (art keeps slanted drafting tables, the lab keeps black benches)
+    const tableColor = this.id === 'art' ? '#a07850' : this.id === 'engineering' ? '#16181b' : '#e8e6df';
+    for (const [x, z] of TABLES) this.box(3.0, 0.74, 0.8, tableColor, x, z - 0.7);
+    DESKS.forEach(([x, z]) => { this.box(0.5, 0.45, 0.5, '#6b6f74', x, z + 0.15); this.box(0.5, 0.5, 0.08, '#6b6f74', x, z + 0.42, 0.45); });
     room.students.forEach((s, i) => {
       const [x, z] = DESKS[i];
-      if (this.id === 'art') this.box(1.3, 0.9, 0.9, deskColor, x, z - 0.6, 0, 0).rotation.x = -0.2;
-      else this.box(1.2, 0.75, 0.7, deskColor, x, z - 0.6);
       const npc = this.ctx.world.npc({ label: s.name, shirt: s.shirt, hair: s.hair, skin: s.skin, pants: '#2c2540' });
       this.people.push(this.place(npc, x, z, 0, Math.PI));
     });
@@ -144,6 +179,23 @@ export class Room3D {
 
   // ---------- API used by demos ----------
   get(name: string) { return this.surfaces.get(name) ?? null; }
+  /** Room-local point → world coordinates. */
+  w(x: number, y: number, z: number): V3 { return { x: this.base.x + x, y: this.base.y + y, z: this.base.z + z }; }
+  /** Students turn to look at the door (true) or back at the board (false). */
+  faceDoor(on: boolean) { for (const p of this.people) p.rotation.y = on ? 0 : Math.PI; }
+  /** Chalk-write a title onto the front board, revealed left→right by t (0..1). */
+  writeTitle(title: string, t: number) {
+    const b = this.get('board'); if (!b) return;
+    chalk(b, this.id === 'engineering' ? '#22303a' : this.id === 'english' ? '#f7f5ee' : '#2f4a3c');
+    const g = b.g; g.save(); g.beginPath(); g.rect(0, 0, b.w * Math.max(0, Math.min(1, t)), b.h); g.clip();
+    text(b, title, b.w / 2, b.h * 0.36, 84, this.id === 'english' ? '#1a1a1a' : '#ffe08a', 'center');
+    g.restore(); b.refresh();
+  }
+  /** A hired candidate who stays at the front of the room after the demo. */
+  standHired(label: string, shirt: string) {
+    const npc = this.ctx.world.npc({ label, sub: 'hired ✔', shirt, pants: '#2c2540' });
+    this.place(npc, this.id === 'engineering' ? -4.6 : -5.2, this.id === 'engineering' ? -3.0 : -5.4, 0, 0);
+  }
   views() { return Object.keys(VIEWS[this.id]); }
   viewLabel(name: string) { return VIEWS[this.id][name]?.label ?? name; }
   view(name: string) {
@@ -153,7 +205,8 @@ export class Room3D {
     if (!this.cam) this.cam = { from: this.target.from.clone(), to: this.target.to.clone() };
   }
   nextView() { const vs = this.views(); this.view(vs[(vs.indexOf(this.current) + 1) % vs.length]); return this.current; }
-  start(firstView: string) { this.active = true; this.cam = null; this.view(firstView); }
+  start(firstView: string) { this.active = true; this.cam = null; this.view(firstView); this.showCeiling(true); }
+  showCeiling(on: boolean) { if (this.ceiling) this.ceiling.visible = on; }
   stop() { this.active = false; this.cam = null; this.target = null; this.ctx.world.releaseCamera(); }
   /** Where the candidate stands to teach (world coords + facing the class). */
   teachSpot() { return { x: this.base.x + (this.id === 'engineering' ? -4.6 : -5.2), y: this.base.y, z: this.base.z + (this.id === 'engineering' ? -3.0 : -5.4), ry: 0 }; }
@@ -165,7 +218,7 @@ export class Room3D {
     return [this.people[i] ?? this.people[0]];
   }
   studentIndex(name: string) { return CLASSROOM.rooms[this.id].students.findIndex(s => s.name === name); }
-  bubble(target: THREE.Object3D, text: string, secs = 2.8) {
+  bubble(target: THREE.Object3D, text: string, secs = 3.2) {
     for (const b of this.bubbles.filter(b => b.parent === target)) { b.obj.removeFromParent(); b.t = 0; }
     const lbl = this.ctx.world.label(text.length > 46 ? text.slice(0, 44) + '…' : text);
     lbl.position.set(0, 3.2, 0); lbl.scale.multiplyScalar(1.1); target.add(lbl);

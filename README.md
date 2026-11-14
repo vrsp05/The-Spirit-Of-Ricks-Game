@@ -120,6 +120,14 @@ npm run data:build            # → src/world/data/campus.generated.json
 
 The bounding box and origin are in `tools/geo-config.mjs`. Historical dates, names and styles are in `src/world/buildingRegistry.ts`, and each entry cites its sources.
 
+## Building information
+
+Walk near a building's existing name sign and click it to open a card with **About** and **Interesting fact**. A nearby hint points out the interaction; aiming the center reticle at the sign also allows E/controller Interact. Player movement and quest timers pause while reading. Close with **Esc** or **×**.
+
+Cards include the complete approved text regardless of the game era. Data for all 27 curated building entries, including source attribution, lives in `src/world/data/building-info.json`; only buildings that already have plaques expose cards. Buildings without signs remain deferred.
+
+To import edits from the reference file: `node tools/import-building-info.cjs "path/to/building_info_cards.txt"`. Browser regression check: `node tools/check-building-info.cjs http://localhost:5173` with Playwright available, or pass its module path after the URL.
+
 ## Opening and ending cutscenes
 
 - New Game plays the 48-second opening: campus, Kimball office telephone call, title, then the assistant knocking and entering. Gameplay begins in President Bednar's office before Quest 1.

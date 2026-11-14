@@ -146,7 +146,13 @@ function moroni(tip: { x: number; y: number; z: number }): THREE.Group {
 function rng(seed: number) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
 const lambert = (c: string) => new THREE.MeshStandardMaterial({ color: c });
 
-interface EraCache { group: THREE.Group; grid: CollisionGrid; buildings: EraBuilding[]; meshes: Map<string, BuiltMesh>; map: HTMLCanvasElement }
+export interface BuildingSign {
+  buildingId: string;
+  name: string;
+  object: THREE.Mesh;
+  normal: { x: number; z: number };
+}
+interface EraCache { group: THREE.Group; grid: CollisionGrid; buildings: EraBuilding[]; meshes: Map<string, BuiltMesh>; map: HTMLCanvasElement; buildingSigns: BuildingSign[] }
 
 export class World {
   readonly root = new THREE.Group();
@@ -924,6 +930,7 @@ export class World {
     grid.extra.push(...this.obstacles);
     const meshes = new Map<string, BuiltMesh>();
     const group = new THREE.Group(); group.name = `era-${era}`;
+    const buildingSigns: BuildingSign[] = [];
     // landmarks first; a background (context) building that overlaps one already placed is skipped
     // (coplanar walls from two buildings flicker / z-fight)
     const claimed = new Set<string>();
@@ -946,13 +953,16 @@ export class World {
     for (const b of buildings) if (b.state === 'standing' && b.registryId) this.addFeatures(b, group, grid, meshes);
     for (const b of buildings) if (b.state !== 'site' && !b.context) {
       const doors = b.state === 'standing' ? this.addEntrances(b, group) : [];
-      if (b.landmark && b.name) this.addWallPlaque(b, group, doors[0] ?? null);
+      if (b.landmark && b.name) {
+        const sign = this.addWallPlaque(b, group, doors[0] ?? null);
+        if (sign) buildingSigns.push(sign);
+      }
     }
-    return { group, grid, buildings, meshes, map: this.paintMap(buildings) };
+    return { group, grid, buildings, meshes, map: this.paintMap(buildings), buildingSigns };
   }
 
   /** Building name on the wall (above an entrance when there is one) — never blocks a path. */
-  private addWallPlaque(b: EraBuilding, group: THREE.Group, door: { x: number; z: number; nx: number; nz: number } | null) {
+  private addWallPlaque(b: EraBuilding, group: THREE.Group, door: { x: number; z: number; nx: number; nz: number } | null): BuildingSign | undefined {
     let spot = door;
     if (!spot) {
       const [cx, cz] = polyAvg(b.poly), R = Math.max(...b.poly.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 30;
@@ -971,7 +981,9 @@ export class World {
     const plaque = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 0.12), [side, side, side, side, new THREE.MeshStandardMaterial({ map: tex }), side]);
     const y = terrainHeight(spot.x, spot.z) + (door ? 4.6 : 3.4);
     plaque.position.set(spot.x + spot.nx * 0.12, y, spot.z + spot.nz * 0.12); plaque.rotation.y = Math.atan2(spot.nx, spot.nz);
+    plaque.name = `building-name-sign:${b.registryId}`;
     group.add(plaque);
+    return b.registryId ? { buildingId: b.registryId, name: b.name!, object: plaque, normal: { x: spot.nx, z: spot.nz } } : undefined;
   }
 
   /** Decorative door spots for a footprint (deterministic: where sidewalks end at its walls). */
@@ -1166,6 +1178,8 @@ export class World {
   get grid() { return this.cache.get(this.era)!.grid; }
   get mapCanvas() { return this.cache.get(this.era)!.map; }
   get eraBuildings() { return this.cache.get(this.era)!.buildings; }
+  get buildingSigns(): readonly BuildingSign[] { return this.cache.get(this.era)?.buildingSigns ?? []; }
+  get buildingOccluder() { return this.cache.get(this.era)?.group.getObjectByName('buildings'); }
   blocked(x: number, z: number, r: number) { return this.grid.blocked(x, z, r); }
   groundY(x: number, z: number) { return terrainHeight(x, z); }
 

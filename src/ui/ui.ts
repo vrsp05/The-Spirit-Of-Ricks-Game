@@ -25,6 +25,7 @@ export interface MenuItem { label: string; action: () => void; disabled?: boolea
 
 export interface HudData {
   objective: string; era: string; prompt: string | null;
+  buildingHint?: string | null;
   px: number; pz: number; pyaw: number; camYaw: number;
   map: HTMLCanvasElement | null; target: { x: number; z: number } | null; interior: string | null;
   markers: { x: number; z: number }[];   // every current objective point (minimap / map)
@@ -302,8 +303,8 @@ export class UI {
     this.lastHud = d;
     this.objectiveEl.textContent = d.objective;
     this.eraEl.textContent = d.era + (d.interior ? ` · ${d.interior}` : '');
-    this.promptEl.classList.toggle('hidden', !d.prompt);
-    if (d.prompt) this.promptEl.innerHTML = `<kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}`;
+    this.promptEl.classList.toggle('hidden', !d.prompt && !d.buildingHint);
+    this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
     const g = this.mini.getContext('2d')!, S = 180;
     g.fillStyle = '#2b2622'; g.fillRect(0, 0, S, S);
     if (d.map && !d.interior) {

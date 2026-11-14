@@ -201,6 +201,26 @@ export class Avatar {
     this.armL.rotation.x = this.armR.rotation.x = -1.15; this.foreL.rotation.x = this.foreR.rotation.x = -0.2;
     this.hips.position.y = 0; this.body.rotation.x = Math.min(0.12, Math.abs(speed) * 0.012); this.torso.rotation.y = 0;
   }
+  private jet: { group: THREE.Group; flames: THREE.Mesh[] } | null = null;
+  /** Show/hide the jetpack (two tanks on the back). */
+  setJetpack(on: boolean) {
+    if (!on) { if (this.jet) { this.torso.remove(this.jet.group); this.jet = null; } return; }
+    if (this.jet) return;
+    const g = new THREE.Group(), tank = new THREE.MeshStandardMaterial({ color: '#9aa3a8', metalness: 0.7, roughness: 0.35 });
+    const flameMat = new THREE.MeshStandardMaterial({ color: '#ffb347', emissive: '#ff7a1a', emissiveIntensity: 2.2, transparent: true, opacity: 0.85 });
+    const flames: THREE.Mesh[] = [];
+    for (const x of [-0.14, 0.14]) {
+      const t = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.2), tank); t.position.set(x, 0.4, -0.32); t.castShadow = true; g.add(t);
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.5, 6), flameMat); f.rotation.x = Math.PI; f.position.set(x, -0.05, -0.32); g.add(f); flames.push(f);
+    }
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.06), tank); strap.position.set(0, 0.55, -0.22); g.add(strap);
+    this.torso.add(g); this.jet = { group: g, flames };
+  }
+  /** Flame size 0..1 (thrusting / gliding / off). */
+  jetFlame(k: number) {
+    if (!this.jet) return;
+    for (const f of this.jet.flames) { f.visible = k > 0.02; f.scale.set(1, (0.4 + k * 1.4) * (0.85 + Math.random() * 0.3), 1); }
+  }
   wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; this.foreR.rotation.x = -0.4 + Math.sin(t * 8) * 0.3; }
 
   /** Deterministic poses for the opening, without replacing gameplay animation. */

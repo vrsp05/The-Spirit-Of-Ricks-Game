@@ -7,6 +7,7 @@ import { Ambience } from './fx/ambience';
 import { VoiceActor } from './fx/voice';
 import { EngineSound, loadSamples, playStep } from './fx/audio';
 import { Traffic } from './world/Traffic';
+import { BallGames } from './world/ballGames';
 import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
 import { InputManager } from './input/actions';
 import { KeyboardMouseSource } from './input/keyboardMouse';
@@ -68,6 +69,7 @@ export class Game {
   readonly voice = new VoiceActor();
   private engine = new EngineSound();
   traffic!: Traffic;
+  balls!: BallGames;
   playerName = '';
   /** Re-apply the chosen season everywhere (set up in the constructor). */
   applySeason: () => void = () => {};
@@ -197,6 +199,7 @@ export class Game {
     this.npcs.setEra(this.world.era, SETTINGS.season);
     this.traffic = new Traffic(this.renderer.scene, () => this.world.activeDoors());
     this.traffic.setEra(this.world.era, SETTINGS.season);
+    this.balls = new BallGames(this.renderer.scene);
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -822,6 +825,7 @@ export class Game {
         this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
       } },
       { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
+      { label: '⌨ Cheat codes', action: () => this.showCheats() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
@@ -841,6 +845,26 @@ export class Game {
       { label: 'Cancel', action: () => this.ui.pop(s) },
     ], { subtitle: 'Developer skip: the story advances, but no coins are awarded.', onBack: () => this.ui.pop(s) });
   }
+  /** Cheat codes. "jetpack" toggles a jetpack: hold jump to fly. */
+  showCheats() {
+    void this.ui.custom('Cheat codes', (root, panel) => {
+      root.innerHTML = `<input class="name-input cheat-input" data-focus maxlength="24" autocomplete="off" spellcheck="false" placeholder="Type a code"><p class="sub cheat-msg">Try a code, then press Enter.</p>`;
+      const input = root.querySelector('.cheat-input') as HTMLInputElement, msg = root.querySelector('.cheat-msg') as HTMLElement;
+      const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null)); root.append(back);
+      const run = () => {
+        const code = input.value.trim().toLowerCase();
+        if (code === 'jetpack') {
+          this.player.jetpack = !this.player.jetpack; this.player.avatar.setJetpack(this.player.jetpack);
+          msg.textContent = this.player.jetpack ? 'Jetpack on! Hold Space (or jump) to fly; let go to glide down.' : 'Jetpack off.';
+          playSound('success'); setTimeout(() => panel.close(null), 900);
+        } else { msg.textContent = code ? 'Nothing happened…' : 'Type a code first.'; playSound('error'); }
+        input.value = '';
+      };
+      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') run(); else if (e.key === 'Escape') panel.close(null); });
+      setTimeout(() => input.focus(), 50);
+    });
+  }
+
   /** Settings: sound (volumes, mute, voices), brightness, season, graphics, reduced motion. Up/down to move, left/right to change. */
   showSettings() {
     void this.ui.custom('Settings', (root, panel) => {
@@ -1005,6 +1029,14 @@ export class Game {
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.updateTraffic(dt);
+    if (this.balls) {
+      const out = this.spaceId === 'exterior';
+      this.balls.setVisible(out);
+      if (out && !this.pauseOpen) for (const e of this.balls.update(dt, { p: this.player.position, yaw: this.player.yaw, speed: this.player.speed, active: this.mode === 'playing' && !this.player.vehicle && !this.cutscenes.active })) {
+        if (e.type === 'score' || e.type === 'goal') { this.ui.toast(e.text!, 1800); playSound(e.type === 'goal' ? 'cheer' : 'success'); }
+        else if (e.type === 'bounce') playSound('step');
+      }
+    }
     // footsteps: one per ~0.8 m walked (shorter when running), surface from where you are
     const P = this.player;
     if (this.mode === 'playing' && !this.cutscenes.active && !P.vehicle && !P.seated && P.grounded && P.speed > 0.6) {
@@ -1062,6 +1094,7 @@ export class Game {
       this.npcs.setVisible(this.spaceId === 'exterior');
       if (this.spaceId === 'exterior') this.npcs.update(dt, this.player.position, (x, z, r) => this.world.blocked(x, z, r) || Math.hypot(x - this.player.position.x, z - this.player.position.z) < r + 0.6);
       // inspectables: whatever is under the screen-centre reticle
+      const ballNear = !focus && !this.player.vehicle && this.spaceId === 'exterior' ? this.balls?.prompt(this.player.position) ?? null : null;
       const insp = !focus && !this.player.vehicle && !uiBlocking ? this.inspectAt(0, 0) : null;
       this.inspectFocus = insp;
       this.ui.setReticle([...this.inspectables.values()].some(i => !i.enabled || i.enabled()) && this.spaceId === 'exterior' && !uiBlocking, !!insp);
@@ -1073,6 +1106,7 @@ export class Game {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
         else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
         else if (focus && a.pressed('interact')) { a.consume('interact'); void this.interactions.trigger(); }
+        else if (ballNear && a.pressed('interact')) { a.consume('interact'); this.balls.action(this.player.position, this.player.yaw); }
         else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
@@ -1086,7 +1120,7 @@ export class Game {
       this.ui.updateHud({
         objective: obj.text, era: ERAS[this.world.era].label,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
-        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, target: this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],

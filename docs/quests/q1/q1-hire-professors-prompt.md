@@ -2,260 +2,130 @@ Copy everything below into Claude:
 
 ---
 
-# Quest 1 refinement: Hire the Professors
+# Quest 1: Hire the Professors (current design and how it's built)
 
-You are refining **Quest 1 (Q1)** of a browser game made at a 24-hour hackathon. A first version of Q1 already exists and works. Your job is to rework it into the refined design below **using the world's existing quest APIs**, without editing core engine files.
+Q1 is built and playable on the `game-foundation` branch. This brief tells you what it is, how it works and where everything lives, so you can maintain it, polish it or extend it without breaking the design.
 
-This brief has three parts:
-- **Intent:** why and what good looks like. Use it when the spec doesn't cover something.
-- **Spec:** what to build.
-- **Plan:** the order to build it in, and how to check each step.
+- **Intent:** why Q1 exists and what good looks like.
+- **Spec:** the design as built.
+- **Plan:** what's left.
 
-Where something is unclear, make a reasonable choice, mark it `// ASSUMPTION:` in code and in the README, and keep going.
+Read these first; they win over this brief if they disagree:
+- `docs/quest-contract.md` and `src/quests/contract.ts`: the only API quests may use.
+- `docs/team-decisions.md`.
+- The Q1 code in `src/quests/q1/` and `tests/q1.test.ts`.
 
 **Repo:** https://github.com/vrsp05/The-Spirit-Of-Ricks-Game
-**Base branch:** `game-foundation`. It holds the current world and the first Q1; use `main` once `game-foundation` is merged into it. Work on a branch such as `quest/q1-refine`.
-
-Read these first. They are the source of truth and win over this brief if the two disagree:
-- `docs/quest-contract.md` and `src/quests/contract.ts`: the only API quests may use.
-- `docs/team-decisions.md`: settled decisions.
-- `src/quests/shared/frame.ts` (`runChallenge`, `legend`, `h`, `btn`, `loop`) and `src/quests/shared/scenes.ts` (`bednarSteps`, `shoulderCam`).
-- The current Q1: `src/quests/q1/` (`professors.ts`, `math.ts`, `art.ts`, `circuit.ts`, `english.ts`, `data/*.json`), plus `tests/q1.test.ts`.
-- `GAME_CONFIG.locations`, `GAME_CONFIG.quests.professors` and `GAME_CONFIG.interiors` in `src/config/game.config.ts`.
 
 ---
 
 ## Part 1: Intent
 
-### The game
-- **What it is:** a voxel, third-person browser game about Ricks College becoming BYU–Idaho. It's built with Node.js, TypeScript, plain HTML and Three.js.
-- **Color:** the campus begins as a lightly colored 90s photo and becomes more saturated after each quest.
-- **Controls:** keyboard and mouse, or the team's ESP32 controllers (4 buttons and 2 sticks each).
-- **Timeline:** Q1 is set in **Fall 1999** (era `ricks1999`). Reporting back to Bednar moves the world to Spring 2001.
-- **No "BYU–Idaho" yet:** nothing in Q1 may say "BYU–Idaho" (team decision 22).
+### The game and Q1
+- **The game:** a voxel, third-person browser game (Node.js, TypeScript, plain HTML, Three.js) about Ricks College becoming BYU–Idaho.
+- **Setting:** Q1 is set in **Fall 1999** (era `ricks1999`). Nothing in Q1 may say "BYU–Idaho" (team decision 22).
+- **The player:** President Bednar's assistant. The college is growing and needs teachers.
+- **The quest:** the player hires four faculty candidates. Each candidate gives a **teaching demonstration inside a real classroom**, and **the player plays the demo as the candidate**.
 
-### What Q1 is
-The player is President Bednar's assistant. The college is growing and needs teachers. The player meets four faculty candidates and takes each one to a **teaching demonstration** in their department. **The player plays each demo as the candidate**, then reports back to Bednar.
-
-### What has to change from the first version (from team review)
-- **It must flow like a real hiring day,** not "walk up to a stranger outside a building and a minigame starts." Candidates are picked up in the Kimball Building and taken to their department, and each challenge is framed as a lesson they teach to a class.
-- **Every challenge must make sense as a lesson.** The classroom reacts to what the player does, but the player does all the solving.
-- **Small surprises make it fun:** the class guessing what you draw, a projector bulb burning out, a fuse popping with smoke.
-- **One story thread:** the projector that breaks in Art is the thing Engineering repairs.
-
-### Success looks like
-- A first-time player finishes Q1 in about 10–15 minutes without asking where to go.
-- All four demos are fully playable with keyboard/mouse and with controllers, with no typing.
-- Q1 uses only the quest contract. If a hook is truly missing, it's requested as a small, clearly marked contract addition.
-- All text and levels live in `src/quests/q1/data/*.json`, and `npm test` passes.
-
-### Keep
-These parts of the current Q1 already match the design and stay:
-- **Bednar cutscenes:** `onAssign`, `onReport` and `readyToReport`.
-- **Perspective switch:** `setBanner("Playing as: …")` plus `focusCamera(shoulderCam…)`.
-- **`runChallenge` frame:** hint, skip, leave and result/retry.
-- **Scoring and progress:** `qualityScore`, `skippedFraction`, `reportColorProgress(hired/4)` and waypoints.
-- **Art:** position-independent scoring, mirror and fill, and the voxel reveal.
-- **Circuit solver behavior:** series is dim, parallel is bright, and shorts are detected.
-- **Difficulty:** Easy and Hard only.
+### What players should feel
+- **A real hiring day, not a list of minigames:** pick up candidates in the Kimball Building's Personnel Services office, walk them to their department, and watch the class react.
+- **No abrupt starts:** walking into a classroom plays a short scene that leads into the challenge.
+- **Challenges are part of the world, not separate apps:** the lesson is on the chalkboard, the reference is on a poster or projected on the wall, the transcript is projected on the whiteboard, and the circuit is on a pegboard beside the broken projector. On-screen interface is only a slim strip for what really needs precision.
+- **One story thread:** the art studio's old overhead projector always shorts out during the art demo, and the engineering demo repairs it.
+- **Nobody gets lost or stuck:** objectives name the next place, map markers point there, and every demo has a hint and can be skipped.
+- **Inputs:** keyboard/mouse and the ESP32 controllers (4 buttons, 2 sticks) both work everywhere, with no typing.
 
 ### Rules
-- **Real people:** Bednar's lines are labelled game dialogue, never real quotes. There are no invented quotes from real people, and candidate names are fictional.
-- **Temple:** the temple appears only as a future concept in 1999.
-- **Facts:** verify dates and scripture values against primary sources.
+- **Real people:** Bednar's lines are labelled game dialogue, never real quotes. Candidate and student names are fictional.
+- **Temple:** the temple appears only as the art candidate's "vision of a temple on the hill" (the real Rexburg Temple was dedicated in 2008).
+- **Facts:** verified against primary sources. Alma 11 for coin values; the Church News, Sept 11, 1999, for the Kimball dedication; the Ricks *Campus Building Histories* for which department was in which building.
 
 ---
 
-## Part 2: Spec
+## Part 2: Spec (as built)
 
 ### 1. Quest flow
+1. **Bednar** (Kimball office) assigns Q1 in a cutscene (`onAssign`). The four candidates wait in Personnel Services, and art must come before engineering.
+2. **Personnel Services** is a room off the Kimball hall, with a counter, waiting chairs, file cabinets, a "Faculty interviews today" sign and a floating hiring board.
+   - The four candidates stand there.
+   - Talking to one plays a greeting, then they follow you.
+   - Toast: "The other candidates will meet you outside their buildings."
+3. **Escort:** the candidate walks **beside** the player (never between the player and the camera) and says two walk-and-talk lines, which set up their demo.
+4. **The classroom:** each department building's entrance leads into its classroom interior. **Walking in starts the walk-in automatically**: no ring, no button. It's skippable with Esc, and only the last beat plays on later attempts.
+   1. Students turn to the door and one whispers, for example "Is that the new math teacher?"
+   2. The candidate walks up the side aisle to the front.
+   3. The chair stands and sets the problem in one line.
+   4. The demo's title is chalked onto the board, the banner says "You are now the … candidate", and the bottom strip slides up.
+5. **The demo** (§3). On a pass, a small result card appears, then the **ending**: the chair's verdict over the class, then the candidate's thanks. The candidate stays at the front of the room.
+6. **Next stop:** after the first pickup, every other candidate **waits outside their own building** (`waitAt`, a per-candidate offset in config). The objective names the next one ("the English candidate is waiting outside the Smith Building"), so there's no trip back to the Kimball between demos.
+7. **Order:** suggested route math → English → art → engineering. Math and English can be done in any order; **engineering stays locked until art is hired**.
+8. **Report:** after all four are hired, the player reports to Bednar (`readyToReport`/`onReport`) and Q1 completes.
 
-1. **Assignment (keep `onAssign`).** Update `dialogue.json`: Bednar says the college is growing, the four candidates are waiting in **Personnel Services** down the hall, and the player should take each one to their demonstration and report back.
-2. **The lobby.** The four candidates wait in a **Personnel Services lobby inside the Kimball Building**, each with a name tag and subject.
-   - **Location:** new room-local anchors in the `kimball-office` space, for example `q1.lobby.math` and so on. They're Q1's own entries in `GAME_CONFIG.locations`.
-   - **Hiring board:** a sign built with `world.voxel` and `world.label` shows each candidate as Waiting, In demo, Hired, or "Waiting on the art demo."
-   - **The room:** if the hall in `kimball-office` is too narrow, ask the world teammate for a small lobby alcove in its layout. Until then, use the hall.
-3. **Pick a candidate.** A short greeting cutscene plays (reuse the current greeting pattern). The candidate says they're due for a teaching demonstration in their building.
-4. **Escort.**
-   - The lobby NPC is removed and a follower NPC (owned by Q1) walks behind the player, moved in `update(dt)` using `world.playerPosition()`.
-   - When the player and follower are in different spaces (interior versus exterior), hide the follower and re-place it by the door.
-   - If following feels bad, fall back to "I'll meet you there": the candidate appears at the destination.
-   - The objective names the destination, for example "Walk the math candidate to the Romney Building." The target is the demo door anchor.
-5. **The demo door.** Each building gets a demo anchor, `candidate.<id>`, moved beside the entrance and **outside the entrance clear zone** (team decision 32).
-   - Interacting with it plays a title card (a cutscene step or `ctx.ui.dialogue`): "Teaching demonstration · Romney Building." Then the banner and camera switch to the candidate and `runChallenge` opens.
-6. **Result.**
-   - **Pass:** applause, the chair's recommendation line, and `world.sound('cheer')`. The banner clears, the camera is released, the candidate is hired, and the board updates.
-   - **Fail:** `ctx.fail()`. The player can retry right away or come back later.
-7. **Report back:** keep `readyToReport` and `onReport`. Bednar's report lines mention the four hires.
+**Persisted progress keys:** `hired`, `skipped`, `quality`, `attempts`, `escort`, `firstPicked`, `projectorBroken`.
 
-**Order:**
-- Math and English can be done in any order.
-- **Art must be passed before Engineering.** Until then, the engineering candidate says "I'm waiting on the art department's demo," and the board shows it. Passing Art sets `progress.projectorBroken = true` and unlocks Engineering.
-
-**Candidate placement** (`GAME_CONFIG.quests.professors.candidates` and `candidate.*` anchors):
-
-| Subject | Building | Change |
-|---|---|---|
-| math | Romney | keep |
-| engineering | Austin | keep |
-| art | original Spori (`spori-original`) | keep |
-| english | **Smith** (`smith`) | was Snow |
-
-English moves to the Smith Building because that's where the English department was in 1999; the Snow was the performing arts center. Update team decision 2 and the Bednar lines.
-
-### 2. The teaching demo frame (shared by all four)
-
-Build a small `q1/classroom.ts` helper that every demo body uses inside `runChallenge`:
-- **Classroom strip:** a voxel-style row along the top or side of the full-screen frame (team decision 33) showing 4–5 students and the department chair. They're drawn with DOM/canvas, and each room has its own color and props.
-- **Speech strip:** one-line reactions, for example `react('nod', "Oh, I get it")`, `react('confused', "Wait, how?")`, plus `ooh`, `gasp` and `applause`. Lines come from data and play `world.sound` cues (`tick`, `error`, `pop`, `cheer`).
-- **Class engagement bar:** fills with correct moves. It's for show only; pass/fail stays with each demo's own rule.
-- **Who solves:** students only ask questions and react. They never give answers.
-- **Hint:** framed as "glances at the lesson notes." Use the frame's `onHint`.
-- **Pass beat:** a short color flash on the teaching surface, then applause.
-- **Hard only:** at the end the chair asks one follow-up multiple-choice question.
-
-Controls follow the contract's `PanelAction` mapping:
-- left stick or WASD to move
-- confirm ① (E)
-- back ② (Esc)
-- hint ③ (H)
-- tools ④ (Tab)
-- right stick ↔ (R/F) for alt/alt2
-- right stick ↕ (T/G) for rup/rdown
-
-Show the controls with `legend()`.
+### 2. The classroom (shared)
+- **Interiors** (`GAME_CONFIG.interiors` + `LAYOUTS`, marked "CONTRACT ADDITION (Q1)"): `q1-room-math` (Romney), `q1-room-english` (Smith), `q1-room-art` (original Spori), `q1-room-engineering` (Austin). Each is 16 × 14, with its exterior door at that candidate's `candidate.*` anchor.
+- **`Room3D`** (`q1/room3d.ts`) builds each room with quest-contract calls only. Modelled on a real lecture room:
+  - boards spanning the front wall with a wood ledge, and a screen case above;
+  - white two-person tables with gray chairs in rows, with a centre aisle;
+  - gray window shades and gray carpet;
+  - a drop ceiling with light panels and a hanging projector, **shown only during scenes and demos**, because the gameplay camera looks down from above.
+  - Art keeps drafting tables; the lab has black benches, oscilloscopes and a fuse box.
+- **Room3D also provides:**
+  - live **surfaces** (canvas textures) the demos draw on: `board`, `poster`, and `peg` in the lab;
+  - **camera views** the player cycles with **T** (right stick ↑): board, poster, class, plus bench in the lab;
+  - speech bubbles over students and the chair, and student hops;
+  - prop signals: projector lamp, fan, fuse flash, and the art projector beam.
+- **The bottom strip** (`withClassroom` in `q1/classroom.ts`) wraps the shared `runChallenge` frame and adds:
+  - the room name, a speech line and a small "Class" engagement meter;
+  - the view button and a pass colour flash;
+  - **Hard only:** the chair says "One more question before I decide," asks a multiple-choice follow-up, and recommends you only after a correct answer.
 
 ### 3. The four demos
 
-#### 3.1 Math: "Binary, the Nephite way" (Romney, third floor, Math & Computer Science)
-This replaces "Nephite Market." Reuse its coin tray, the fewest-coin DP and the reference checks.
+| Demo | Room | What's in the world | What's in the strip |
+|---|---|---|---|
+| **Math — "Binary, the Nephite way"** | Romney 3rd floor (Math & CS) | Chalkboard: the student's question and the shum · seon · senine ✔/0-1 board, which lights up the answer. Alma 11 gold-coin poster on the side wall. | Answer choices (Easy) or the coin tray (Hard); feedback; Next. |
+| **English — "Editing for accuracy"** | Smith Building | The whole of Brother Price's summary of the Kimball dedication is projected on the whiteboard. A yellow cursor moves word by word and line by line. A correction is struck through with the fix written above in red ink. A Church News fact clipping is on the bulletin board. | Progress, the current line as clickable words (mouse), correction choices. |
+| **Art — "Drawing what you see"** | Original Spori 3rd floor | You paint **directly on the studio board** (brush cursor and hint outline on the board). The projector beams the temple reference onto the side wall and **always shorts out** (Easy 90 s, Hard 40 s, or right at the end if you finish first); the wall goes dark. | Colours, mirror, fill, check, match meter (Easy), small mouse pad. |
+| **Engineering — "Fix it live"** | Austin electronics lab | Physical Plant brings in the Spori's projector. You rotate wire tiles **on a pegboard on the bench beside it**; its lamp lights, its fan spins, and the fuse box flashes on a short. | Goal, lamp/fan status (fan shows stopped/slow/full), small mouse pad. |
 
-- **Premise:** the computer science students keep tripping on binary, and the chair asks the candidate to explain it so it sticks. Fall 1999 is Y2K season, so a "Is your computer Y2K ready?" flyer fits the room.
-- **Lines:**
-  - Chair: "Our computer science students keep tripping on binary. Explain it so it sticks."
-  - Candidate's opening board line: "Forget computers for a minute. The Nephites already used binary. Look at their coins."
-- **Coins (gold only; verify against Alma 11:5–10):** senine 1, seon 2, shum 4, limnah 7 ("the value of them all"). A judge earns 1 senine a day (Alma 11:3). Leave out the silver coins and the fractions. One silver coin appears only in the finale.
-- **The idea:** any amount from 1 to 7 can be paid with at most one senine, seon and shum. Which coins you hold, written biggest to smallest, is the binary number: 101 = shum + senine = 5. A limnah is one of each smaller coin (111).
-- **Board widget:** three columns, shum · seon · senine, each showing ✔/1 or blank/0 as coins are placed.
-- **Questions** (asked by students):
+**Details:**
+- **Math:**
+  - **Opening:** an unscored **guided tutorial**: "Pay 5", shum then senine, with the coin highlighted each step, ending at 1 0 1 → 5.
+  - **Questions:** Pay 6 · read 011 · Pay 7 (one limnah) · why is a limnah 7 · Zeezrom's six onties = 42 days of pay. Hard adds Pay 9 and Pay 13.
+  - **Rules:** misses allowed are Easy 2, Hard 1. On Hard, a right amount with too many coins counts as a miss.
+- **English:** Easy has 3 mistakes, Hard 6. Wrong marks allowed: Easy unlimited, Hard 2. Hints highlight the sentence.
+- **Art:** pass at 60% on Easy, 85% on Hard. Scoring ignores position, the class guesses as you draw, the first mirror stroke gets an "ooh", and passing shows a voxel reveal.
+- **Engineering:** Easy plays 3 levels, Hard 4: lamp; lamp + fan in parallel; fan switch; dim power light + slow fan in series with the lamp bright.
 
-  | # | Question | Answer |
-  |---|---|---|
-  | 1 | "Pay 5 with the fewest coins." | shum + senine (101) |
-  | 2 | "Pay 6." | shum + seon (110) |
-  | 3 | "Pay 3." | seon + senine (011) |
-  | 4 | "Why is a limnah worth 7?" (choice) | one of every smaller coin, 1 + 2 + 4 |
-  | 5 | Finale (Alma 11:22): "Zeezrom offered Amulek six onties. An onti is the silver version of a limnah. How many days of a judge's pay is that?" (choice) | 42. Class: "Six weeks of work!" |
-
-  - **Hard** adds "Pay 9" (limnah + seon) and "Pay 13" (limnah + shum + seon) before the finale.
-- **Controls:**
-  - **Easy:** all questions are multiple choice (4 shuffled options; wrong options are common mistakes).
-  - **Hard:** coin questions use the tray (confirm adds a coin, back removes one, alt submits). A correct amount using too many coins gets "Right amount, but can you do it with fewer coins?" and counts as a miss.
-- **Pass rule:** misses allowed are 2 on Easy and 1 on Hard.
-- **Hints:**
-  1. "Start with the biggest coin that fits."
-  2. Highlight the needed coins on the ✔ board.
-- **Closing line:** a student says "So 101 just means shum, no seon, senine?" and the candidate answers "That's all binary is: which coins you're holding."
-- **Classroom look:** drop ceiling, fluorescent panels, beige walls and blinds, tablet-arm desks, a green chalkboard, and beige CRT computers at the back.
-
-#### 3.2 English: "Editing for accuracy" (Smith Building, English classroom)
-Keep the "Red Pen Rush" timing mechanic, but reskin it:
-- **The page:** a transparency scrolls slowly up the overhead projector instead of a press line.
-- **The marking:** the candidate stamps words with a red marker as they cross the lamp line, then picks the correction.
-
-**Content change:** the passage is now a student's (Brother Price's) **summary of the Kimball Building's dedication** (September 1999). The old passage was a paraphrase of the June 2000 announcement, which comes after Q1's Fall 1999 setting and names BYU–Idaho, against team decision 22.
-- **Text:** a labelled fictional student summary with no quotes from real people. Verify facts against the 1999 Church News article on the dedication. The building is named for President Spencer W. Kimball and was dedicated by President Hinckley.
-- **Errors:** 3–6, which anyone can catch from things seen in the game:
-  - "Rexburg, *Utah*"
-  - "Ricks *University*" (the campus sign says Ricks College)
-  - "*1899*" (the HUD says Fall 1999)
-  - "the *Hinckley* Building" (the wall plaque says Spencer W. Kimball Building)
-  - one their/there and one is/are
-- **Wrong stamps allowed:** keep the current rules (unlimited on Easy, 2 on Hard; Hard scrolls faster).
-- **Reactions:** each correct catch gets a reluctant "…yeah, okay, that's fair" from Brother Price.
-- **Classroom look:** carpeted (the Smith Building really had carpeted classrooms), desks in a U, an overhead projector and a box of transparencies.
-- **Team note:** update team decision 3.
-
-#### 3.3 Art: "Drawing what you see" (original Spori, third-floor art studio)
-Keep the canvas, position-independent scoring (60% on Easy, 85% on Hard), mirror, fill and the voxel reveal. Add:
-- **Framing:** the candidate teaches the grid method, copying the reference shown by the overhead projector. Subject in config, `art.subject`:
-  - `'temple'` (default): the existing future-temple concept, framed as the candidate's "vision of a temple on the hill." Optional music: an original arrangement of "High on the Mountain Top." The 1800s hymn is public domain, but don't use existing recordings.
-  - `'tabernacle'`: the Rexburg Stake Tabernacle (1911). Add a template for it.
-- **The class guesses as you draw:** "A castle?" → "Is it the Spori?" → "A wedding cake?" → the right answer. Guesses move along as the live score crosses thresholds in `art.json`.
-- **The projector bulb burns out** (Hard only), once, at about 40% score or after 45 seconds. The reference flickers and goes dark, a student says "I'll get a new bulb!", and the player draws from memory for 15 seconds before it comes back. Never on Easy.
-- **Mirror moment:** the first mirrored stroke makes the class say "Ooh."
-- **Pass:** a color flash, then the voxel reveal, then applause. Set `projectorBroken = true`.
-- **Classroom look:** 1903 rhyolite stone, creaky wood floors, deep narrow windows, drafting tables, a projector on a cart, and a "Final year in the old Spori" banner. The building was vacated in 2000.
-
-#### 3.4 Engineering: "Fix it live" (Austin Building, electronics lab; unlocks after Art)
-Keep the circuit engine (tile rotation, the live current display, the solver) and **re-theme the levels around the broken projector**:
-- **Opening:**
-  - A Physical Plant worker (the campus maintenance office) wheels in the Spori art studio's projector: "It keeps blowing fuses, and the art department needs it."
-  - Chair: "Forget the lesson plan. Show us."
-- **Levels:**
-
-  | # | Goal | Teaches | Mode |
-  |---|---|---|---|
-  | 1 | Get the lamp to light | A complete circuit | Easy, Hard |
-  | 2 | Lamp and cooling fan both at full | Parallel; in series both run weak | Easy, Hard |
-  | 3 | The power light glows dim while the lamp stays bright | Mixing series and parallel | Easy, Hard |
-  | 4 | Find and fix the short that keeps blowing the fuse | Short circuits | Hard |
-
-  Easy plays levels 1–3 and Hard plays 1–4, the same counts the current tests expect.
-- **Fan:** works like a bulb in the solver, shown as stopped, slow or full.
-- **Short circuit:** the fuse pops with `world.sound('pop')`, a smoke puff and a student's "Whoa!", then a new fuse goes in and the player retries.
-- **Pass:** the lamp throws a bright square on the classroom wall, and the class claps.
-- **Classroom look:** cinderblock, fluorescent tubes (one flickering), black lab benches, oscilloscopes, students in safety glasses, and the projector on the bench.
-
-### 4. Data and tests
-- **Data:** all lines, questions, levels, guesses, reactions and look notes go in `src/quests/q1/data/*.json`.
-- **Tests:** update `tests/q1.test.ts` to match. Keep:
-  - the Alma 11 checks;
-  - the fewest-coin optimum;
-  - art scoring at any offset;
-  - series/parallel/short in the solver;
-  - the English answer keys.
-
-  Add tests for:
-  - the math binary questions and the Hard extra questions;
-  - Art-before-Engineering order and the persisted `projectorBroken` flag;
-  - the English facts (Kimball, Hinckley, 1999, Rexburg, Idaho, Ricks College).
-
-### 5. Contract additions (only if needed)
-Ask the world teammate first. If you must add one, keep it minimal, put it in its own commit, and mark it `// CONTRACT ADDITION (Q1):`. The likely ones:
-- **A lobby alcove** in the `kimball-office` layout.
-- **A way to hide or show a Q1-owned object across interior/exterior spaces,** if `addObject` plus `playerPosition` isn't enough for the escort.
+### 4. Content and tests
+- **Content** lives in `src/quests/q1/data/`:
+  - `dialogue.json`: Bednar's lines, greetings, walk lines, waiting lines.
+  - `classroom.json`: rooms, chairs, students, walk-in and verdict lines, follow-ups.
+  - `math.json`, `english.json`, `art.json`, `circuit.json`.
+- **Tests** (`tests/q1.test.ts`):
+  - Alma 11 values, fewest coins, the binary digits, Zeezrom = 42, the tutorial;
+  - English answer keys, facts and page layout;
+  - Art scoring at any offset, Easy short time later than Hard, the templates;
+  - circuit series/parallel/short;
+  - config: art before engineering, lobby and door anchors, English in the Smith, a follow-up for every room, and no "BYU" in Q1 data.
 
 ---
 
-## Part 3: Plan
+## Part 3: Plan (what's left)
 
-Commit after each step. Run `npm run typecheck` and `npm test` each time.
+1. **Playtest fail paths on Easy:** losing each demo for real, and Retry/Leave mid-demo, then walking back in (the short walk-in should play).
+2. **Not built yet** (optional):
+   - an Engineering "find the short" level 4 (today shorts pop the fuse on any level);
+   - an original arrangement of "High on the Mountain Top" for the art demo;
+   - drawing the math coin poster before the demo starts (it's blank during the walk-in).
+3. **Tune after playtests:** walk-in shot timing, waiting-spot offsets (`wait` in `GAME_CONFIG.quests.professors.candidates`), short times in `art.json`.
+4. **World teammate:** review the marked additions in `src/interiors/interiors.ts` (Kimball Personnel Services room and the four classrooms) and in `GAME_CONFIG`.
+5. **Team content:** final candidate names and dialogue (placeholders now).
 
-1. **Flow first, with the old demo bodies still in place.**
-   - Lobby anchors, the hiring board, escort (or the meet-there fallback), demo doors beside the entrances, title cards, Art-before-Engineering gating, and English moved to Smith.
-   - *Check:* play the whole quest in the game. Objectives and waypoints always point to the next stop, Engineering is locked until Art, and a reload keeps progress.
-2. **`classroom.ts`:** the strip, reactions, engagement bar, pass flash and the Hard follow-up.
-   - *Check:* it shows in all four demos and works with the mock controller.
-3. **Math → binary.** *Check:* the tests, and every answer matches Alma 11.
-4. **English → Kimball dedication summary on the projector.** *Check:* the tests, and no "BYU–Idaho" anywhere in Q1 (grep for it).
-5. **Art additions:** guesses, bulb burnout (Hard), the "ooh," and `projectorBroken`. *Check:* the tests, and the burnout never happens on Easy.
-6. **Engineering → projector levels.** *Check:* the solver tests, all levels solvable, and the fuse pop and retry work.
-7. **Polish and docs:** update `docs/team-decisions.md` (decisions 1–3), `dialogue.json` and the README notes.
-   - *Check:* play all of Q1 on Easy and on Hard using only the mock controller.
-
-**If time runs short:** cut in this order: the class guessing, the Hard follow-up questions, the escort (use meet-there), then the engagement bar animation.
-
-### Done when
-- Q1 starts with Bednar, runs through the Personnel Services lobby, takes each candidate to a demo door at their building, and completes only after reporting back with all four hired.
-- Math and English can be done in any order, Art comes before Engineering, and Engineering repairs Art's projector.
-- Each demo switches to the candidate and back, and has the classroom strip, reactions, a hint, skip, pass/fail/retry, and Easy/Hard.
-- Keyboard/mouse and controllers both work everywhere, with no typing.
-- Math answers match Alma 11, the English facts match the 1999 dedication, nothing says BYU–Idaho, and all tests pass.
-
-### Open questions (proceed on these assumptions)
-1. Art subject: temple or Tabernacle? *Assumed: temple by default, with a config switch.*
-2. Lobby location: an alcove or the existing hall? *Assumed: the hall until the world teammate adds an alcove.*
-3. Final candidate names and dialogue. *Assumed: placeholders in data.*
-
-When you finish, report what's done, what's approximate, any contract additions, and which content still needs team input.
+**Keep while editing:**
+- the quest contract only (no renderer, player or input imports);
+- content in `data/`;
+- `npm run typecheck` and `npm test` passing;
+- every change played once in the browser (the dev build exposes `window.__game`, and the title menu has "Jump to a quest (testing) → Quest 1").

@@ -3,244 +3,200 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one reading column with a sticky section index on wide screens; four demo "cards" share one anatomy */
+/* Layout: one reading column + sticky index on wide screens; four demo cards share one anatomy */
 :root{
   --bg:#f3efe6; --surface:#fbf8f2; --ink:#2a2620; --muted:#6b6255; --line:#ddd4c3;
-  --board:#2f4a3c; --board-ink:#eef3ea; --amber:#b9761d; --tag:#e9e1cf;
-  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
-  --body:"Inter", system-ui, -apple-system, sans-serif;
-  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --board:#2f4a3c; --board-ink:#eef3ea; --amber:#b9761d; --tag:#e9e1cf; --red:#b0392b;
+  --display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#1b1916; --surface:#24211d; --ink:#ece6da; --muted:#a59b8b; --line:#3a352e;
-  --board:#2c4537; --board-ink:#e6efe2; --amber:#e0a04a; --tag:#332e27; color-scheme:dark}}
+  --board:#2c4537; --board-ink:#e6efe2; --amber:#e0a04a; --tag:#332e27; --red:#e07060; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#1b1916; --surface:#24211d; --ink:#ece6da; --muted:#a59b8b; --line:#3a352e;
-  --board:#2c4537; --board-ink:#e6efe2; --amber:#e0a04a; --tag:#332e27; color-scheme:dark}
+  --board:#2c4537; --board-ink:#e6efe2; --amber:#e0a04a; --tag:#332e27; --red:#e07060; color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
 .wrap{max-width:1080px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
 nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;font-size:14px}
 nav ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-nav a{color:var(--muted);text-decoration:none}
-nav a:hover,nav a:focus-visible{color:var(--ink)}
+nav a{color:var(--muted);text-decoration:none}nav a:hover,nav a:focus-visible{color:var(--ink)}
 main{min-width:0;max-width:720px}
 h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15}
 h1{font-size:clamp(34px,5vw,50px);font-weight:800;margin:0 0 12px}
 h2{font-size:26px;font-weight:800;margin:56px 0 12px;padding-top:8px;border-top:1px solid var(--line)}
-h3{font-size:19px;font-weight:600;margin:28px 0 8px}
+h3{font-size:19px;font-weight:600;margin:24px 0 8px}
 p,li{max-width:66ch}
 .lede{font-size:18px;color:var(--muted);margin:0 0 20px}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin:0 0 6px}
 .facts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px;padding:0;list-style:none}
 .facts li{font-family:var(--mono);font-size:13px;background:var(--tag);padding:4px 10px;border-radius:4px}
-table{border-collapse:collapse;width:100%;font-size:15px}
-.tbl{overflow-x:auto;margin:12px 0}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500}
-td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .flow{counter-reset:s;list-style:none;padding:0;margin:16px 0;display:flex;flex-direction:column;gap:10px}
 .flow li{counter-increment:s;position:relative;padding-left:44px}
 .flow li::before{content:counter(s);position:absolute;left:0;top:1px;width:28px;height:28px;border-radius:50%;background:var(--board);color:var(--board-ink);font-family:var(--mono);font-size:13px;display:grid;place-items:center}
-.demo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px;margin:24px 0}
+.beats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.beat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
+.beat b{display:block;font-family:var(--mono);font-size:12px;color:var(--amber);margin-bottom:4px}
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;margin:22px 0}
 .demo h2{border:0;margin-top:0;padding-top:0}
-.board{background:var(--board);color:var(--board-ink);border-radius:6px;padding:14px 18px;font-family:var(--mono);font-size:14px;margin:12px 0}
-.board p{margin:4px 0}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.split div{border-radius:8px;padding:12px 14px}
+.world{background:var(--board);color:var(--board-ink)}
+.strip{background:var(--tag)}
+.split b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;opacity:.85}
 .say{border-left:3px solid var(--amber);padding:2px 0 2px 14px;margin:10px 0;font-style:italic}
 .say b{font-style:normal;font-weight:600}
 .room{font-size:15px;color:var(--muted)}
-.room strong{color:var(--ink)}
-.decide{display:grid;gap:12px;margin:16px 0}
-.decide div{border:1px dashed var(--amber);border-radius:8px;padding:12px 16px}
-.decide strong{display:block}
-.src{font-size:14px;color:var(--muted)}
-.src a{color:var(--muted)}
-a{color:var(--amber)}
-a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
-@media (max-width:820px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}nav{display:none}.demo{padding:18px}}
+.todo{display:grid;gap:10px;margin:14px 0}
+.todo div{border:1px dashed var(--amber);border-radius:8px;padding:10px 14px}
+.todo strong{display:block}
+.src{font-size:14px;color:var(--muted)}.src a{color:var(--muted)}
+a{color:var(--amber)}a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.mark{color:var(--red);font-style:italic}
+@media (max-width:820px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}nav{display:none}.demo{padding:16px}.beats{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}}
 </style>
 
 <div class="wrap">
 <nav aria-label="Sections"><ol>
   <li><a href="#story">Story and setting</a></li>
   <li><a href="#flow">Quest flow</a></li>
-  <li><a href="#frame">The teaching demo</a></li>
+  <li><a href="#walkin">Classroom walk-in</a></li>
+  <li><a href="#rooms">The classrooms</a></li>
   <li><a href="#math">Math</a></li>
   <li><a href="#english">English</a></li>
   <li><a href="#art">Art</a></li>
   <li><a href="#engineering">Engineering</a></li>
   <li><a href="#rules">Rules for all four</a></li>
-  <li><a href="#world">What the world team builds</a></li>
-  <li><a href="#decide">Still to decide</a></li>
+  <li><a href="#next">What's left</a></li>
   <li><a href="#sources">Sources</a></li>
 </ol></nav>
 
 <main>
-<p class="eyebrow">The Spirit of Ricks · Quest 1 of 3 · team draft</p>
+<p class="eyebrow">The Spirit of Ricks · Quest 1 of 3 · as built on game-foundation</p>
 <h1>Q1: Hire the Professors</h1>
-<p class="lede">Ricks College is growing, and it needs new faculty. As Elder Bednar's assistant, the player brings four candidates through their interviews. Each interview ends in a teaching demonstration, and the player plays it as the candidate.</p>
-<ul class="facts">
-  <li>Fall 1999</li><li>4 candidates</li><li>Easy / Hard</li><li>Gives back 1/3 of the color</li><li>Keyboard/mouse + ESP32 controllers</li>
-</ul>
+<p class="lede">Ricks College is growing and needs new faculty. As President Bednar's assistant, the player brings four candidates to teaching demonstrations in real classrooms, and plays each demo as the candidate.</p>
+<ul class="facts"><li>Fall 1999</li><li>4 classroom demos</li><li>Easy / Hard</li><li>Keyboard/mouse + ESP32 controllers</li><li>Gives back 1/3 of the colour</li></ul>
 
 <h2 id="story">Story and setting</h2>
 <ul>
-  <li><strong>When:</strong> Fall 1999, the world's starting era. The Kimball Building had just been dedicated (September 1999), and the old Spori Building is in its final school year: its last classes were in August 2000. Reporting back to Bednar moves the world to Spring 2001.</li>
-  <li><strong>No "BYU–Idaho" yet:</strong> the team decided nothing in the game says BYU–Idaho until the very end, so Q1 only says the college is growing.</li>
-  <li><strong>Who you are:</strong> Elder Bednar's assistant. You go to him to get each quest, and you come back to report when it's done.</li>
-  <li><strong>Where hiring happens:</strong> the Kimball Building. It held the president's office and Personnel Services, the Ricks-era name for HR, which today handles faculty hiring in room 226.</li>
-  <li><strong>Perspective:</strong> you walk around as the assistant. When a demo starts the view switches and you play as the candidate. When it ends you're back to the assistant.</li>
+  <li><strong>When:</strong> Fall 1999, the world's starting era. The Kimball Building was dedicated that September, and the old Spori is in its final school year. Nothing in Q1 says "BYU–Idaho."</li>
+  <li><strong>Who you are:</strong> President Bednar's assistant. You get the quest in his Kimball office and report back to finish it.</li>
+  <li><strong>Where hiring happens:</strong> Personnel Services, a room off the Kimball hall. The Kimball really housed personnel offices.</li>
+  <li><strong>Perspective:</strong> you walk as the assistant. In each classroom you become the candidate ("You are now the Math candidate"), then you're back to yourself.</li>
+  <li><strong>The thread:</strong> the art studio's old overhead projector always shorts out during the art demo. Engineering repairs it.</li>
 </ul>
 
 <h2 id="flow">Quest flow</h2>
 <ol class="flow">
-  <li>In his Kimball office, Elder Bednar gives you a folder of four candidate files and sends you down the hall to Personnel Services.</li>
-  <li>The four candidates wait in the Personnel Services lobby inside the Kimball Building (the hall for now, until the world team adds a small alcove), each with a name tag and subject. A board on the wall tracks each one as waiting, in demo, hired or "waiting on the art demo."</li>
-  <li>You pick a candidate. They say they're due for a teaching demonstration in their department's building.</li>
-  <li>The candidate <strong>walks with you</strong> to that building. A minimap marker and the objective text show the way, for example "Walk the math candidate to the Romney Building." If following feels bad, the candidate meets you there instead.</li>
-  <li>At a demo door beside the entrance, a title card reads "Teaching demonstration · Romney Building." The banner switches to "Playing as" the candidate, the camera moves behind them, and the full-screen demo opens.</li>
-  <li>The demo plays out. When you pass, the class applauds and the view returns to you. The candidate is marked hired on the board.</li>
-  <li>After all four are hired, you report to Elder Bednar. Q1 is complete and one third of the color comes back to campus.</li>
+  <li>Bednar assigns the quest: four candidates are waiting in Personnel Services, and art comes before engineering.</li>
+  <li>In Personnel Services (counter, chairs, hiring board) you pick up the first candidate. "The other candidates will meet you outside their buildings."</li>
+  <li>The candidate walks beside you and says two walk-and-talk lines that set up their demo.</li>
+  <li>Walk into their building's classroom and the <strong>walk-in</strong> plays, then the demo.</li>
+  <li>Pass, and the chair gives the verdict and the candidate thanks you. The objective then points to the next candidate, already <strong>waiting outside their building</strong>, so there are no trips back to the Kimball.</li>
+  <li>Suggested route: math, then English, then art, then engineering. Engineering stays locked until art is done.</li>
+  <li>After all four, report to Bednar. Q1 is complete.</li>
 </ol>
-<p><strong>Order:</strong> Math and English can be done in any order. <strong>Art comes before Engineering.</strong> The engineering candidate becomes available only after the art candidate is hired, because the engineering demo is fixing the projector that broke during the art demo.</p>
 
-<h2 id="frame">The teaching demo: what all four share</h2>
-<p>Every challenge is one lesson the candidate teaches. The player does all the solving. The classroom is the setting around the puzzle, and its reactions come only from what the player does.</p>
-<div class="tbl"><table>
-  <thead><tr><th>Moment</th><th>What happens</th></tr></thead>
-  <tbody>
-    <tr><td>Start</td><td>Title card: "You are now Sister Ames · teaching demonstration, Romney Building." The department chair says one line to begin.</td></tr>
-    <tr><td>Playing</td><td>The HUD shows the candidate's name and portrait. Instruction text speaks to the player ("Pay 6 with the fewest coins."). Students only ask; they never answer.</td></tr>
-    <tr><td>Progress</td><td>A <strong>Class engagement</strong> bar fills as the player gets things right. Right answers get nods ("Oh, I get it"); wrong ones get confusion ("Wait, how?").</td></tr>
-    <tr><td>Hint</td><td>The candidate glances at the lesson notes on the lectern. Hints only appear when the player asks for one.</td></tr>
-    <tr><td>Fail</td><td>The chair says "Let's take a short break and try that again." Only this demo restarts.</td></tr>
-    <tr><td>Pass</td><td>Applause. The chair says "I'll recommend you to President Bednar." The view says "Back to you."</td></tr>
-    <tr><td>Hard difficulty</td><td>The chair asks one extra follow-up question at the end.</td></tr>
-  </tbody>
-</table></div>
-<p class="room">The demos are full-screen, in the game's voxel style. A classroom strip along the edge shows 4–5 students and the department chair, with each room's own colors and props, so no 3D classroom has to be built. The only color flash is the short one when the player passes.</p>
+<h2 id="walkin">The classroom walk-in</h2>
+<p>Walking into a classroom starts this short scene automatically. Esc skips it, and later visits play only the last beat.</p>
+<div class="beats">
+  <div class="beat"><b>1 · Arrival</b>Students turn to the door. "Is that the new math teacher?"</div>
+  <div class="beat"><b>2 · The aisle</b>The candidate walks up the side aisle to the front.</div>
+  <div class="beat"><b>3 · The problem</b>The chair stands and sets it in one line.</div>
+  <div class="beat"><b>4 · Handoff</b>The title is chalked on the board, "You are now…", and the strip slides up.</div>
+</div>
+<p>Every demo follows the same arc: the chair's setup, you teach, a twist, the chair's verdict. On Hard, the chair says "One more question before I decide" and asks a follow-up first.</p>
+
+<h2 id="rooms">The classrooms</h2>
+<p>All four are modelled on a real lecture room:</p>
+<ul>
+  <li>boards spanning the front wall with a wood ledge, and a screen case above;</li>
+  <li>white two-person tables and gray chairs in rows, with a centre aisle;</li>
+  <li>gray window shades and gray carpet;</li>
+  <li>a drop ceiling with light panels and a hanging projector, shown during scenes and demos.</li>
+</ul>
+<p>The work happens on the room's own surfaces. <strong>T</strong> (right stick ↑) switches between camera views: board, poster or wall, class. A slim strip at the bottom holds only what needs precision: answer choices, colours, a small mouse pad.</p>
 
 <section class="demo" id="math">
-<p class="eyebrow">Romney Building · third floor · Math &amp; Computer Science</p>
+<p class="eyebrow">Romney Building · 3rd floor · Math &amp; Computer Science</p>
 <h2>Math: "Binary, the Nephite way"</h2>
-<p><strong>The setup:</strong> the computer science students keep tripping on binary, and the chair asks the candidate to explain it so it sticks. The candidate uses the <strong>gold coins from Alma 11</strong>, which happen to work exactly like binary.</p>
-<p class="say"><b>Chair:</b> "Our computer science students keep tripping on binary. Explain it so it sticks."</p>
-<p class="say"><b>Candidate (first line on the board):</b> "Forget computers for a minute. The Nephites already used binary. Look at their coins."</p>
-<div class="board">
-  <p>SENINE = 1 &nbsp;·&nbsp; SEON = 2 &nbsp;·&nbsp; SHUM = 4 &nbsp;·&nbsp; LIMNAH = 7</p>
-  <p>Each coin is either in your hand (1) or not (0).</p>
-  <p>5 = shum + senine = 1 0 1</p>
+<p class="say"><b>Chair:</b> "Our computer science students keep tripping on binary — let's see if this helps."</p>
+<div class="split">
+  <div class="world"><b>In the room</b>The chalkboard shows the student's question and the shum · seon · senine board, which lights up the answer (1 1 0 → 6). The Alma 11 gold-coin poster hangs on the side wall.</div>
+  <div class="strip"><b>In the strip</b>Answer choices on Easy, or the coin tray on Hard. Feedback, then Next.</div>
 </div>
-<h3>How binary works here</h3>
-<p>Any amount from 1 to 7 can be paid with <em>at most one</em> senine, seon and shum. Writing which coins you hold, from biggest to smallest, gives the binary number: 101 means a shum, no seon and a senine, so 4 + 1 = 5. The surprise is that a limnah is worth exactly 7, which is one of each smaller coin (111).</p>
-<p>Use the gold coins only. The silver coins have the same values under different names, and the fractions are a second concept, so both are left out.</p>
-<h3>Questions, each asked by a student</h3>
-<div class="tbl"><table>
-  <thead><tr><th>#</th><th>Question</th><th>Answer</th></tr></thead>
-  <tbody>
-    <tr><td class="num">1</td><td>"Pay 5 with the fewest coins."</td><td>shum + senine (101)</td></tr>
-    <tr><td class="num">2</td><td>"Pay 6."</td><td>shum + seon (110)</td></tr>
-    <tr><td class="num">3</td><td>"Pay 3."</td><td>seon + senine (011)</td></tr>
-    <tr><td class="num">4</td><td>"Why is a limnah worth 7?"</td><td>It's one of every smaller coin: 1 + 2 + 4 (111)</td></tr>
-    <tr><td class="num">5</td><td>Finale: "Zeezrom offered Amulek six onties. An onti is the silver limnah. How many days of pay is that?" (Alma 11:22)</td><td>6 × 7 = 42 days. Class: "Six weeks of work!"</td></tr>
-  </tbody>
-</table></div>
-<p><strong>Controls:</strong> no typing. The player picks coins from a tray or chooses from 3–4 options.<br>
-<strong>Difficulty:</strong> on Easy, every question is multiple choice (2 misses allowed). On Hard, the player builds amounts from the coin tray, a right amount with too many coins counts as a miss, and "pay 9" (limnah + seon) and "pay 13" (limnah + shum + seon) are added, plus the chair's follow-up (1 miss allowed).</p>
-<p><strong>Hints:</strong> first, "Start with the biggest coin that fits." Second, the board shows each coin with a ✔ or blank (shum · seon · senine) so the player can read off the 1s and 0s. A judge earns one senine a day (Alma 11:3), which keeps the Zeezrom question easy to follow.</p>
-<p class="say"><b>Closing moment:</b> a student says "Wait, so 101 just means shum, no seon, senine?" and the candidate answers "That's all binary is: which coins you're holding."</p>
-<p class="room"><strong>Room:</strong> the 1987 addition, so newer than the rest of campus: drop ceiling, fluorescent panels, beige walls and blinds. Rows of tablet-arm desks, a green chalkboard across the front, and a few beige CRT computers along the back wall (it's the computer science floor). A timely "Is your computer Y2K ready?" flyer (it's fall 1999) and cardboard Nephite coins on the instructor's desk. Camera: behind the candidate's shoulder; the challenge UI sits on the chalkboard.</p>
+<ul>
+  <li><strong>Tutorial first (not scored):</strong> "Pay 5". Put down a shum, then a senine, with each coin highlighted, and the board reads 1 0 1 → 5.</li>
+  <li><strong>Questions:</strong> Pay 6 · read "011" · Pay 7 (one limnah!) · why is a limnah worth 7 · Zeezrom's six onties = 42 days of pay (Alma 11:22). Hard adds Pay 9 and Pay 13.</li>
+  <li><strong>Misses allowed:</strong> 2 on Easy, 1 on Hard. On Hard, the right amount with too many coins counts as a miss.</li>
+</ul>
 </section>
 
 <section class="demo" id="english">
 <p class="eyebrow">Smith Building · English classroom</p>
 <h2>English: "Editing for accuracy"</h2>
-<p><strong>The setup:</strong> a student, Brother Price, wrote a summary of the <strong>Kimball Building's dedication</strong> (September 1999), and it has mistakes in it. The transparency scrolls slowly up the overhead projector, and the candidate stamps wrong words with a red marker as they cross the lamp line, then picks the correction.</p>
-<p><strong>Why the Kimball dedication:</strong> the earlier passage summarized the June 2000 BYU–Idaho announcement, which hasn't happened yet in Fall 1999 and would say "BYU–Idaho" too early. The dedication fits the year, and the player has just been inside the building.</p>
+<p class="say"><b>Chair:</b> "Brother Price has kindly volunteered his write-up of the Kimball Building dedication."</p>
+<div class="split">
+  <div class="world"><b>In the room</b>The whole summary is projected on the whiteboard as one page. Move word by word, mark a mistake, and the fix is written above it in red ink: <span class="mark">1999,</span> over <s>1899,</s>. The Church News fact clipping is pinned to the bulletin board.</div>
+  <div class="strip"><b>In the strip</b>Progress, the current line as clickable words (for mouse), and the correction choices.</div>
+</div>
 <ul>
-  <li><strong>Text:</strong> a fictional student summary, labelled as such, with no quotes from real people. Facts are checked against the 1999 Church News article: the building is named for President Spencer W. Kimball and was dedicated by President Hinckley.</li>
-  <li><strong>Errors (3–6), each catchable from the game:</strong> "Rexburg, <em>Utah</em>," "Ricks <em>University</em>" (the campus sign says Ricks College), "<em>1899</em>" (the HUD says Fall 1999), "the <em>Hinckley</em> Building" (the wall plaque says Spencer W. Kimball Building), plus one their/there and one is/are.</li>
-  <li><strong>Passing:</strong> wrong stamps allowed are unlimited on Easy and 2 on Hard, where the transparency also scrolls faster.</li>
-  <li><strong>Reactions:</strong> each correct catch gets a reluctant "…yeah, okay, that's fair" from Brother Price.</li>
-  <li><strong>Hints:</strong> point to the next sentence that has an error.</li>
+  <li><strong>Mistakes:</strong> 3 on Easy, 6 on Hard. Facts include the 1999 date, Rexburg, <em>Idaho</em>, Ricks <em>College</em>, and the building named for President Kimball and dedicated by President Hinckley.</li>
+  <li><strong>Wrong marks:</strong> unlimited on Easy, 2 on Hard. A hint highlights the sentence. Brother Price reacts: "…yeah, okay, that's fair."</li>
 </ul>
-<p class="room"><strong>Room:</strong> the Smith Building (1968), home of the English department. Its classrooms were carpeted, an unusual choice then. Desks in a U facing an overhead projector, a box of transparencies, and the chair sitting by the bookshelf.</p>
 </section>
 
 <section class="demo" id="art">
-<p class="eyebrow">Old Spori Building · third floor · art studio</p>
+<p class="eyebrow">Original Spori Building · 3rd floor · art studio</p>
 <h2>Art: "Drawing what you see"</h2>
-<p><strong>The setup:</strong> the candidate teaches the grid method by drawing a building from a reference image projected on the overhead projector. The subject is still to decide: the Rexburg Temple or the Rexburg Tabernacle.</p>
+<p class="say"><b>Chair:</b> "Today: the grid method — if that old projector cooperates."</p>
+<div class="split">
+  <div class="world"><b>In the room</b>You paint directly on the studio's gridded board, with the brush cursor drawn on it. The projector beams the temple reference onto the side wall, then shorts out and the wall goes dark.</div>
+  <div class="strip"><b>In the strip</b>Colours, mirror, fill, check, the match meter (Easy) and a small mouse pad.</div>
+</div>
 <ul>
-  <li><strong>Board:</strong> a 20 × 24 grid canvas. The reference image is a 12 × 16 template.</li>
-  <li><strong>Scoring doesn't care where you draw.</strong> The drawing counts as correct anywhere on the board, even in the top-right corner. Pass at 60% on Easy and 85% on Hard.</li>
-  <li><strong>Mirror and fill tools.</strong> The building is symmetric, so drawing one tower draws both, and the class goes "ooh."</li>
-  <li><strong>The class guesses as you draw.</strong> "A castle?" "Is it the Spori?" "A wedding cake?" The guesses get closer as more of the drawing is correct, until someone names it.</li>
-  <li><strong>The projector bulb burns out</strong> (Hard only). The reference image flickers out. A student says "I'll get a new bulb!" and runs off, and the player draws from memory for 15 seconds. This never happens on Easy.</li>
-  <li><strong>Color comes back on the finished drawing.</strong> When the player passes, the drawing fills with color for a moment, previewing the game's main mechanic. Applause.</li>
-  <li><strong>Hints:</strong> outline the next row to fill, or briefly flash the template over the canvas.</li>
+  <li><strong>The short-out:</strong> the projector always shorts out, at 90 seconds on Easy and 40 on Hard. If you finish first, it pops right at the end. Either way you finish from memory, and the chair sends it to the engineering lab.</li>
+  <li><strong>Subject:</strong> the temple, framed as the candidate's "vision of a temple on the hill."</li>
+  <li><strong>Scoring and extras:</strong> pass at 60% on Easy, 85% on Hard, and the drawing counts anywhere on the board. The class guesses as you draw, the first mirror stroke gets an "ooh," and passing shows a voxel reveal.</li>
 </ul>
-<p><strong>Leads into Engineering:</strong> the projector that burned out is wheeled off to the engineering lab afterwards.</p>
-<p class="room"><strong>Room:</strong> the original 1903 Spori in its final school year. Walls of local rhyolite stone, creaky wooden floors, tall narrow windows set deep in the thick stone, and high ceilings. The third floor was redone in 1987 as a graphic-arts studio, so there are drafting tables under the old stone and wood. A gridded chalkboard, the overhead projector on a cart, half-packed boxes, and a hand-lettered "Final year in the old Spori" banner. The chair stands by the window. Camera: framing the board and the projected image together.</p>
 </section>
 
 <section class="demo" id="engineering">
 <p class="eyebrow">Austin Building · electronics lab · unlocks after Art</p>
 <h2>Engineering: "Fix it live"</h2>
-<p><strong>The setup:</strong> partway through the interview, a Physical Plant worker (Physical Plant was the campus maintenance office) wheels in the overhead projector from the Spori art studio.</p>
-<p class="say"><b>Physical Plant:</b> "It keeps blowing fuses, and the art department needs it."</p>
-<p class="say"><b>Chair (sliding it over):</b> "Forget the lesson plan. Show us."</p>
-<p>It keeps the existing circuit puzzle: rotate wire tiles until current flows, with bulbs lighting up live as off, dim or bright (inspired by <a href="https://universeandmore.com/crack-the-circuit/">Crack the Circuit</a>). The levels become the projector's own circuit. Easy plays levels 1–3 and Hard plays 1–4:</p>
-<div class="tbl"><table>
-  <thead><tr><th>Level</th><th>Fix</th><th>Concept</th></tr></thead>
-  <tbody>
-    <tr><td class="num">1</td><td>Get the lamp to light</td><td>A complete circuit</td></tr>
-    <tr><td class="num">2</td><td>Lamp and cooling fan both run at full power</td><td>Parallel (wired in series, both run weak)</td></tr>
-    <tr><td class="num">3</td><td>The small power light glows dim while the lamp stays bright</td><td>Mixing series and parallel</td></tr>
-    <tr><td class="num">4</td><td>Find the short that keeps blowing the fuse, with limited wire</td><td>Short circuits</td></tr>
-  </tbody>
-</table></div>
+<p class="say"><b>Physical Plant:</b> "It shorted out in the middle of the art demo. The art department needs it back."</p>
+<div class="split">
+  <div class="world"><b>In the room</b>Rotate wire tiles on a pegboard on the lab bench, right beside the broken projector. Its lamp lights, its fan spins, and the fuse box flashes on a short.</div>
+  <div class="strip"><b>In the strip</b>The goal, lamp and fan status (stopped / slow / full), and a small mouse pad.</div>
+</div>
 <ul>
-  <li><strong>Short circuit:</strong> the fuse on the bench pops with a puff of smoke and a student yells "Whoa!" A new fuse goes in, which is the retry.</li>
-    <li><strong>Payoff:</strong> the lamp comes on and throws a bright square on the wall, and the class claps.</li>
-  <li><strong>Hints:</strong> highlight one wire that belongs in the solution, or show which bulbs are currently wrong.</li>
+  <li><strong>Levels:</strong> get the lamp to light · lamp and fan at full (parallel) · a switch for the fan · a dim power light with a slow fan and the lamp bright (Hard only).</li>
 </ul>
-<p class="room"><strong>Room:</strong> the Austin Building (1969), which had electronics labs from the start. Cinderblock walls, fluorescent tubes with one flickering, black lab benches, oscilloscopes and multimeters, a fuse panel on the wall, and a resistor color-code poster. Students in safety glasses stand around the bench. Camera: looking down over the bench; the challenge UI sits on the pegboard and the projector stays visible beside it.</p>
 </section>
 
 <h2 id="rules">Rules for all four</h2>
 <ul>
-  <li><strong>Inputs:</strong> keyboard/mouse and the custom controllers both work everywhere. No typed text input.</li>
-  <li><strong>Difficulty:</strong> Easy and Hard, taken from the game setting.</li>
-  <li><strong>Hints:</strong> an easy-to-find hint on every challenge (H key or left stick click).</li>
-  <li><strong>Finding your way</strong> (from playtesting): objectives always name the building, minimap markers point to the next stop, and Bednar's lines point to it too.</li>
-  <li><strong>Skipping</strong> (from playtesting): every challenge has Skip, which hires the candidate without the test. There is also a "Skip quest" option. A config flag can turn skipping off.</li>
-  <li><strong>Progress and saving:</strong> color progress moves within Q1's third as candidates are hired (hired ÷ 4). Progress saves after every hire.</li>
-  <li><strong>Real people:</strong> Hinckley and Bednar are shown respectfully, and candidate names are fictional placeholders.</li>
+  <li><strong>Inputs:</strong> keyboard/mouse and controllers both work everywhere, with no typing.</li>
+  <li><strong>Every demo has:</strong> a hint, skip, retry and Easy/Hard. Map markers always show the next stop.</li>
+  <li><strong>Colour:</strong> it comes back in steps as candidates are hired. Progress is saved after every hire.</li>
+  <li><strong>Real people:</strong> shown respectfully, with no invented quotes. Candidates and students are fictional.</li>
 </ul>
 
-<h2 id="world">What the world team builds</h2>
-<ul>
-  <li><strong>Kimball lobby:</strong> a small Personnel Services alcove off the Kimball hall for the four candidates and the hiring board. Until it exists, they wait in the hall.</li>
-  <li><strong>Nothing else new:</strong> the demos are full-screen with a drawn classroom strip, and everything else Q1 needs (banner and camera switch, cutscenes, map markers, color progress, report-back, sounds, the player's position for the escort) is already in the world's quest API.</li>
-</ul>
-
-<h2 id="decide">Still to decide</h2>
-<div class="decide">
-  <div><strong>Art: temple or tabernacle?</strong>The Rexburg Temple wasn't built until 2008, so in 2000 it would be the candidate's "vision of a temple on the hill," a deliberate nod for fans. "High on the Mountain Top" could play here. The 1800s hymn is public domain, but we'd need our own recording. The Rexburg Tabernacle (1911) was really there in 2000, and its twin towers draw well on a grid (<a href="https://commons.wikimedia.org/wiki/Category:Rexburg_Stake_Tabernacle">photos</a>).</div>
-  <div><strong>Lobby: alcove or hall?</strong>The world team decides whether to add a Personnel Services alcove to the Kimball layout. The hall works until then.</div>
-  <div><strong>Candidate names and looks</strong>Fictional placeholders for now.</div>
-  <div><strong>Tie-in to Q3 (optional)</strong>A fixed item, such as a flashlight, could carry into the Q3 letter search. Q3's team decides; Q1 shouldn't depend on it.</div>
-  <div><strong>Interior photos</strong>Period interior photos aren't easy to find online. Leads: Ricks yearbooks from the late 1990s, BYU–Idaho Special Collections, and alumni Facebook groups.</div>
+<h2 id="next">What's left</h2>
+<div class="todo">
+  <div><strong>Playtest the fail paths</strong>Losing each demo on Easy, Retry/Leave mid-demo, then walking back in.</div>
+  <div><strong>Optional extras</strong>An Engineering "find the short" level, an original "High on the Mountain Top" arrangement, and the math poster filled in before the demo starts.</div>
+  <div><strong>World teammate review</strong>The Personnel Services room and four classrooms are marked additions in <code>src/interiors/interiors.ts</code> and <code>GAME_CONFIG</code>.</div>
+  <div><strong>Team content</strong>Final candidate names and dialogue (placeholders now).</div>
 </div>
 
 <h2 id="sources">Sources</h2>
 <ul class="src">
-  <li><a href="https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf">BYU–Idaho Campus Building Histories</a>: the Spori, Romney, Smith and Austin department history</li>
-  <li><a href="https://www.deseret.com/2000/11/30/19541571/fire-destroys-ricks-spori-building-during-demolition">Deseret News: Fire destroys Ricks' Spori Building during demolition</a></li>
-  <li><a href="https://www.thechurchnews.com/1999/9/11/23248018/president-hinckley-dedicates-new-building-at-ricks/">Church News: Kimball Building dedication, 1999</a> (English passage facts)</li>
-  <li><a href="https://www.byui.edu/human-resources/faculty-hiring">BYU–Idaho HR: Faculty hiring</a> (226 Kimball)</li>
-  <li><a href="https://en.wikipedia.org/wiki/Rexburg_Stake_Tabernacle">Wikipedia: Rexburg Stake Tabernacle</a></li>
-  <li>Alma 11:3–22: the Nephite coin values and Zeezrom's offer</li>
+  <li><a href="https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf">BYU–Idaho Campus Building Histories</a>: Romney (Math &amp; CS), Smith (English), Spori (Art), Austin (electronics)</li>
+  <li><a href="https://www.thechurchnews.com/1999/9/11/23248018/president-hinckley-dedicates-new-building-at-ricks/">Church News, Sept 11, 1999: Kimball Building dedication</a> (English facts; the building housed personnel offices)</li>
+  <li><a href="https://www.deseret.com/2000/11/30/19541571/fire-destroys-ricks-spori-building-during-demolition">Deseret News: the Spori Building fire, Nov 2000</a></li>
+  <li>Alma 11:3–22: Nephite coin values and Zeezrom's offer</li>
 </ul>
 </main>
 </div>

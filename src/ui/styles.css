@@ -525,3 +525,15 @@ html, body { overscroll-behavior: none; }
 .season-row button.focused { outline: 4px solid var(--focus); }
 .settings-head { font: 800 12px system-ui; text-transform: uppercase; letter-spacing: .06em; color: #8d3b2f; margin-top: 6px; }
 .settings-screen .panel { width: min(560px, calc((100vw - 32px) / var(--z))); }
+
+/* pause menu with the campus map on the right */
+.screen.menu.with-map { gap: 18px; padding: 16px; align-items: stretch; }
+.screen.menu.with-map > .panel { width: min(440px, 40vw); flex: none; align-self: center; }
+.menu-map { display: flex; flex-direction: column; gap: 6px; background: rgba(20,15,10,.85); border: 3px solid #5b4636; border-radius: 10px; padding: 10px; color: #f3e7cf; min-width: 0; }
+.menu-map-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
+.menu-map-head button, .map-head .map-in, .map-head .map-out { font: inherit; font-size: 16px; padding: 3px 10px; margin-left: 6px; cursor: pointer; }
+.map-canvas { display: block; border-radius: 6px; cursor: grab; touch-action: none; }
+.map-canvas:active { cursor: grabbing; }
+.map-tip { font-size: 13px; color: #d8c9ad; text-align: center; }
+.screen.map { flex-direction: column; gap: 6px; }
+@media (max-width: 900px) { .screen.menu.with-map .menu-map { display: none; } .screen.menu.with-map > .panel { width: min(520px, calc(100vw - 32px)); } }

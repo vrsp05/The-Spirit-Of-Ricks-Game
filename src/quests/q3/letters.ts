@@ -32,9 +32,9 @@ export function createLetters(): QuestModule {
   const journal = (intro = false) => openJournal(ctx, {
     cards: C.cards, state, noteLabel: C.noteLabel, intro, hintsAllowed: { view: C.modes[ctx.difficulty()].viewHint },
     onHint: () => ctx.progress.set('hints', ctx.progress.get('hints', 0) + 1),
-    openMap: () => { /* the game's map is on M; journal closes first */ ctx.ui.toast('Press M (or Button 3 outside the journal) for the map. Letters are not marked — use the clues!'); },
+    openMap: () => { /* the game's map is on M; journal closes first */ ctx.ui.toast('Press M (or the map button) for the map. Letters are not marked — use the clues!'); },
   });
-  const registerJournalButton = () => { if (cardsGiven()) ctx.ui.hudButton('Journal (J)', () => void journal(), ctx.status() === 'active'); };
+  const registerJournalButton = () => { if (cardsGiven()) ctx.ui.hudButton('Journal (J)', () => void journal()); };
 
   const updateObjective = () => {
     const f = found().length, p = placed().length;

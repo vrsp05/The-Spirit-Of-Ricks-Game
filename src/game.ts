@@ -833,7 +833,7 @@ export class Game {
       ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick', 'A · left stick'],
       ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick'],
       ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
-      ['Map / objective', 'M', 'Button 3', 'X or Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
+      ['Map / objective', 'M', 'Button 3', 'X'], ['Journal (Quest 3 cards)', 'J', 'Pause menu', 'Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
       ['One Joy-Con (sideways)', '', '', 'Stick moves · SL / SR turn the camera'],
     ];
     const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th><th>Joy-Con</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
@@ -877,6 +877,7 @@ export class Game {
       { label: 'Reset saved game', action: () => this.confirmReset() },
     ];
     const s = this.ui.menu('Paused', items, { subtitle: `${ERAS[this.world.era].label} · ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} · quest timers paused`, onBack: close });
+    this.ui.attachMap(s);   // options on the left, the zoomable campus map on the right
     s.onPause = close;
   }
   private confirmSkip() {
@@ -1155,8 +1156,7 @@ export class Game {
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
         else if (a.pressed('journal') && this.hudBtn) { a.consume('journal'); this.hudBtn.fn(); }
-        else if (a.pressed('map') && this.hudBtn?.viaMap) { a.consume('map'); this.hudBtn.fn(); }
-        else if (a.pressed('map') && this.spaceId === 'exterior') { a.consume('map'); this.ui.bigMap(() => {}); }
+        else if (a.pressed('map')) { a.consume('map'); this.ui.bigMap(() => {}); }   // the map always opens the map (the journal has its own button: J / Joy-Con Y)
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;

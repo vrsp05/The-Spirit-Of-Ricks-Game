@@ -6,7 +6,7 @@
 // - Firefox: raw HID buttons (mapping ""), single Joy-Cons only; handled best-effort, held sideways.
 // Layout (by the label on the button, tested on real Joy-Cons):
 //   A = action / use (E: talk, doors, carts, balls; confirm in menus)   B = back + jump
-//   + or − = menu (pause; the tools bar in minigames)   X / Y = map (hint in minigames)
+//   + or − = menu (pause; the tools bar in minigames)   X = map (hint in minigames)   Y = journal (Quest 3 cards)
 //   left stick = move, right stick = camera, ZR/R = sprint (hold), D-pad = menu navigation.
 //   In minigames, L/ZL and R/ZR (SL/SR on one Joy-Con) change the view left/right.
 //   One Joy-Con sideways: its stick moves, SL/SR turn the camera.
@@ -29,7 +29,7 @@ export function joyConKind(gp: { id: string }): JoyConKind | null {
 }
 
 const ACT: Record<'A' | 'B' | 'X' | 'Y' | 'plus' | 'minus' | 'run' | 'reset' | 'l3', ButtonName[]> = {
-  A: ['interact'], B: ['back', 'jump'], X: ['map'], Y: ['map'], plus: ['pause'], minus: ['pause'],
+  A: ['interact'], B: ['back', 'jump'], X: ['map'], Y: ['journal'], plus: ['pause'], minus: ['pause'],
   run: ['run'], reset: ['cameraReset'], l3: ['runToggle'],
 };
 

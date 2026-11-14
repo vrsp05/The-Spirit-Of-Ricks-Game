@@ -207,6 +207,7 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     return false;
   });
 
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__english = { tokens, errors: [...errorAt.entries()].map(([i, e]) => ({ i, correct: e.correct })), cur: () => cur, choosing: () => choosing };   // test hook (dev builds only)
   const clip = room?.get('poster'); if (clip) drawFactClipping(clip);
   let raf = 0, last = performance.now();
   const tick = (now: number) => { const dt = (now - last) / 1000; last = now; if (flashT > 0) { flashT -= dt; if (flashT <= 0) draw(); } raf = requestAnimationFrame(tick); };

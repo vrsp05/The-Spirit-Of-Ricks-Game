@@ -7,8 +7,8 @@ import { btn, h } from '../shared/frame';
 export interface CoachRect { left: number; top: number; width: number; height: number }
 export interface CoachStep { text: string; target: () => CoachRect | null }
 
-/** Shows the steps one by one inside `host`; resolves when finished or skipped. Returns a cancel function. */
-export function coach(host: HTMLElement, steps: CoachStep[], onDone: () => void): () => void {
+/** Shows the steps one by one inside `host`. Returns controls so controller buttons can drive it too (confirm = next, back = skip). */
+export function coach(host: HTMLElement, steps: CoachStep[], onDone: () => void): { next: () => void; end: () => void } {
   const layer = h('div', { class: 'q1-coach', role: 'dialog', 'aria-label': 'Tutorial' });
   const hole = h('div', { class: 'q1-coach-hole' });
   const note = h('div', { class: 'q1-coach-note' });
@@ -43,5 +43,5 @@ export function coach(host: HTMLElement, steps: CoachStep[], onDone: () => void)
   };
   window.addEventListener('keydown', onKey, true);
   show(); place();
-  return end;
+  return { next: () => { i++; show(); }, end };
 }

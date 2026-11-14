@@ -99,14 +99,14 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
         { text: 'Hint, Brief and More are written on the circuit board.', target: reg('tools') },
       ],
     };
-    let stopCoach: (() => void) | null = null;
-    const startCoach = () => { const steps = STEPS[roomId]; if (!room3d || !steps || !root.isConnected) return; stopCoach = coach(host() as HTMLElement, steps, () => { stopCoach = null; api.refocus(); }); };
+    let coachCtl: { next: () => void; end: () => void } | null = null;
+    const startCoach = () => { const steps = STEPS[roomId]; if (!room3d || !steps || !root.isConnected) return; coachCtl = coach(host() as HTMLElement, steps, () => { coachCtl = null; api.refocus(); }); };
     const openCard = (then?: () => void) => {
       if (card) { closeCard(); return; }
       popup('', 'How this works', [
         [h('b', { text: `You're playing as ${playingAs}. ` }), 'This is their teaching demonstration, and you deliver it: the lesson moves forward as you work through it.'],
         [h('b', { text: 'The lesson: ' }), room.brief.teach],
-        [h('b', { text: 'How to play: ' }), room.brief.how]], 'Got it ▸', 'Reopen any time with Brief (B).', then);
+        [h('b', { text: 'How to play: ' }), room.brief.how]], 'Got it ▸', 'Reopen any time with Brief (B, or ④ on a controller).', then);
     };
     /** The very first demo of the quest: a small window explaining what a teaching demo is. */
     const openIntro = () => popup('q1-intro', 'Your first teaching demonstration', [
@@ -147,14 +147,15 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       const mini = h('div', { class: 'q1-mini' }, h('span', { class: 'q1-place', text: room.place }), speech, h('div', { class: 'q1-eng' }, h('span', { text: 'Class' }), h('div', { class: 'q1-eng-bar' }, fill)), switcher);
       if (!ctx.progress.get<boolean>('demoIntroSeen', false)) { ctx.progress.set('demoIntroSeen', true); briefSeen.add(roomId); window.setTimeout(openIntro, 400); }
       else if (!briefSeen.has(roomId)) { briefSeen.add(roomId); window.setTimeout(() => openCard(startCoach), 400); }
-      const onKey = (e: KeyboardEvent) => { if (!root.isConnected || e.repeat) return; if (e.code === 'KeyB' && !stopCoach) openCard(); if (e.code === 'Tab') toggleMore(); };
+      const onKey = (e: KeyboardEvent) => { if (!root.isConnected || e.repeat) return; if (e.code === 'KeyB' && !coachCtl) openCard(); };
       window.addEventListener('keydown', onKey);
-      (root as HTMLElement & { q1Cleanup?: () => void }).q1Cleanup = () => { window.removeEventListener('keydown', onKey); card?.remove(); card = null; cardClose = null; more.remove(); stopCoach?.(); };
+      (root as HTMLElement & { q1Cleanup?: () => void }).q1Cleanup = () => { window.removeEventListener('keydown', onKey); card?.remove(); card = null; cardClose = null; more.remove(); coachCtl?.end(); };
       root.append(mini, stage);
       // Skip / Leave live in the "More…" pop-up (opened from the chalk on the board, or Tab)
       const footer = root.parentElement?.querySelector(':scope > .ch-footer.tools-zone');
+      // (④ / Tab enters tools mode, which shows this pop-up so a controller can reach Brief, Skip and Leave)
       const closeMore = btn('Close', () => toggleMore(false)); closeMore.removeAttribute('data-focus');
-      if (footer) { more.append(footer, closeMore); host().append(more); }
+      if (footer) { footer.prepend(btn('Brief', () => { toggleMore(false); openCard(); })); more.append(footer, closeMore); host().append(more); }
       root.closest('.panel')?.classList.add('q1-inroom-panel');
       drawTools();
     } else root.append(strip, stage);
@@ -193,6 +194,7 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
     const wrapped: ChallengeApi = {
       ...api,
       onAction: fn => api.onAction(a => {
+        if (coachCtl) { if (a === 'confirm') coachCtl.next(); else if (a === 'back') coachCtl.end(); return true; }   // controller drives the tutorial
         if (card && (a === 'confirm' || a === 'back')) { closeCard(); return true; }
         if (more.classList.contains('open') && a === 'back') { toggleMore(false); return true; }
         if (room3d && (a === 'rup' || a === 'rdown')) { stepView(a === 'rup' ? 1 : -1); return true; }
@@ -307,8 +309,8 @@ body:has(.q1-inroom) .hud-top,body:has(.q1-inroom) .hud-mini,body:has(.q1-inroom
 .q1-inroom .q1-bin-work,.q1-inroom .q1-eng-line,.q1-inroom .q1-eng-choice,.q1-inroom .art-wrap>div:first-child,.q1-inroom .art-refbox,.q1-inroom .cx-boardbox{display:none!important}
 .q1-inroom .q1-bin-fb,.q1-inroom .q1-bin-score,.q1-inroom .q1-eng-hud,.q1-inroom .cx-side,.q1-inroom .art-side{color:#fbf1dc}
 .q1-inroom .ch-hint{background:#fff3a8;color:#2a211a;border-radius:3px;display:inline-block;padding:3px 10px!important;margin:4px 0 0!important}
-.q1-more{position:absolute;left:50%;bottom:30dvh;transform:translateX(-50%);display:none;flex-direction:column;align-items:stretch;gap:8px;pointer-events:auto;background:#fffaf0;border:3px solid #3a2c22;border-radius:10px;padding:12px 14px;z-index:6;box-shadow:0 10px 24px rgba(0,0,0,.4)}
-.q1-more.open{display:flex}
+.q1-more{position:absolute;left:50%;bottom:30dvh;transform:translateX(-50%);display:flex;visibility:hidden;flex-direction:column;align-items:stretch;gap:8px;pointer-events:auto;background:#fffaf0;border:3px solid #3a2c22;border-radius:10px;padding:12px 14px;z-index:6;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.q1-more.open,.screen.tools-mode .q1-more{visibility:visible}
 .q1-more .ch-footer{display:flex!important;flex-direction:column;gap:6px;padding:0!important;border:0!important;background:none!important}
 .q1-more .tools-label,.q1-more .ch-hintbtn{display:none!important}
 .q1-intro{border-color:#7a4f1a}

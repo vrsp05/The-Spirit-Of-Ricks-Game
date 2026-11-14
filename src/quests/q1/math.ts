@@ -192,6 +192,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   const startLesson = () => { tutorialDone = true; hand = []; phase = 'ask'; reveal = null; revealExtra = ''; load(); };
   const renderQ = () => {
     const cur = q(); if (!cur) return;
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__math = { opts, correct: cur.correct, kind: cur.kind, target: cur.target, sel: () => sel };   // test hook (dev builds only)
     qEl.replaceChildren(h('b', { text: `${cur.who}: ` }), `“${cur.ask}”`);
     if (usesTray()) {
       const sum = comboValue(hand);

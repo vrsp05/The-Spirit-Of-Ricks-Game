@@ -204,10 +204,10 @@ function portraitCanvas(p: typeof PRESIDENTS[number], year: number, img: HTMLIma
   const words = p.name.split(' '); const l1 = words.slice(0, Math.ceil(words.length / 2)).join(' '), l2 = words.slice(Math.ceil(words.length / 2)).join(' ');
   g.fillText(l1, 128, 252); g.fillText(l2, 128, 272);
   g.font = '14px system-ui'; g.fillStyle = '#5a3a1a';
-  const serving = p.to === null || p.to > year, today = year >= 2023;
-  // in a past era the then-current president reads "since 2005" (not "present"); today it's "2023–present"
-  g.fillText(`${p.title} · ${serving ? (today ? `${p.from}–present` : `since ${p.from}`) : `${p.from}–${p.to}`}`, 128, 292);
-  if (serving) { g.fillStyle = '#8d3b2f'; g.font = 'bold 12px system-ui'; g.fillText(today ? 'CURRENT PRESIDENT' : `PRESIDENT IN ${Math.floor(year)}`, 128, 44); }
+  // real-world terms always; the current president (today) is marked, and so is whoever led the school in this era
+  g.fillText(`${p.title} · ${p.to === null ? `${p.from}–present` : `${p.from}–${p.to}`}`, 128, 292);
+  const thenServing = p.from <= year && (p.to === null || p.to > year) && year < 2023;
+  if (p.to === null || thenServing) { g.fillStyle = '#8d3b2f'; g.font = 'bold 12px system-ui'; g.fillText(p.to === null ? 'CURRENT PRESIDENT' : `PRESIDENT IN ${Math.floor(year)}`, 128, 44); }
   return c;
 }
 function foodcourt(): CampusLayout {
@@ -250,12 +250,12 @@ function foodcourt(): CampusLayout {
     onEra: era => {
       const year = ERAS[era].year;
       for (const f of frames) {
-        f.mesh.visible = f.p.from <= year;
+        f.mesh.visible = true;                                   // the whole line, through today's president
         const paint = () => { const m = f.mesh.material as THREE.MeshBasicMaterial; (m.map as THREE.CanvasTexture).image = portraitCanvas(f.p, year, photos.get(slug(f.p.name)) ?? null); m.map!.needsUpdate = true; };
         photo(f.p, paint); paint();
       }
-      const today = year >= 2023, t = ERAS[era].institution === 'byui' ? 'Presidents of Ricks College and BYU–Idaho' : 'Presidents of Ricks College';
-      if (title) { const m = title.material as THREE.MeshBasicMaterial; m.map = new THREE.CanvasTexture(textCanvas(today ? [t] : [t, `as of ${Math.floor(year)}`], { w: 512, h: 128, bg: '#2a211b' })); m.map.colorSpace = THREE.SRGBColorSpace; m.needsUpdate = true; }
+      const t = ERAS[era].institution === 'byui' ? 'Presidents of Ricks College and BYU–Idaho' : 'Presidents of Ricks College';
+      if (title) { const m = title.material as THREE.MeshBasicMaterial; m.map = new THREE.CanvasTexture(textCanvas([t], { w: 512, h: 128, bg: '#2a211b' })); m.map.colorSpace = THREE.SRGBColorSpace; m.needsUpdate = true; }
     },
   };
 }

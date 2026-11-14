@@ -285,6 +285,8 @@ export class Game {
     for (const [id, def] of this.interiors.defs) {
       const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string; building?: string };
       const open = () => !cfg.building || this.world.buildingStanding(cfg.building) || this.gateBuilt(cfg.building);
+      // Coordinates tagged with an interior space are room-local.
+      this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
       if (cfg.building && this.world.buildingDoors().some(d => d.id === cfg.building)) continue;   // its real doors are the entrances (setupBuildingDoors)
       const anchor = this.location(def.exteriorDoor);
       const d = this.world.doorPlacement(anchor);
@@ -299,8 +301,6 @@ export class Game {
         onInteract: () => this.enterInterior(id),
       });
       this.interactions.add({ id: `core:doorvis-${id}`, kind: 'generic', at: { x: d.x, z: d.z }, radius: 0, eras: cfg.eras, visual: door, prompt: '', onInteract: () => {} });
-      // Coordinates tagged with an interior space are room-local.
-      this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
     }
   }
 

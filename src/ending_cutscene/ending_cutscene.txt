@@ -1,0 +1,190 @@
+THE SPIRIT OF RICKS
+Ending Cutscene — Draft 4 / updated graphics
+Working title: Light the Legacy
+Target duration: 40 seconds (30-second celebration + 10-second STC epilogue)
+
+LATEST VISUAL REVISION
+
+Use the updated game-foundation graphics: PBR materials, sky environment and
+full-color grading. Elder and Sister Bednar and President and Sister Meredith
+have cheerful, upturned voxel smiles. Bednar's speech remains animated.
+
+The STC epilogue follows presenting_stage_reference.jpg: a portable screen on
+a low dark stage, gray chairs and carpet, pale panels, glass classrooms on the
+right, rear stairs and an upper glass gallery. Include the projector table,
+speaker stand, green vending machines and department banner in a simplified
+voxel layout. Daniel, Giovanni, Seth and Victor all smile and cheer with both
+arms raised, fist pumps and small bounces. Keep their reference blue shirts,
+black floppy disks on the wearer's left chest, and individual portrait details.
+No floating character names. The continuous screen pullback remains.
+
+TRIGGER AND LOOK
+
+All three quests are complete. B, Y and U are already fixed to the campus sign.
+The cutscene begins as the player fits the final letter, I, into place.
+
+The campus reaches full color as the final letter settles. Keep full color
+throughout the ending. The later nighttime setting changes the lighting,
+while preserving blue, gold, green, orange and the other restored colors.
+
+This is a simplified fictional tribute to BYU–Idaho's Light the Legacy
+celebration on October 9, 2026. The dialogue and drone formations below are
+proposed for the game, rather than a transcript or an exact event recreation.
+
+
+00:00–00:04 — THE FINAL LETTER
+
+Close on the player's hands as the I clicks into its place beside B, Y and U.
+
+Pull back just enough to reveal the completed BYUI lettering, the player,
+and the campus in full color. The interface fades away.
+
+
+00:04–00:06 — THE LEGACY CONTINUES
+
+A quick fade carries us forward in time to the stadium at night. Establish
+the deep-blue sky, the lit stage, and the crowd in one wide shot. The player
+stands near the front of the stage.
+
+LOCATION CARD:
+Light the Legacy
+BYU–Idaho Stadium · 2026
+
+
+00:06–00:12 — LIGHTING THE TORCH
+
+Cut close to Bednar holding a small burning torch. Simple supporting figures
+for Susan Bednar and President and Sister Meredith stand beside him.
+
+BEDNAR — SUBTITLE:
+“The Spirit of Ricks lives on.”
+
+Show the subtitle during the first three seconds, with his voxel mouth moving.
+He then lowers his torch to the ceremonial bowl. Orange and yellow flames
+catch, lighting the nearby faces. The crowd raises its arms.
+
+
+00:12–00:20 — LIGHTS ABOVE CAMPUS
+
+Tilt upward from the flame. Tiny blue, white and gold lights rise and form:
+
+25
+
+Hold briefly, then move the same lights into their second formation:
+
+BYUI
+
+Use roughly two seconds for the upward reveal, two and a half seconds for
+25, one and a half seconds for the transition, and two seconds for BYUI.
+The BYUI formation remains overhead through the following shots.
+
+
+00:20–00:25 — THE VIKINGS RETURN
+
+Cut back to the stage. Its simple screen lights up with:
+
+THE VIKINGS ARE BACK!
+
+Thor and two stylized, helmeted Viking supporters are already on stage.
+Thor raises both arms; the supporters and crowd wave. Include the player
+in the foreground, joining the celebration. Use one shot for the whole beat.
+
+
+00:25–00:28 — MAKE IT HAPPEN
+
+Cut to Bednar with the lit torch behind him. He looks toward the player.
+
+BEDNAR — SUBTITLE:
+“Together, we made it happen.”
+
+Keep the camera steady so the player can read the line.
+
+
+00:28–00:30 — FINAL CARD
+
+Fade to a deep-blue background.
+
+THE SPIRIT OF RICKS
+The legacy continues.
+
+The title is the image on a large screen, initially framed to fill our view.
+
+
+00:30–00:40 — MAKE IT HAPPEN, TOGETHER
+
+In one continuous move, pull back from that screen into an indoor presentation
+room in the Science & Technology Center (STC). The original ending is complete;
+this is an added epilogue. As the room comes into view, the title on the screen
+fades to the moving final celebration: lit torch, Vikings and BYUI drone lights.
+
+Daniel, Giovanni, Seth and Victor stand in front of the screen, facing the
+audience and presenting their game. All four wear the blue short-sleeved shirts
+from shirt_reference, with the black floppy-disk emblem on the wearer's left
+chest. Keep their individual hair, glasses and beard details from picture_of_us.
+No floating names or character labels. All four cheer with happy smiles,
+both arms raised, fist pumps and small bounces, without additional dialogue.
+
+Reveal rows of seated viewers, facing the team and screen, with a central aisle.
+Several audience members raise a hand as the camera settles into the wide shot.
+Keep the same voxel geometry and full-color look. The room is a practical,
+simplified STC atrium based on presenting_stage_reference: portable screen,
+gray seating, glass rooms, rear stairs and upper gallery.
+
+Hold the complete composition briefly, then fade to the ending menu at 40 seconds:
+Replay ending
+Keep exploring
+Title screen
+
+
+ENGINE NOTES
+
+- Reuse the existing voxel avatars, Bednar's animated mouth, subtitle system,
+  stadium geometry, camera interpolation, fades and full-color renderer.
+- Build a small stage and torch bowl from boxes. Animate a few orange/yellow
+  emissive blocks for the flame, with one nearby warm light.
+- Represent the drones with one instanced group of glowing cubes. Move the
+  same lights between two predefined point formations: 25 and BYUI. Basic
+  bright materials are sufficient; a separate bloom effect is optional.
+- Use a modest number of crowd figures, reusing the same meshes and a few
+  offset wave animations. Dress Thor and the supporters with simple voxel
+  helmet/beard/costume pieces.
+- Stage and shoot only the part of the stadium needed for these views.
+  Use a separate night-lit celebration setup so the outdoor gameplay lighting
+  can be restored cleanly when the player chooses Keep exploring.
+- Subtitles carry all dialogue. The scene works without spoken audio.
+- Keep the stadium celebration at 30 seconds. Its crowd waves, flame motion
+  and final drone formation overlap across shots. Append the STC epilogue.
+- Render the ceremony to a texture on the STC screen. The final title already
+  lives on that screen, so the reveal uses a continuous camera pullback.
+- Reuse the same four presenter models, audience, render target and room on
+  replay; retain preview save safety and normal game-state restoration.
+- Launch once after the final I is placed and quest completion is recorded.
+  The current example quest places all four letters together; the final
+  placement animation can show B, Y, U, then I, with the I as the trigger.
+- This draft makes the stadium celebration the main ending directly after
+  the sign is completed. The existing STC travel prompt would be replaced
+  when this ending is implemented.
+
+HISTORICAL / ADAPTATION NOTES
+
+At the 2026 event, his label would read Elder David A. Bednar. His two lines
+in this draft are fictional game dialogue, not historical quotations.
+
+Event coverage identifies the torch lighters as Elder and Sister Bednar and
+President and Sister Meredith. The staging here deliberately focuses on
+Bednar while acknowledging the other participants.
+
+Thor's return is documented. The two accompanying Viking figures, their
+movements, the exact scene order, and the two drone formations are simplified
+creative choices for this game. Costume details can follow event photographs
+when we build the scene.
+
+SOURCES
+
+BYU–Idaho Scroll, “A look at BYU-Idaho’s Light the Legacy celebration,”
+October 14, 2026 (event date, torch lighting participants, drones and Thor):
+https://byuiscroll.org/light-the-legacy-in-the-midst-of-miracles/
+
+BYU–Idaho Radio, “The Spot: The Vikings Return,” November 2, 2026
+(stadium celebration, torch lighting and Thor's return):
+https://www.byui.edu/radio/the-spot-the-vikings-return

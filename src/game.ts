@@ -38,8 +38,9 @@ import { computeReward, type RewardReceipt } from './quests/rewards';
 import { meshBuilding } from './world/voxelMesher';
 import { BUILDINGS } from './world/buildingRegistry';
 import { registryPoly } from './world/campusData';
+import { OpeningCutscene } from './opening_cutscene/OpeningCutscene';
 
-type Mode = 'title' | 'playing' | 'finale';
+type Mode = 'title' | 'playing' | 'finale' | 'cutscene';
 type At = string | { x: number; z: number; space?: string };
 
 export class Game {
@@ -56,6 +57,7 @@ export class Game {
   readonly interactions: InteractionSystem;
   readonly quests: QuestManager;
   readonly finale: Finale;
+  readonly opening: OpeningCutscene;
   mode: Mode = 'title';
   /** Team songs: menus + exploring; silent during cutscenes, time-jump cards and the finale. */
   readonly music = new MusicPlayer();
@@ -86,7 +88,7 @@ export class Game {
   private markers: THREE.Object3D[] = [];
   private markerT = 0;
   cutscenes!: CutsceneRunner;
-  bednar: Avatar | null = null;
+  bednar!: Avatar;
   effects!: Effects;
   private inspectables = new Map<string, Inspectable>();
   inspectFocus: Inspectable | null = null;
@@ -165,6 +167,7 @@ export class Game {
     });
     for (const m of createQuestModules()) this.quests.register(m);
     this.finale = new Finale(this);
+    this.opening = new OpeningCutscene(this);
     this.world.onEraChanged.push(era => this.quests.eraChanged(era));
     // era time-of-day: environment light, haze, exposure; NPC wardrobes
     const atmos = (era: EraId) => {
@@ -282,15 +285,6 @@ export class Game {
       // Coordinates tagged with an interior space are room-local.
       this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
     }
-    // Finale trigger inside the STC (approximate celebration hall)
-    const stage = { x: 0, z: -9 };
-    const marker = new THREE.Group();
-    const ring = voxelBox(3, 0.1, 3, '#ffd34d'); ring.position.y = 0.05; marker.add(ring);
-    this.interactions.add({
-      id: 'core:finale', kind: 'finale', at: { ...stage, space: 'stc-first-floor' }, radius: 3, visual: marker,
-      enabled: () => this.quests.allComplete() && this.mode !== 'finale', objective: () => true,
-      prompt: 'Join the celebration', onInteract: () => this.finale.start(),
-    });
   }
 
   // ---------------- golf carts ----------------
@@ -528,6 +522,10 @@ export class Game {
 
   // ---------------- story progression ----------------
   private async onQuestCompleted(id: QuestId, receipt: RewardReceipt | null) {
+    if (this.quests.allComplete()) {
+      // The final letter already earned its once-only reward in QuestManager.
+      this.voice.stop(); this.applyColor(true); this.finale.start(); return;
+    }
     this.busy = true;
     try {
       this.applyColor();
@@ -591,13 +589,7 @@ export class Game {
 
   // ---------------- objective / navigation ----------------
   currentObjective(): { text: string; target: At | null } {
-    if (this.finaleReached) return { text: 'Celebrate!', target: null };
-    if (this.quests.allComplete()) {
-      if (this.world.era !== GAME_CONFIG.story.finaleEra) return { text: 'Travelling to the present day…', target: null };
-      return this.spaceId === 'stc-first-floor'
-        ? { text: 'Walk into the celebration hall', target: { x: 0, z: -9, space: 'stc-first-floor' } }
-        : { text: 'Go to the Science and Technology Center', target: 'door.stc.main' };
-    }
+    if (this.quests.allComplete()) return { text: 'Explore BYU–Idaho', target: null };
     const o = this.quests.objective();
     if (o) return { text: o.text, target: o.target };
     return { text: `Talk to ${GAME_CONFIG.questGiver.displayName} in ${GAME_CONFIG.questGiver.where}`, target: GAME_CONFIG.questGiver.anchor };
@@ -625,9 +617,10 @@ export class Game {
       introSeen: this.introSeen, finaleReached: this.finaleReached,
     };
   }
-  save() { if (this.mode !== 'title') writeSave(this.snapshot()); }
+  save() { if (!this.finale.previewing && (this.mode === 'playing' || this.mode === 'finale')) writeSave(this.snapshot()); }
 
   newGame(difficulty: DifficultyId) {
+    this.finale.stop(); this.mode = 'title';
     this.difficulty = difficulty; this.colorStage = 0; this.introSeen = false; this.finaleReached = false;
     this.collectedCoins.clear(); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init(freshQuestState());
@@ -642,7 +635,8 @@ export class Game {
     this.beginPlay(true);
   }
   continueGame(d: SaveData) {
-    this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = false;
+    this.finale.stop();
+    this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = d.finaleReached;
     this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init({ quests: d.quests, targets: d.targets ?? {}, rewards: d.rewards ?? {} });
     this.world.refreshBuildings();
@@ -663,20 +657,44 @@ export class Game {
   private async beginPlay(intro: boolean) {
     this.ui.clear(); this.mode = 'playing'; this.ui.showHud(true);
     if (intro && !this.introSeen) {
-      this.busy = true;
-      await this.ui.card(ERAS[GAME_CONFIG.story.startEra].cardTitle, STORY.introSubtitle, 3200);
-      this.introSeen = true; this.busy = false;
+      this.busy = true; this.mode = 'cutscene'; this.ui.showHud(false); this.voice.stop();
+      try {
+        await this.opening.play();
+        this.spaceId = 'kimball-office'; this.world.exterior.visible = false; this.interiors.show(this.spaceId);
+        const p = this.interiors.toWorld(this.spaceId, 0, -4.5);
+        this.player.place(this.interiors.space(this.spaceId), p.x, p.z, Math.PI);
+        this.player.speed = 0;
+        this.cameraRig.reset(Math.PI); this.cameraRig.pitch = .9; this.cameraRig.distance = 9;
+        this.cameraRig.snap(this.player.position.clone().add(new THREE.Vector3(0, 1.6, 0)));
+        this.cameraRig.update(0, null, this.player.position, this.space, this.player.yaw);
+        this.world.updateSun(this.player.position);
+        this.interactions.update(this.player.position.x, this.player.position.z, this.spaceId, this.world.era);
+        this.introSeen = true;
+      } finally { this.mode = 'playing'; this.busy = false; this.ui.showHud(true); }
     }
+    if (!intro && this.quests.allComplete() && !this.finaleReached) { this.finale.start(); return; }
     this.save();
   }
 
+  previewEnding() { if (this.mode === 'title') { this.voice.stop(); this.finale.start(true); } }
+
   // ---------------- menus ----------------
+  /** Preview the opening without changing the player's saved progress. */
+  async previewOpening() {
+    if (this.mode !== 'title') return;
+    this.ui.clear(); this.ui.showHud(false); this.ui.setReticle(false, false); this.voice.stop(); this.mode = 'cutscene';
+    try { await this.opening.play(true); }
+    finally { this.showTitle(); }
+  }
+
   showTitle() {
     this.mode = 'title'; this.ui.clear(); this.ui.showHud(false);
     const save = loadSave();
     const s = this.ui.menu(GAME_CONFIG.title, [
       { label: save ? `Continue (${ERAS[save.era]?.label ?? save.era})` : 'Continue', disabled: !save, action: () => save && this.continueGame(save) },
       { label: 'New game', action: () => this.chooseDifficulty() },
+      { label: 'Watch opening', action: () => { void this.previewOpening(); } },
+      { label: 'Watch ending', action: () => this.previewEnding() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
@@ -712,7 +730,7 @@ export class Game {
     if (stage === 4) { const d = this.world.doorPlacement(this.location('door.stc.main')); player = { space: 'exterior', x: d.x + d.nx * 4, z: d.z + d.nz * 4, yaw: Math.atan2(-d.nx, -d.nz) }; }
     else { const p = this.interiors.toWorld('kimball-office', 0, -4); player = { space: 'kimball-office', x: p.x, z: p.z, yaw: Math.PI }; }
     this.continueGame({ version: 3, savedAt: '', difficulty: diff, era, colorStage: this.quests.completedCount(), quests: st.quests, targets: st.targets, rewards: st.rewards, player, coins: [], introSeen: true, finaleReached: false });
-    this.ui.toast(stage === 4 ? 'Testing: walk into the STC to trigger the finale.' : 'Testing: talk to President Bednar to start the quest.', 5000);
+    this.ui.toast(stage === 4 ? 'Testing: playing the ending.' : 'Testing: talk to President Bednar to start the quest.', 5000);
   }
 
   private chooseDifficulty() {
@@ -870,7 +888,7 @@ export class Game {
 
   private updateTraffic(dt: number) {
     if (!this.traffic) return;
-    const show = this.spaceId === 'exterior' && this.mode !== 'finale';
+    const show = this.spaceId === 'exterior' && this.mode !== 'finale' && this.mode !== 'cutscene';
     this.traffic.setVisible(show);
     if (!show || this.pauseOpen) return;
     const p = this.mode === 'title' ? { x: 1e6, z: 1e6 } : this.player.position;
@@ -879,11 +897,12 @@ export class Game {
 
   // ---------------- frame loop ----------------
   private frame() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    const elapsed = this.clock.getDelta();
+    const dt = Math.min(0.05, elapsed);
     this.gamepads.update();
     this.input.update(dt);
-    this.music.update(dt, !(this.cutscenes.active || this.mode === 'finale' || this.ui.cardShowing));
-    const cinematic = this.cutscenes.active || this.ui.cardShowing;
+    const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
+    this.music.update(dt, !cinematic);
     this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: ATMOSPHERE[this.world.era].season, cinematic });
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : 'car');
@@ -912,8 +931,11 @@ export class Game {
       c.position.set(center.x + Math.sin(this.titleT) * 140, 85, center.z + Math.cos(this.titleT) * 140);
       c.lookAt(center.x, 20, center.z);
       this.world.updateSun(center);
+    } else if (this.mode === 'cutscene') {
+      this.markers.forEach(m => m.visible = false);
+      this.opening.update(elapsed, a);
     } else if (this.mode === 'finale') {
-      this.finale.update(dt);
+      this.finale.update(elapsed, a);
       this.markers.forEach(m => m.visible = false);
       this.npcs.setVisible(false);
       this.interactions.update(this.player.position.x, this.player.position.z, this.spaceId, this.world.era); // refresh marker visibility
@@ -975,7 +997,8 @@ export class Game {
       this.autosaveT += dt; if (this.autosaveT > 20) { this.autosaveT = 0; this.save(); }
     }
     this.effects.update(dt);
-    this.updateMouths(dt);
+    // The opening and ending drive their own subtitle-synchronized mouths.
+    if (this.mode !== 'cutscene' && this.mode !== 'finale') this.updateMouths(dt);
     this.syncVehicles();
     if (this.overhead) {
       const c = this.renderer.camera, o = this.overhead, h = o.span / 2 / Math.tan(THREE.MathUtils.degToRad(c.fov / 2));

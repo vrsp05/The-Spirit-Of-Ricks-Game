@@ -155,6 +155,7 @@ export class World {
   era: EraId = GAME_CONFIG.story.startEra;
   private cache = new Map<EraId, EraCache>();
   private signs = new THREE.Group();
+  get campusSignGroup() { return this.signs; }
   private obstacles: { x: number; z: number; r: number }[] = [];
   private signSpots = new Map<string, Vec2>();
   /** Bench positions (seatable). yaw = direction the sitter faces. */

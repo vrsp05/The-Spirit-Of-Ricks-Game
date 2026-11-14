@@ -16,7 +16,7 @@ export class CameraRig {
 
   constructor(readonly camera: THREE.PerspectiveCamera) {}
 
-  reset(behindYaw: number) { this.yaw = behindYaw + Math.PI; this.pitch = GAME_CONFIG.camera.pitch; this.distance = GAME_CONFIG.camera.distance; }
+  reset(behindYaw: number) { this.yaw = behindYaw + Math.PI; this.pitch = GAME_CONFIG.camera.pitch; this.distance = GAME_CONFIG.camera.distance; this.pitchBoost = 0; }
   snap(target: THREE.Vector3) { this.target.copy(target); this.current = this.distance; }
 
   update(dt: number, input: ActionState | null, follow: THREE.Vector3, space: Space, playerYaw: number) {

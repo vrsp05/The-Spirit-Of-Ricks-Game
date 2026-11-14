@@ -4,6 +4,8 @@ let game: Game;
 try {
   game = new Game(document.getElementById('app')!, document.getElementById('ui')!);
   (window as any).__game = game; // handy for console debugging and automated smoke tests
+  if (new URLSearchParams(location.search).get('cutscene') === 'preview') void game.previewOpening();
+  else if (new URLSearchParams(location.search).get('cutscene') === 'ending') game.previewEnding();
   if (new URLSearchParams(location.search).has('dev')) {
     import('./dev/devTools').then(m => m.installDevTools(game));
   }

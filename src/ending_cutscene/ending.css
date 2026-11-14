@@ -1,0 +1,12 @@
+.ending-cutscene .oc-black { background: #07162c; }
+.ending-cutscene .oc-bar { background: #061120; }
+.ending-cutscene .oc-controls button { background: #14263d; border-color: #627999; }
+.ending-cutscene .oc-caption { background: rgba(5, 17, 34, .93); }
+.ending-cutscene .oc-progress { background: #273a53; }
+.screen.menu.ending-menu { background: #07162c; color: #fff2d5; }
+.ending-menu .panel { background: transparent; border: 0; box-shadow: none; width: min(640px, 94vw); text-align: center; }
+.ending-menu .panel h1 { font-size: clamp(34px, 5vw, 60px); font-weight: 400; }
+.ending-menu .panel .sub { color: #d3bd8e; margin: 12px 0 32px; font-size: 18px; }
+.ending-menu .items { max-width: 300px; margin: 0 auto; }
+.ending-menu .panel button { color: #fff2d5; background: #19334f; border-color: #6e8298; text-align: center; }
+.ending-menu .panel button.focused { background: #264c71; }

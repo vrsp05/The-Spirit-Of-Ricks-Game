@@ -15,28 +15,33 @@ interface Walker {
 
 const HAIR = ['#2a1d14', '#4a3324', '#7a4b2a', '#c9a35a', '#1a1a1a', '#8b5a2b'];
 const SKIN = ['#f0c9a4', '#e0b48f', '#c68c64', '#a8714a', '#8d5a3b'];
-/** Era wardrobes (generic, period-flavoured clothing; seeded per walker so each person stays recognisable). */
-export function eraLook(era: EraId, seed: number): AvatarLook {
+/** Wardrobe: the era sets the style, the season the weather layer (seeded per walker so each person stays recognisable). */
+export function eraLook(era: EraId, seed: number, season: 'spring' | 'summer' | 'autumn' | 'winter' = 'autumn'): AvatarLook {
   let s = seed * 9301 + 49297; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   const p = <T,>(a: T[]) => a[(r() * a.length) | 0];
   const skin = p(SKIN), hair = p(HAIR);
   const hairStyle: HairStyle = p(['short', 'side', 'long', 'bun', 'curly', 'short', 'long', 'buzz']);
   const glasses = r() < 0.15;
-  const pack = r() < 0.5 ? p(['#2f3e57', '#7a2b2b', '#3f5f3a', '#2a2a2a', '#b8742c']) : undefined;
-  if (era === 'ricks1999') return { skin, hair, hairStyle, glasses, backpack: pack,
-    shirt: p(['#8d3b2f', '#3f5f8a', '#4a6a3a', '#7a4f2a', '#c8b48a', '#2c2c34', '#b8423a']), pattern: r() < 0.35 ? 'flannel' : 'plain',
-    jacket: r() < 0.2 ? '#3f5f8a' : undefined, pants: p(['#3a4a6a', '#2b3550', '#8a7a5a', '#4a4a50']),
-    hat: r() < 0.25 ? 'cap' : 'none', hatColor: p(['#2f4f7f', '#7a2b2b', '#2a2a2a', '#3f6f4a']), shoes: p(['#efe9de', '#2a221c', '#5a4632']) };
-  if (era === 'transition') return { skin, hair, hairStyle, glasses, backpack: pack,
-    shirt: p(['#e0e0d8', '#4aa3a0', '#d1a12f', '#3d6fa8', '#c86b2a', '#7a4f9a', '#3f8a52']), pattern: r() < 0.2 ? 'stripe' : 'plain',
-    pants: p(['#3a4252', '#8a7a5a', '#2b2f3a', '#5a6a7a']), shorts: r() < 0.25, hat: r() < 0.15 ? 'cap' : 'none', hatColor: p(['#2f4f7f', '#b8423a']) };
-  if (era === 'byui') return { skin, hair, hairStyle, glasses, backpack: pack,
-    shirt: p(['#e0e0d8', '#3d6fa8', '#2c2c34']), coat: r() < 0.82 ? p(['#2b2f3a', '#8d3b2f', '#3f6f8a', '#4a5a3a', '#d8c8a8', '#5a3a5a']) : undefined,
-    pants: p(['#22283a', '#2b2f3a', '#3a4252']), hat: r() < 0.55 ? 'beanie' : 'none', hatColor: p(['#8d3b2f', '#2f4f7f', '#d1a12f', '#3f6f4a', '#2a2a2a', '#efe9de']),
-    scarf: r() < 0.45 ? p(['#b8423a', '#efe9de', '#3f5f8a', '#d1a12f']) : undefined, shoes: p(['#3a2a1c', '#2a2a2a', '#5a4632']) };
-  return { skin, hair, hairStyle, glasses, backpack: pack,                                   // present day, summer
-    shirt: p(['#e0e0d8', '#2c2c34', '#4aa3a0', '#d96a5a', '#3d6fa8', '#c9b23a', '#7a8a9a']), pattern: r() < 0.15 ? 'stripe' : 'plain',
-    pants: p(['#3a4252', '#8a7a5a', '#2b2f3a', '#6b6b70']), shorts: r() < 0.4, shoes: p(['#f4f4f0', '#f4f4f0', '#2a2a2a']) };
+  const backpack = r() < 0.5 ? p(['#2f3e57', '#7a2b2b', '#3f5f3a', '#2a2a2a', '#b8742c']) : undefined;
+  let look: AvatarLook;
+  if (era === 'ricks1999' || era === 'transition') look = { skin, hair, hairStyle, glasses, backpack,       // 90s: flannel, denim, caps
+    shirt: p(['#8d3b2f', '#3f5f8a', '#4a6a3a', '#7a4f2a', '#c8b48a', '#2c2c34', '#b8423a', '#e0e0d8']), pattern: r() < 0.3 ? 'flannel' : r() < 0.15 ? 'stripe' : 'plain',
+    jacket: r() < 0.15 ? '#3f5f8a' : undefined, pants: p(['#3a4a6a', '#2b3550', '#8a7a5a', '#4a4a50']),
+    hat: r() < 0.22 ? 'cap' : 'none', hatColor: p(['#2f4f7f', '#7a2b2b', '#2a2a2a', '#3f6f4a']), shoes: p(['#efe9de', '#2a221c', '#5a4632']) };
+  else if (era === 'byui') look = { skin, hair, hairStyle, glasses, backpack,                               // 2010s: hoodies, skinny jeans
+    shirt: p(['#e0e0d8', '#3d6fa8', '#2c2c34', '#7a2b2b', '#4aa3a0', '#5a5a62']), pattern: r() < 0.12 ? 'stripe' : 'plain',
+    pants: p(['#22283a', '#2b2f3a', '#3a4252']), hat: r() < 0.12 ? 'cap' : 'none', hatColor: '#2f4f7f', shoes: p(['#3a2a1c', '#2a2a2a', '#d8d8d0']) };
+  else look = { skin, hair, hairStyle, glasses, backpack,                                                    // today: plain tees, white sneakers
+    shirt: p(['#e0e0d8', '#2c2c34', '#4aa3a0', '#d96a5a', '#3d6fa8', '#c9b23a', '#7a8c9a']), pattern: r() < 0.12 ? 'stripe' : 'plain',
+    pants: p(['#3a4252', '#8a7a5a', '#2b2f3a', '#6b6b70']), shoes: p(['#f4f4f0', '#f4f4f0', '#2a2a2a']) };
+  // season layer
+  if (season === 'winter') {
+    if (r() < 0.82) look.coat = p(['#2b2f3a', '#8d3b2f', '#3f6f8a', '#4a5a3a', '#d8c8a8', '#5a3a5a']);
+    if (r() < 0.55) { look.hat = 'beanie'; look.hatColor = p(['#8d3b2f', '#2f4f7f', '#d1a12f', '#3f6f4a', '#2a2a2a', '#efe9de']); }
+    if (r() < 0.45) look.scarf = p(['#b8423a', '#efe9de', '#3f5f8a', '#d1a12f']);
+  } else if (season === 'autumn') { if (!look.jacket && r() < 0.25) look.coat = p(['#5a4632', '#3f4a5a', '#7a5a3a']); }
+  else look.shorts = r() < (season === 'summer' ? 0.4 : 0.15);
+  return look;
 }
 
 // Fictional first names for ambient students (not real people).
@@ -72,8 +77,8 @@ export class NpcCrowd {
   }
 
   /** Re-dress everyone for the era (winter coats in 2011, flannel in 1999, …). */
-  private era: EraId | null = null;
-  setEra(era: EraId) { if (era === this.era) return; this.era = era; for (const w of this.walkers) w.avatar.rebuild(eraLook(era, w.seed)); }
+  private lookKey = '';
+  setEra(era: EraId, season: 'spring' | 'summer' | 'autumn' | 'winter' = 'autumn') { const k = era + season; if (k === this.lookKey) return; this.lookKey = k; for (const w of this.walkers) w.avatar.rebuild(eraLook(era, w.seed, season)); }
 
   setVisible(v: boolean) { for (const w of this.walkers) w.avatar.root.visible = v; }
 

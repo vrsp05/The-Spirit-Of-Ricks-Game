@@ -41,7 +41,7 @@ export class Traffic {
   private roads: Lane[]; private paths: Lane[];
   private roadJ; private pathJ;
   private rnd: () => number;
-  private era: EraId | null = null;
+  private era: string | null = null;
   private bellCooldown = 0;
 
   constructor(private scene: THREE.Scene, cars = 10, bikes = 6) {
@@ -69,15 +69,15 @@ export class Traffic {
   }
 
   /** Re-style cars and re-dress cyclists for the era. */
-  setEra(era: EraId) {
-    if (era === this.era) return; this.era = era;
+  setEra(era: EraId, season: 'spring' | 'summer' | 'autumn' | 'winter' = 'autumn') {
+    if (era + season === this.era) return; const carsToo = !this.era?.startsWith(era); this.era = era + season;
     this.agents.forEach((a, i) => {
-      if (a.kind === 'car') {
+      if (a.kind === 'car' && carsToo) {
         const nv = new Vehicle(`traffic-${i}`, 'car', STYLES[era][i % 3], PALETTE[(i * 2 + era.length) % PALETTE.length]);
         nv.root.position.copy(a.v.root.position); nv.root.rotation.y = a.yaw; nv.root.visible = a.v.root.visible;
         this.scene.remove(a.v.root); a.v.root.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
         a.v = nv; this.scene.add(nv.root);
-      } else a.rider?.rebuild(eraLook(era, a.seed));
+      } else if (a.kind !== 'car') a.rider?.rebuild(eraLook(era, a.seed, season));
     });
   }
   setVisible(v: boolean) { for (const a of this.agents) { a.v.root.visible = v; if (a.rider) a.rider.root.visible = v; } }

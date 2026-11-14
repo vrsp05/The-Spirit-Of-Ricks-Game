@@ -29,6 +29,8 @@ export interface HudData {
   px: number; pz: number; pyaw: number; camYaw: number;
   map: HTMLCanvasElement | null; target: { x: number; z: number } | null; interior: string | null;
   markers: { x: number; z: number }[];   // every current objective point (minimap / map)
+  /** Minimap centre (the building's entrance while indoors); defaults to px/pz. */
+  mapX?: number; mapZ?: number;
   doors: { x: number; z: number; label: string }[]; // enterable entrances
   targetLabel: string | null;            // where the pointer leads ("Romney Building")
   coins: string;
@@ -114,11 +116,20 @@ export class UI {
   setBanner(text: string | null) { this.banner.classList.toggle('hidden', !text); if (text) this.banner.textContent = text; }
   setReticle(visible: boolean, active = false) { this.reticle.classList.toggle('hidden', !visible); this.reticle.classList.toggle('active', active); }
   setHudButton(label: string | null, action: (() => void) | null) { this.hudBtn.classList.toggle('hidden', !label); if (label) this.hudBtn.textContent = label; this.hudBtnAction = action; }
+  /** Player name used for "{player}" in dialogue and for the "You" speaker. */
+  playerName = '';
+  /** Clean a line for display: no "(game character)" notes, {player} → the player's name. */
+  cleanLine<T extends { speaker: string; text: string }>(l: T): T {
+    const name = this.playerName || 'friend';
+    const speaker = l.speaker.replace(/\s*\(game character\)/gi, '').replace(/^You$/, this.playerName || 'You');
+    return { ...l, speaker, text: l.text.replace(/\{player\}/g, name) };
+  }
   /** Called when a spoken line starts (or with null when the conversation/scene ends) — drives the voices. */
   onLine: ((line: { speaker: string; text: string } | null) => void) | null = null;
   private lastSub = '';
-  subtitle(line: { speaker: string; text: string } | null, hint: string) {
-    this.currentSpeaker = line?.speaker || null;
+  subtitle(raw: { speaker: string; text: string } | null, hint: string) {
+    this.currentSpeaker = raw?.speaker || null;            // raw name: drives the speaker's mouth
+    const line = raw ? this.cleanLine(raw) : null;
     const key = line ? `${line.speaker}|${line.text}` : '';
     if (line && key !== this.lastSub) this.onLine?.(line);
     if (!line && !hint) this.onLine?.(null);          // scene finished / skipped
@@ -219,8 +230,8 @@ export class UI {
       const el = document.createElement('div'); el.className = 'screen dialogue';
       el.innerHTML = `<div class="dlg"><div class="dlg-speaker"></div><div class="dlg-text"></div><div class="dlg-next">Confirm ▸</div></div>`;
       const render = () => {
-        const l = lines[i];
-        this.currentSpeaker = l.speaker;
+        const raw = lines[i], l = this.cleanLine(raw);
+        this.currentSpeaker = raw.speaker;
         el.querySelector('.dlg-speaker')!.innerHTML = esc(l.speaker) + (l.placeholder ? ' <span class="badge">PLACEHOLDER DIALOGUE</span>' : '');
         el.querySelector('.dlg-text')!.textContent = l.text;
         this.onLine?.(l);
@@ -287,6 +298,29 @@ export class UI {
     });
   }
 
+  /** Ask the player's name and season (keyboard for the name; controllers can keep the suggestion). */
+  askName(suggestion: string, season: 'spring' | 'summer' | 'autumn' | 'winter'): Promise<{ name: string; season: 'spring' | 'summer' | 'autumn' | 'winter' }> {
+    const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
+    return new Promise(resolve => {
+      const el = document.createElement('div'); el.className = 'screen menu name-screen';
+      el.innerHTML = `<div class="panel"><h2>What’s your name?</h2><p class="sub">President Bednar’s new assistant needs a name. Characters will call you by it.</p>
+        <input class="name-input" data-focus maxlength="18" autocomplete="off" spellcheck="false" placeholder="Your name">
+        <p class="sub">Season for the whole game (you can change it later in Settings):</p>
+        <div class="season-row">${SEASONS.map(x => `<button type="button" data-focus data-season="${x}">${x[0].toUpperCase()}${x.slice(1)}</button>`).join('')}</div>
+        <div class="items"><button data-focus type="button" class="name-ok primary">Start</button></div></div>`;
+      const input = el.querySelector('.name-input') as HTMLInputElement; input.value = suggestion;
+      let pick = season, done = false;
+      const paint = () => el.querySelectorAll<HTMLButtonElement>('[data-season]').forEach(b => b.classList.toggle('chosen', b.dataset.season === pick));
+      el.querySelectorAll<HTMLButtonElement>('[data-season]').forEach(b => b.addEventListener('click', () => { pick = b.dataset.season as typeof pick; paint(); }));
+      paint();
+      const finish = () => { if (done) return; done = true; const v = input.value.trim().replace(/[<>{}]/g, '').slice(0, 18) || suggestion; this.pop(s); resolve({ name: v, season: pick }); };
+      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(); });   // typing doesn't move the game
+      el.querySelector('.name-ok')!.addEventListener('click', finish);
+      const s = this.push(el, { onBack: finish });
+      setTimeout(() => { input.focus(); input.select(); }, 50);
+    });
+  }
+
   toast(text: string, ms = 3500) {
     const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
     this.toastEl.appendChild(t); setTimeout(() => t.classList.add('out'), ms); setTimeout(() => t.remove(), ms + 600);
@@ -307,10 +341,10 @@ export class UI {
     this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
     const g = this.mini.getContext('2d')!, S = 180;
     g.fillStyle = '#2b2622'; g.fillRect(0, 0, S, S);
-    if (d.map && !d.interior) {
+    if (d.map) {
       const scale = d.map.width / (CAMPUS.bounds.maxX - CAMPUS.bounds.minX); // px per metre in map canvas
-      const viewM = 130, src = viewM * scale;
-      const cx = (d.px - CAMPUS.bounds.minX) * scale, cy = (d.pz - CAMPUS.bounds.minZ) * scale;
+      const viewM = 130, src = viewM * scale, mx = d.mapX ?? d.px, mz = d.mapZ ?? d.pz;
+      const cx = (mx - CAMPUS.bounds.minX) * scale, cy = (mz - CAMPUS.bounds.minZ) * scale;
       g.drawImage(d.map, cx - src / 2, cy - src / 2, src, src, 0, 0, S, S);
       const drawMarker = (m: { x: number; z: number }, primary: boolean) => {
         let tx = (m.x - d.px) / viewM * S + S / 2, ty = (m.z - d.pz) / viewM * S + S / 2;
@@ -328,8 +362,7 @@ export class UI {
         if (tx < 6 || ty < 6 || tx > S - 6 || ty > S - 6) continue;
         drawDoorIcon(g, tx, ty, 6);
       }
-      for (const m of d.markers) drawMarker(m, false);
-      if (d.target) drawMarker(d.target, true);
+      if (!d.interior) { for (const m of d.markers) drawMarker(m, false); if (d.target) drawMarker(d.target, true); }   // indoor targets use room coordinates
     }
     const dist = d.target ? Math.round(Math.hypot(d.target.x - d.px, d.target.z - d.pz)) : 0;
     this.distEl.textContent = d.target ? `${dist} m` : '';
@@ -344,6 +377,11 @@ export class UI {
     }
     this.coinsEl.textContent = d.coins;
     this.helpEl.textContent = d.driving ? 'Golf cart: W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause';
+    if (d.interior) {   // indoors: the campus map stays visible, centred on the building you're in
+      g.fillStyle = 'rgba(20,16,12,0.72)'; g.fillRect(0, S - 22, S, 22);
+      g.fillStyle = '#ffd34d'; g.font = 'bold 11px system-ui'; g.textAlign = 'center'; g.fillText(`Inside: ${d.interior.split('—')[0].trim()}`.slice(0, 30), S / 2, S - 8); g.textAlign = 'start';
+      g.strokeStyle = '#ffd34d'; g.lineWidth = 2; g.beginPath(); g.arc(S / 2, S / 2, 13, 0, Math.PI * 2); g.stroke();
+    }
     // player arrow (north-up map)
     g.save(); g.translate(S / 2, S / 2); g.rotate(-d.pyaw + Math.PI);
     g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 1.5;

@@ -142,7 +142,7 @@ export const GAME_CONFIG = {
     // The freestanding B Y U I letters on the lawn east of the roundabout (Quest 3 builds the plinth and
     // letters in letters.ts / camo.ts). Empty text = nothing drawn here; the entry reserves the spot:
     // trees and props keep clear and the plinth collides (circles along `width`).
-    { anchor: 'sign.byui', width: 13, hideInEras: [] as string[], text: { ricks: '', ricksTransition: '', byui: '' },
+    { anchor: 'sign.byui', width: 13, hideInEras: [] as string[], eras: ['byui', 'presentFinale'] as string[], text: { ricks: '', ricksTransition: '', byui: '' },
       banner: {} as Record<string, string> },
   ],
 

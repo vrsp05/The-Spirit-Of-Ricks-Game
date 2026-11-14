@@ -1,43 +1,93 @@
 {
-  "note": "Scripture excerpts verified against churchofjesuschrist.org (2026-11-13). Each 'note' is AUTHORED DIALOGUE for the fictional Bednar game character — never a real quote.",
-  "noteLabel": "A note from President Bednar (game character)",
-  "cards": [
-    {
-      "letter": "B", "destination": "David O. McKay Library", "anchor": "letter.B", "art": "books",
-      "scripture": { "text": "…seek ye out of the best books words of wisdom…", "ref": "Doctrine and Covenants 88:118" },
-      "note": "The words you need are kept where students come to learn from the best books. Once you reach their home, read the building as carefully as a page.",
-      "hints": { "broad": "Look at the library's south side, near the walkway.", "view": "Stand on the walkway south of the library and face the wall — one tall column and two rounded bays." }
-    },
-    {
-      "letter": "Y", "destination": "Rexburg Idaho Temple", "anchor": "letter.Y", "art": "temple",
-      "scripture": null,
-      "note": "Look toward the house on the hill, where thoughts turn heavenward. Near its approach, two lines become one if you stand in the right place.",
-      "hints": { "broad": "On the lawn north of the temple, beside the approach.", "view": "Stand north of the lawn and look toward the temple: two hedge lines meet and continue as one." }
-    },
-    {
-      "letter": "U", "destination": "Hart Building / athletics area", "anchor": "letter.U", "art": "track",
-      "scripture": { "text": "…be one; and if ye are not one ye are not mine.", "ref": "Doctrine and Covenants 38:27" },
-      "note": "A team learns to move as one where students train and compete. What seems separate from nearby may come together from farther away.",
-      "hints": { "broad": "On the lawn south of the Hart Building.", "view": "Step back south of the two curved walls until they line up into one shape." }
-    },
-    {
-      "letter": "I", "destination": "Eliza R. Snow Performing Arts Center", "anchor": "letter.I", "art": "note",
-      "scripture": { "text": "For my soul delighteth in the song of the heart…", "ref": "Doctrine and Covenants 25:12" },
-      "note": "Follow the music to where students perform. Amid many notes and voices, look for one line standing on its own.",
-      "hints": { "broad": "By the Snow Building's south entrance, among the decorative poles.", "view": "Most poles carry a round 'note' — find the plain column with a cap and a base." }
-    }
-  ],
-  "dialogue": {
-    "assign": [
-      { "speaker": "President Bednar (game character)", "text": "Years have passed, and the campus has grown. One last task remains." },
-      { "speaker": "President Bednar (game character)", "text": "Four letters are hidden in plain sight around campus. These four cards will guide you — take them." },
-      { "speaker": "President Bednar (game character)", "text": "Find each letter, then set them on the sign by the roundabout between the Center and the Manwaring Center." }
-    ],
-    "reminder": "Keep your cards close — open your Journal (J) any time. Found letters go on the sign by the roundabout.",
-    "allPlaced": "Quest complete!"
+ "note": "Scripture excerpts verified against churchofjesuschrist.org (2026-11-13). Each 'note' is AUTHORED DIALOGUE for the fictional Bednar game character — never a real quote.",
+ "noteLabel": "A note from President Bednar (game character)",
+ "cards": [
+  {
+   "letter": "B",
+   "destination": "David O. McKay Library",
+   "anchor": "letter.B",
+   "art": "books",
+   "scripture": {
+    "text": "…seek ye out of the best books words of wisdom…",
+    "ref": "Doctrine and Covenants 88:118"
+   },
+   "note": "The words you need are kept where students come to learn from the best books. Once you reach their home, read the building as carefully as a page.",
+   "hints": {
+    "broad": "Look at the library's south side, near the walkway.",
+    "view": "Stand on the walkway south of the library and face the wall — one tall column and two rounded bays."
+   }
   },
-  "modes": {
-    "easy": { "proximityMeters": 28, "proximityFeedback": true, "viewHint": true },
-    "hard": { "proximityMeters": 0, "proximityFeedback": false, "viewHint": false }
+  {
+   "letter": "Y",
+   "destination": "Rexburg Idaho Temple",
+   "anchor": "letter.Y",
+   "art": "temple",
+   "scripture": null,
+   "note": "Look toward the house on the hill, where thoughts turn heavenward. Near its approach, two lines become one if you stand in the right place.",
+   "hints": {
+    "broad": "On the lawn north of the temple, beside the approach.",
+    "view": "Stand north of the lawn and look toward the temple: two hedge lines meet and continue as one."
+   }
+  },
+  {
+   "letter": "U",
+   "destination": "Hart Building / athletics area",
+   "anchor": "letter.U",
+   "art": "track",
+   "scripture": {
+    "text": "…be one; and if ye are not one ye are not mine.",
+    "ref": "Doctrine and Covenants 38:27"
+   },
+   "note": "A team learns to move as one where students train and compete. What seems separate from nearby may come together from farther away.",
+   "hints": {
+    "broad": "On the lawn south of the Hart Building.",
+    "view": "Step back south of the two curved walls until they line up into one shape."
+   }
+  },
+  {
+   "letter": "I",
+   "destination": "Eliza R. Snow Performing Arts Center",
+   "anchor": "letter.I",
+   "art": "note",
+   "scripture": {
+    "text": "For my soul delighteth in the song of the heart…",
+    "ref": "Doctrine and Covenants 25:12"
+   },
+   "note": "Follow the music to where students perform. Amid many notes and voices, look for one line standing on its own.",
+   "hints": {
+    "broad": "By the Snow Building's south entrance, among the decorative poles.",
+    "view": "Most poles carry a round 'note' — find the plain column with a cap and a base."
+   }
   }
+ ],
+ "dialogue": {
+  "assign": [
+   {
+    "speaker": "President Bednar",
+    "text": "{player}, it’s good to see you. The years have flown by, haven’t they? Look how much this campus has grown."
+   },
+   {
+    "speaker": "President Bednar",
+    "text": "I have one more job for you. Four letters are hidden around campus, right in plain sight. These cards will help you find them."
+   },
+   {
+    "speaker": "President Bednar",
+    "text": "Once you have them, bring them to the sign by the roundabout. Let’s finish it together."
+   }
+  ],
+  "reminder": "Keep those cards handy, {player}. Check your journal whenever you need a clue, and bring each letter to the sign by the roundabout.",
+  "allPlaced": "Quest complete!"
+ },
+ "modes": {
+  "easy": {
+   "proximityMeters": 28,
+   "proximityFeedback": true,
+   "viewHint": true
+  },
+  "hard": {
+   "proximityMeters": 0,
+   "proximityFeedback": false,
+   "viewHint": false
+  }
+ }
 }

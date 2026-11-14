@@ -502,3 +502,13 @@ html, body { overscroll-behavior: none; }
 .audio-settings input[type=range] { width: 100%; accent-color: #2f5f8f; }
 .audio-settings input[type=range].focused { outline: none; }
 .audio-settings b { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* name + season screen, settings */
+.name-input { width: 100%; font: 600 22px system-ui; padding: 10px 12px; border: 2px solid #5b4636; border-radius: 6px; background: #fffaf0; margin: 6px 0 10px; }
+.name-input.focused { outline: 4px solid var(--focus); }
+.season-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.season-row button { font: inherit; padding: 8px; border: 2px solid #5b4636; border-radius: 6px; background: #fffaf0; cursor: pointer; }
+.season-row button.chosen { background: #2f5f8f; color: #fff; }
+.season-row button.focused { outline: 4px solid var(--focus); }
+.settings-head { font: 800 12px system-ui; text-transform: uppercase; letter-spacing: .06em; color: #8d3b2f; margin-top: 6px; }
+.settings-screen .panel { width: min(560px, calc((100vw - 32px) / var(--z))); }

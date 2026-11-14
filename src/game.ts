@@ -67,6 +67,9 @@ export class Game {
   readonly voice = new VoiceActor();
   private engine = new EngineSound();
   traffic!: Traffic;
+  playerName = '';
+  /** Re-apply the chosen season everywhere (set up in the constructor). */
+  applySeason: () => void = () => {};
   private stepDist = 0;
   difficulty: DifficultyId = GAME_CONFIG.difficulty.default as DifficultyId;
   colorStage = 0;
@@ -175,13 +178,13 @@ export class Game {
     // era time-of-day: environment light, haze, exposure; NPC wardrobes
     const atmos = (era: EraId) => {
       const A = ATMOSPHERE[era]; this.renderer.setAtmosphere(A);
-      this.npcs?.setEra(era);
-      this.traffic?.setEra(era);
+      this.npcs?.setEra(era, SETTINGS.season);
+      this.traffic?.setEra(era, SETTINGS.season);
       // the player dresses for the weather too (coat + scarf in winter)
-      const base = this.player.avatar.look, winter = A.season === 'winter';
+      const base = this.player.avatar.look, winter = SETTINGS.season === 'winter';
       if (!!base.coat !== winter) this.player.avatar.rebuild({ ...base, coat: winter ? '#2b3a4f' : undefined, scarf: winter ? '#8d3b2f' : undefined });
     };
-    this.world.onEraChanged.push(atmos); atmos(this.world.era);
+    this.world.onEraChanged.push(atmos); atmos(this.world.era); this.applySeason = () => { this.world.applyAtmosphere(this.world.era); atmos(this.world.era); };
     this.world.gateBuilt = id => this.gateBuilt(id);
     const sp = this.resolve('spawn');
     this.player.place(this.exteriorSpace, sp.x, sp.z, this.location('spawn').yaw ?? 0);
@@ -190,9 +193,9 @@ export class Game {
     this.setupVehicles();
     this.setupBenches();
     this.npcs = new NpcCrowd(this.renderer.scene);
-    this.npcs.setEra(this.world.era);
+    this.npcs.setEra(this.world.era, SETTINGS.season);
     this.traffic = new Traffic(this.renderer.scene);
-    this.traffic.setEra(this.world.era);
+    this.traffic.setEra(this.world.era, SETTINGS.season);
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -467,6 +470,23 @@ export class Game {
     const sp = this.ui.currentSpeaker;
     for (const [name, a] of this.speakers) { a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }
   }
+  /**
+   * Face-to-face conversation: both characters turn toward each other and the camera frames
+   * them side-on (a two-shot), on whichever side has room (indoors too). Released afterwards.
+   */
+  private async faceToFace(other: THREE.Object3D, talk: () => Promise<void>) {
+    const p = this.player.position, o = other.position;
+    const dx = o.x - p.x, dz = o.z - p.z, d = Math.hypot(dx, dz) || 1;
+    this.player.yaw = Math.atan2(dx, dz); this.player.avatar.root.rotation.y = this.player.yaw;
+    other.rotation.y = Math.atan2(-dx, -dz);
+    const mx = (p.x + o.x) / 2, mz = (p.z + o.z) / 2, px = -dz / d, pz = dx / d;
+    const room = (sgn: number) => { let k = 0.5; while (k < 4.2 && !this.space.blocked(mx + px * sgn * k, mz + pz * sgn * k, 0.25)) k += 0.25; return k; };
+    const a = room(1), b = room(-1), sgn = a >= b ? 1 : -1, dist = Math.max(1.6, Math.min(3.4 + d * 0.3, (sgn > 0 ? a : b) - 0.3));
+    const y = this.space.groundY(mx, mz);
+    this.camFocus = { from: new THREE.Vector3(mx + px * sgn * dist, y + 1.75, mz + pz * sgn * dist), to: new THREE.Vector3(mx, y + 1.45, mz) };
+    try { await talk(); } finally { this.camFocus = null; this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position); }
+  }
+
   private npcTalking = false;
   private lineBag = new LineBag();
   private async talkToNpc(w: NpcCrowd['walkers'][number]) {
@@ -476,7 +496,7 @@ export class Game {
     const pool = GAME_CONFIG.npcs.lines[key] ?? GAME_CONFIG.npcs.lines.ricks1999;
     const line = this.lineBag.next(key, pool);
     w.heard++;
-    try { await this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }]); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
+    try { await this.faceToFace(w.avatar.root, () => this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }])); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
   }
 
   async talkToQuestGiver() {
@@ -484,16 +504,17 @@ export class Game {
     if (this.bednar) { const b = this.bednar.root.position, p = this.player.position; this.bednar.root.rotation.y = Math.atan2(p.x - b.x, p.z - b.z); }
     const active = this.quests.active();
     if (active && this.quests.readyToReport(active)) { await this.quests.report(active); return; }
-    if (active) { await this.ui.dialogue(this.quests.reminder(active)); return; }
+    const talk = (lines: Parameters<UI['dialogue']>[0]) => (this.bednar ? this.faceToFace(this.bednar.root, () => this.ui.dialogue(lines)) : this.ui.dialogue(lines));
+    if (active) { await talk(this.quests.reminder(active)); return; }
     const next = this.quests.nextAvailable();
     if (next) {
-      if (next === 'professors' && !this.quests.data('professors').__greeted) { this.quests.data('professors').__greeted = true; await this.ui.dialogue(STORY.bednarGreeting()); }
+      if (next === 'professors' && !this.quests.data('professors').__greeted) { this.quests.data('professors').__greeted = true; await talk(STORY.bednarGreeting()); }
       await this.quests.assign(next);
       if (this.quests.status(next) === 'active') this.ui.toast(`New assignment: ${this.quests.modules.get(next)?.title}`);
       this.save();
       return;
     }
-    if (this.quests.allComplete()) await this.ui.dialogue(STORY.allQuestsDone());
+    if (this.quests.allComplete()) await talk(STORY.allQuestsDone());
   }
 
   playCutscene(spec: CutsceneSpec): Promise<void> {
@@ -619,7 +640,7 @@ export class Game {
       quests: this.quests.state.quests, targets: this.quests.state.targets, rewards: this.quests.state.rewards,
       player: { space: this.spaceId, x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw },
       coins: [...this.collectedCoins],
-      introSeen: this.introSeen, finaleReached: this.finaleReached,
+      introSeen: this.introSeen, finaleReached: this.finaleReached, playerName: this.playerName,
     };
   }
   save() { if (!this.finale.previewing && (this.mode === 'playing' || this.mode === 'finale')) writeSave(this.snapshot()); }
@@ -637,11 +658,13 @@ export class Game {
     const s = this.resolve('spawn');
     this.player.place(this.exteriorSpace, s.x, s.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
-    this.beginPlay(true);
+    void this.ui.askName(this.playerName || 'Alex', SETTINGS.season).then(({ name, season }) => { this.setPlayerName(name); if (season !== SETTINGS.season) { SETTINGS.season = season; saveSettings(); this.applySeason(); } this.beginPlay(true); });
   }
+  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; }
   continueGame(d: SaveData) {
     this.finale.stop();
     this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = d.finaleReached;
+    this.setPlayerName(d.playerName ?? 'Alex');
     this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init({ quests: d.quests, targets: d.targets ?? {}, rewards: d.rewards ?? {} });
     this.world.refreshBuildings();
@@ -787,10 +810,7 @@ export class Game {
       { label: `Difficulty: ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} — switch to ${other === 'easy' ? 'Easy' : 'Hard'}`, action: () => {
         this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
       } },
-      { label: `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, action: () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; saveSettings(); close(); this.showPause(); } },
-      { label: `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, action: () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; saveSettings(); this.renderer.setQuality(SETTINGS.graphics, this.world.sun); close(); this.showPause(); } },
-      { label: `Sound: ${SETTINGS.muted ? 'Muted' : 'On'}`, action: () => { SETTINGS.muted = !SETTINGS.muted; saveSettings(); close(); this.showPause(); } },
-      { label: 'Audio settings (volume, voices)…', action: () => this.showAudio() },
+      { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
@@ -810,41 +830,49 @@ export class Game {
       { label: 'Cancel', action: () => this.ui.pop(s) },
     ], { subtitle: 'Developer skip: the story advances, but no coins are awarded.', onBack: () => this.ui.pop(s) });
   }
-  /** Volumes for music / effects / ambience / voices + voices on/off. Left/right (or the mouse) adjusts. */
-  showAudio() {
-    void this.ui.custom('Audio settings', (root, panel) => {
-      const rows: [keyof typeof SETTINGS, string][] = [['musicVolume', 'Music'], ['sfxVolume', 'Sound effects'], ['ambienceVolume', 'Ambience (wind, birds)'], ['voiceVolume', 'Character voices']];
-      root.innerHTML = '';
+  /** Settings: sound (volumes, mute, voices), brightness, season, graphics, reduced motion. Up/down to move, left/right to change. */
+  showSettings() {
+    void this.ui.custom('Settings', (root, panel) => {
       const list = document.createElement('div'); list.className = 'items audio-settings';
-      const sliders: HTMLInputElement[] = [];
-      for (const [key, label] of rows) {
+      const sliders: { el: HTMLInputElement; step: number }[] = [];
+      const head = (t: string) => { const h = document.createElement('div'); h.className = 'settings-head'; h.textContent = t; list.append(h); };
+      const slider = (label: string, get: () => number, set: (v: number) => void, min = 0, max = 100, step = 5, fmt = (v: number) => `${v}%`) => {
         const row = document.createElement('label'); row.className = 'audio-row';
         const name = document.createElement('span'); name.textContent = label;
         const val = document.createElement('b');
-        const r = document.createElement('input'); r.type = 'range'; r.min = '0'; r.max = '100'; r.step = '5'; r.setAttribute('data-focus', '');
-        r.value = String(Math.round((SETTINGS[key] as number) * 100)); val.textContent = `${r.value}%`;
-        r.addEventListener('input', () => { (SETTINGS as unknown as Record<string, number>)[key] = Number(r.value) / 100; val.textContent = `${r.value}%`; saveSettings(); if (key === 'sfxVolume') playSound('tick'); });
-        row.append(name, r, val); list.append(row); sliders.push(r);
-      }
-      const vbtn = document.createElement('button'); vbtn.setAttribute('data-focus', ''); vbtn.type = 'button';
-      const paint = () => { vbtn.textContent = `Voices: ${SETTINGS.voices ? 'On' : 'Off'}${this.voice.supported ? '' : ' (not supported in this browser)'}`; };
-      vbtn.addEventListener('click', () => { SETTINGS.voices = !SETTINGS.voices; saveSettings(); paint(); if (SETTINGS.voices) this.voice.speak('Narrator', 'Voices are on.'); else this.voice.stop(); });
-      const test = document.createElement('button'); test.setAttribute('data-focus', ''); test.type = 'button'; test.textContent = 'Test a voice';
-      test.addEventListener('click', () => this.voice.speak('President Bednar (game character)', 'Welcome. There is important work to do.'));
-      const back = document.createElement('button'); back.setAttribute('data-focus', ''); back.type = 'button'; back.textContent = 'Back';
-      back.addEventListener('click', () => panel.close(null));
-      paint(); list.append(vbtn, test, back);
-      const hint = document.createElement('p'); hint.className = 'sub'; hint.textContent = 'Up/down to choose · left/right to change · Sound: Muted in the pause menu silences everything.';
+        const r = document.createElement('input'); r.type = 'range'; r.min = String(min); r.max = String(max); r.step = String(step); r.setAttribute('data-focus', '');
+        r.value = String(get()); val.textContent = fmt(get());
+        r.addEventListener('input', () => { set(Number(r.value)); val.textContent = fmt(Number(r.value)); saveSettings(); });
+        row.append(name, r, val); list.append(row); sliders.push({ el: r, step });
+      };
+      const button = (label: () => string, onClick: () => void) => {
+        const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-focus', ''); b.textContent = label();
+        b.addEventListener('click', () => { onClick(); saveSettings(); b.textContent = label(); }); list.append(b); return b;
+      };
+      const V = SETTINGS as unknown as Record<string, number>;
+      head('Sound');
+      slider('Music', () => Math.round(SETTINGS.musicVolume * 100), v => { V.musicVolume = v / 100; });
+      slider('Sound effects', () => Math.round(SETTINGS.sfxVolume * 100), v => { V.sfxVolume = v / 100; playSound('tick'); });
+      slider('Ambience (wind, birds)', () => Math.round(SETTINGS.ambienceVolume * 100), v => { V.ambienceVolume = v / 100; });
+      slider('Character voices', () => Math.round(SETTINGS.voiceVolume * 100), v => { V.voiceVolume = v / 100; });
+      button(() => `Sound: ${SETTINGS.muted ? 'Muted' : 'On'}`, () => { SETTINGS.muted = !SETTINGS.muted; });
+      button(() => `Voices: ${SETTINGS.voices ? 'On' : 'Off'}${this.voice.supported ? '' : ' (not supported here)'}`, () => { SETTINGS.voices = !SETTINGS.voices; if (SETTINGS.voices) this.voice.speak('President Bednar', 'Voices are on.'); else this.voice.stop(); });
+      head('Look');
+      slider('Brightness', () => Math.round(SETTINGS.brightness * 100), v => { V.brightness = v / 100; this.renderer.setBrightness(SETTINGS.brightness); }, 60, 140, 5);
+      const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
+      button(() => `Season: ${SETTINGS.season[0].toUpperCase()}${SETTINGS.season.slice(1)} (whole game)`, () => { SETTINGS.season = SEASONS[(SEASONS.indexOf(SETTINGS.season) + 1) % 4]; this.applySeason(); });
+      button(() => `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
+      button(() => `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; });
+      const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null));
+      list.append(back);
+      const hint = document.createElement('p'); hint.className = 'sub'; hint.textContent = 'Up/down to choose · left/right to change sliders · confirm to toggle.';
       root.append(list, hint);
       panel.onAction(a => {
-        const focused = root.querySelector('.focused') as HTMLInputElement | null;
-        if ((a === 'left' || a === 'right') && focused && sliders.includes(focused)) {
-          focused.value = String(Math.max(0, Math.min(100, Number(focused.value) + (a === 'right' ? 5 : -5))));
-          focused.dispatchEvent(new Event('input')); return true;
-        }
+        const focused = root.querySelector('.focused') as HTMLInputElement | null, sl = sliders.find(x => x.el === focused);
+        if ((a === 'left' || a === 'right') && sl) { sl.el.value = String(Number(sl.el.value) + (a === 'right' ? sl.step : -sl.step)); sl.el.dispatchEvent(new Event('input')); return true; }
         return false;
       });
-    });
+    }, { className: 'settings-screen' });
   }
 
   quitToTitle(save: boolean) { if (save) this.save(); this.finale.stop(); this.showTitle(); }
@@ -947,6 +975,13 @@ export class Game {
     for (const e of this.traffic.update(dt, p)) if (this.mode === 'playing' && !this.cutscenes.active) playSound(e.type);
   }
 
+  /** Minimap position: the player outdoors; indoors, the entrance of the building they're in. */
+  private mapPosition() {
+    const def = this.spaceId === 'exterior' ? null : this.interiors.defs.get(this.spaceId);
+    if (!def) return { mapX: this.player.position.x, mapZ: this.player.position.z };
+    const d = this.world.doorPlacement(this.location(def.exteriorDoor)); return { mapX: d.x, mapZ: d.z };
+  }
+
   // ---------------- frame loop ----------------
   private frame() {
     const elapsed = this.clock.getDelta();
@@ -955,7 +990,7 @@ export class Game {
     this.input.update(dt);
     const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
     this.music.update(dt, !cinematic);
-    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: ATMOSPHERE[this.world.era].season, cinematic });
+    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic });
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : 'car');
     this.updateTraffic(dt);
@@ -965,7 +1000,7 @@ export class Game {
       this.stepDist += P.speed * dt;
       if (this.stepDist > (P.speed > 6 ? 1.3 : 0.8)) {
         this.stepDist = 0;
-        const x = P.position.x, z = P.position.z, winter = ATMOSPHERE[this.world.era].season === 'winter';
+        const x = P.position.x, z = P.position.z, winter = SETTINGS.season === 'winter';
         const hard = this.world.onPath(x, z) || onVehicleRoad(x, z);
         playStep(this.spaceId !== 'exterior' ? 'wood' : hard ? 'concrete' : winter ? 'snow' : 'grass', P.speed > 6 ? 0.45 : 0.3);
       }
@@ -1041,7 +1076,7 @@ export class Game {
         objective: obj.text, era: ERAS[this.world.era].label,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
         prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
-        px: this.player.position.x, pz: this.player.position.z, pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
+        px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, target: this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],
         targetLabel: this.targetLabel(obj.target),

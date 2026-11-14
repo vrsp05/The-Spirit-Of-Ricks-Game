@@ -164,6 +164,7 @@ export function createProfessors(): QuestModule {
       if (ctx.isActive()) { updateObjective(); spawnFollower(); }
     },
     async onAssign(start) {
+      if (!ctx) { start(); return; }
       await ctx.cutscene({ id: 'q1-assign', steps: bednarSteps(ctx, D.assign), onDone: start });
     },
     update(dt) {

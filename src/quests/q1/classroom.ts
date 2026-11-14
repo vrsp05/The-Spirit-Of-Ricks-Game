@@ -136,7 +136,7 @@ function injectStyles() {
 .q1-stage.q1-flash{animation:q1flash 1.2s ease-out}
 @keyframes q1flash{0%{filter:saturate(1)}30%{filter:saturate(2.4) brightness(1.15)}100%{filter:saturate(1)}}
 .q1-follow{padding:18px;border:3px dashed #b9761d;border-radius:8px;background:#fffaf0}
-.q1-follow-who{font:700 13px monospace;color:#7a4f1a}.q1-follow h3{margin:6px 0 12px;font-family:Georgia,serif}
+.q1-follow-who{font:700 13px monospace;color:#7a4f1a}.q1-follow h3{margin:6px 0 12px;font-family:Georgia,serif;color:#2a211a}
 .q1-follow-opts{display:flex;flex-direction:column;gap:8px}
 @media (prefers-reduced-motion:reduce){.q1-person,.q1-stage.q1-flash{animation:none!important}}
 /* Math: binary board */
@@ -155,6 +155,11 @@ function injectStyles() {
 .q1-hand .q1-coin{width:42px;height:42px;font-size:9px}.q1-hand .q1-coin i{font-size:12px}
 .q1-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
 .q1-choices button.sel{outline:4px solid #ffd34d}.q1-choices button.gone{opacity:.35;text-decoration:line-through}
+.q1-bin-fb{min-height:1.5em;font:16px/1.4 Georgia,serif;text-align:center;padding:6px 10px;border-radius:6px}
+.q1-bin-fb.ok{background:#e3f4dc;color:#24521c;border:2px solid #4f9a45}.q1-bin-fb.bad{background:#f8e1dc;color:#7a2216;border:2px solid #b04a3a}
+.q1-choices button.right{background:#d8f0cf!important;border-color:#4f9a45!important}.q1-choices button.wrong{background:#f6d6cf!important;border-color:#b04a3a!important}
+.q1-next{margin-top:10px;display:block;margin-left:auto;margin-right:auto}
+.q1-bin-how{font:16px/1.5 Georgia,serif;background:#fffaf0;color:#2a211a;border:2px solid #3a2c22;border-radius:6px;padding:10px 14px 10px 34px;margin:0 0 10px}
 .q1-bin-score{font:13px monospace;text-align:center;color:inherit}
 /* Art: projector */
 .art-refbox.q1-dark .art-ref{filter:brightness(.06)}

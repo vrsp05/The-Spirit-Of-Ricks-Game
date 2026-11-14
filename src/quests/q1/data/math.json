@@ -100,29 +100,10 @@
  },
  "questions": [
   {
-   "id": "pay5",
-   "kind": "pay",
-   "who": "Sister Hall",
-   "ask": "Pay 5 with the fewest coins.",
-   "target": 5,
-   "modes": [
-    "easy",
-    "hard"
-   ],
-   "options": [
-    "shum + senine",
-    "seon + seon + senine",
-    "limnah",
-    "shum + seon"
-   ],
-   "correct": "shum + senine",
-   "explain": "4 + 1 = 5 → shum, no seon, senine = 101."
-  },
-  {
    "id": "pay6",
    "kind": "pay",
-   "who": "Brother Ortiz",
-   "ask": "Pay 6.",
+   "who": "Sister Hall",
+   "ask": "Pay 6 with the fewest coins.",
    "target": 6,
    "modes": [
     "easy",
@@ -135,26 +116,59 @@
     "limnah"
    ],
    "correct": "shum + seon",
-   "explain": "4 + 2 = 6 → 110."
+   "explain": "4 + 2 = 6 → 110.",
+   "bits": [
+    1,
+    1,
+    0
+   ]
   },
   {
-   "id": "pay3",
-   "kind": "pay",
+   "id": "read011",
+   "kind": "choice",
    "who": "Sister Kim",
-   "ask": "Pay 3.",
-   "target": 3,
+   "ask": "I wrote 011 on my paper — shum no, seon yes, senine yes. How much is that?",
    "modes": [
     "easy",
     "hard"
    ],
    "options": [
-    "seon + senine",
-    "senine + senine + senine",
-    "shum",
-    "seon + seon"
+    "3",
+    "11",
+    "6",
+    "1"
    ],
-   "correct": "seon + senine",
-   "explain": "2 + 1 = 3 → 011."
+   "correct": "3",
+   "explain": "0 shum + 1 seon + 1 senine = 2 + 1 = 3.",
+   "bits": [
+    0,
+    1,
+    1
+   ]
+  },
+  {
+   "id": "pay7",
+   "kind": "pay",
+   "who": "Brother Ortiz",
+   "ask": "Pay 7 with the fewest coins.",
+   "target": 7,
+   "modes": [
+    "easy",
+    "hard"
+   ],
+   "options": [
+    "limnah",
+    "shum + seon + senine",
+    "shum + shum",
+    "seon + seon + seon + senine"
+   ],
+   "correct": "limnah",
+   "explain": "One limnah — a single coin does it. (Three coins, shum + seon + senine, also make 7, but that's more coins.)",
+   "bits": [
+    1,
+    1,
+    1
+   ]
   },
   {
    "id": "why7",
@@ -172,7 +186,12 @@
     "It's a shum and a half"
    ],
    "correct": "It's one of every smaller coin: 1 + 2 + 4",
-   "explain": "Alma 11:10 calls the limnah \"the value of them all\" — 111 in binary."
+   "explain": "Alma 11:10 calls the limnah \"the value of them all\" — 111 in binary.",
+   "bits": [
+    1,
+    1,
+    1
+   ]
   },
   {
    "id": "pay9",
@@ -190,7 +209,13 @@
     "shum + seon + seon + senine"
    ],
    "correct": "limnah + seon",
-   "explain": "7 + 2 = 9 — two coins."
+   "explain": "7 + 2 = 9 — two coins.",
+   "bits": [
+    0,
+    1,
+    0
+   ],
+   "boardNote": "  + limnah (7) = 9"
   },
   {
    "id": "pay13",
@@ -208,7 +233,13 @@
     "limnah + shum + senine + senine"
    ],
    "correct": "limnah + shum + seon",
-   "explain": "7 + 4 + 2 = 13 — three coins."
+   "explain": "7 + 4 + 2 = 13 — three coins.",
+   "bits": [
+    1,
+    1,
+    0
+   ],
+   "boardNote": "  + limnah (7) = 13"
   },
   {
    "id": "zeezrom",
@@ -227,7 +258,13 @@
    ],
    "correct": "42",
    "explain": "6 × 7 = 42 days of pay.",
-   "reaction": "Six weeks of work!"
+   "reaction": "Six weeks of work!",
+   "bits": [
+    1,
+    1,
+    1
+   ],
+   "boardNote": "  per onti × 6 onties = 42"
   }
  ],
  "modes": {
@@ -241,5 +278,11 @@
    "hints": 2,
    "tray": true
   }
- }
+ },
+ "howItWorks": [
+  "Each gold coin is worth double the one before it: senine 1, seon 2, shum 4.",
+  "For any amount up to 7, each coin is either in your hand (1) or not (0).",
+  "Write the coins biggest to smallest — shum · seon · senine — and you have a binary number.",
+  "Example: 5 = shum + senine = 1 0 1."
+ ]
 }

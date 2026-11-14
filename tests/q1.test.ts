@@ -24,6 +24,8 @@ describe('math (Binary, the Nephite way — Alma 11 gold coins)', () => {
       const ids = parseCombo(q.correct);
       expect(comboValue(ids), q.id).toBe(q.target);
       expect(ids.length, q.id).toBe(fewestCoins(q.target!, MATH.tray)!.length);
+      if (q.bits && q.target! <= 7 && q.id !== 'pay7') expect(q.bits, q.id).toEqual(bits(ids));
+      if (q.bits && q.target! > 7) expect(q.bits[0] * 4 + q.bits[1] * 2 + q.bits[2] + 7, q.id).toBe(q.target);
       expect(q.options, q.id).toContain(q.correct); expect(new Set(q.options).size).toBe(q.options.length);
     }
   });

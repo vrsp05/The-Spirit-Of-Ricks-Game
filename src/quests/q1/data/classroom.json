@@ -2,59 +2,224 @@
   "note": "Teaching-demo rooms. Students and chairs are fictional. Room details from the Ricks College Campus Building Histories (Romney 1987 addition housed Math & Computer Science; the Smith Building housed English with carpeted classrooms; the original Spori housed the Art Department until 2000; the Austin Building had electronics labs).",
   "passLine": "Wonderful. I'll recommend you to President Bednar.",
   "lines": {
-    "nod": ["Oh, I get it!", "That makes sense.", "Okay, okay — I see it now.", "Ohhh."],
-    "confused": ["Wait, how?", "Hmm… I’m lost.", "Can you go over that again?", "That doesn’t look right."],
-    "ooh": ["Ooh!", "Whoa, nice.", "Cool!"],
-    "gasp": ["Whoa!", "Yikes!"],
-    "applause": ["*applause*"]
+    "nod": [
+      "Oh, I get it!",
+      "That makes sense.",
+      "Okay, okay — I see it now.",
+      "Ohhh."
+    ],
+    "confused": [
+      "Wait, how?",
+      "Hmm… I’m lost.",
+      "Can you go over that again?",
+      "That doesn’t look right."
+    ],
+    "ooh": [
+      "Ooh!",
+      "Whoa, nice.",
+      "Cool!"
+    ],
+    "gasp": [
+      "Whoa!",
+      "Yikes!"
+    ],
+    "applause": [
+      "*applause*"
+    ]
   },
   "rooms": {
     "math": {
-      "id": "math", "place": "Romney Building · 3rd floor · Math & Computer Science",
-      "chair": "Brother Hale (math chair)", "wall": "#e9e2cf", "floor": "#9c8f78", "board": "#2f4a3c",
+      "id": "math",
+      "place": "Romney Building · 3rd floor · Math & Computer Science",
+      "chair": "Brother Hale (math chair)",
+      "wall": "#e9e2cf",
+      "floor": "#9c8f78",
+      "board": "#2f4a3c",
       "students": [
-        { "name": "Sister Hall", "shirt": "#7a4f9a", "hair": "#5b3a1e", "skin": "#e8c19c" },
-        { "name": "Brother Ortiz", "shirt": "#2f6d8d", "hair": "#1a1a1a", "skin": "#c9915e" },
-        { "name": "Sister Kim", "shirt": "#b8742c", "hair": "#1a1a1a", "skin": "#f1d2b3" },
-        { "name": "Brother Lund", "shirt": "#3b6b3a", "hair": "#aa7a3c", "skin": "#f0c9a4" }
+        {
+          "name": "Sister Hall",
+          "shirt": "#7a4f9a",
+          "hair": "#5b3a1e",
+          "skin": "#e8c19c"
+        },
+        {
+          "name": "Brother Ortiz",
+          "shirt": "#2f6d8d",
+          "hair": "#1a1a1a",
+          "skin": "#c9915e"
+        },
+        {
+          "name": "Sister Kim",
+          "shirt": "#b8742c",
+          "hair": "#1a1a1a",
+          "skin": "#f1d2b3"
+        },
+        {
+          "name": "Brother Lund",
+          "shirt": "#3b6b3a",
+          "hair": "#aa7a3c",
+          "skin": "#f0c9a4"
+        }
       ],
-      "props": ["green chalkboard", "beige CRT computers", "“Is your computer Y2K ready?”"],
-      "followUp": { "q": "In binary, what number does 111 stand for?", "options": ["7", "3", "111", "6"], "correct": "7" }
+      "props": [
+        "green chalkboard",
+        "beige CRT computers",
+        "“Is your computer Y2K ready?”"
+      ],
+      "followUp": {
+        "q": "In binary, what number does 100 stand for? (shum · seon · senine)",
+        "options": [
+          "4",
+          "100",
+          "1",
+          "3"
+        ],
+        "correct": "4"
+      }
     },
     "english": {
-      "id": "english", "place": "Smith Building · English classroom",
-      "chair": "Sister Moss (English chair)", "wall": "#e6dccb", "floor": "#6f6a8a", "board": "#3a3f52",
+      "id": "english",
+      "place": "Smith Building · English classroom",
+      "chair": "Sister Moss (English chair)",
+      "wall": "#e6dccb",
+      "floor": "#6f6a8a",
+      "board": "#3a3f52",
       "students": [
-        { "name": "Brother Price", "shirt": "#8d3b2f", "hair": "#2a1d14", "skin": "#e8c19c" },
-        { "name": "Sister Lowe", "shirt": "#2f8d6d", "hair": "#8a6a3a", "skin": "#f1d2b3" },
-        { "name": "Brother Tafoya", "shirt": "#3b4a8d", "hair": "#1a1a1a", "skin": "#a86b3c" },
-        { "name": "Sister Grant", "shirt": "#9a3b62", "hair": "#5b3a1e", "skin": "#e0b48f" }
+        {
+          "name": "Brother Price",
+          "shirt": "#8d3b2f",
+          "hair": "#2a1d14",
+          "skin": "#e8c19c"
+        },
+        {
+          "name": "Sister Lowe",
+          "shirt": "#2f8d6d",
+          "hair": "#8a6a3a",
+          "skin": "#f1d2b3"
+        },
+        {
+          "name": "Brother Tafoya",
+          "shirt": "#3b4a8d",
+          "hair": "#1a1a1a",
+          "skin": "#a86b3c"
+        },
+        {
+          "name": "Sister Grant",
+          "shirt": "#9a3b62",
+          "hair": "#5b3a1e",
+          "skin": "#e0b48f"
+        }
       ],
-      "props": ["carpet", "desks in a U", "overhead projector", "box of transparencies"],
-      "followUp": { "q": "Before you correct a fact in someone's writing, what should you do first?", "options": ["Check it against a reliable source", "Trust your memory", "Ask the class to vote", "Leave it — facts don't matter"], "correct": "Check it against a reliable source" }
+      "props": [
+        "carpet",
+        "desks in a U",
+        "overhead projector",
+        "box of transparencies"
+      ],
+      "followUp": {
+        "q": "Before you correct a fact in someone's writing, what should you do first?",
+        "options": [
+          "Check it against a reliable source",
+          "Trust your memory",
+          "Ask the class to vote",
+          "Leave it — facts don't matter"
+        ],
+        "correct": "Check it against a reliable source"
+      }
     },
     "art": {
-      "id": "art", "place": "Original Spori Building · 3rd floor · Art studio",
-      "chair": "Brother Sorensen (art chair)", "wall": "#cbbfa8", "floor": "#7a5a3a", "board": "#3b3a36",
+      "id": "art",
+      "place": "Original Spori Building · 3rd floor · Art studio",
+      "chair": "Brother Sorensen (art chair)",
+      "wall": "#cbbfa8",
+      "floor": "#7a5a3a",
+      "board": "#3b3a36",
       "students": [
-        { "name": "Sister Young", "shirt": "#c0392b", "hair": "#2a1d14", "skin": "#f1d2b3" },
-        { "name": "Brother Akana", "shirt": "#27ae60", "hair": "#1a1a1a", "skin": "#a86b3c" },
-        { "name": "Sister Berg", "shirt": "#d4a017", "hair": "#ccc", "skin": "#e8c19c" },
-        { "name": "Brother Diaz", "shirt": "#2f6db5", "hair": "#5b3a1e", "skin": "#c68c64" }
+        {
+          "name": "Sister Young",
+          "shirt": "#c0392b",
+          "hair": "#2a1d14",
+          "skin": "#f1d2b3"
+        },
+        {
+          "name": "Brother Akana",
+          "shirt": "#27ae60",
+          "hair": "#1a1a1a",
+          "skin": "#a86b3c"
+        },
+        {
+          "name": "Sister Berg",
+          "shirt": "#d4a017",
+          "hair": "#ccc",
+          "skin": "#e8c19c"
+        },
+        {
+          "name": "Brother Diaz",
+          "shirt": "#2f6db5",
+          "hair": "#5b3a1e",
+          "skin": "#c68c64"
+        }
       ],
-      "props": ["rhyolite stone walls", "drafting tables", "projector on a cart", "“Final year in the old Spori”"],
-      "followUp": { "q": "Why does the grid method help you copy a picture?", "options": ["You copy one small square at a time", "It hides your mistakes", "It makes the colours brighter", "You never have to look at the picture"], "correct": "You copy one small square at a time" }
+      "props": [
+        "rhyolite stone walls",
+        "drafting tables",
+        "projector on a cart",
+        "“Final year in the old Spori”"
+      ],
+      "followUp": {
+        "q": "Why does the grid method help you copy a picture?",
+        "options": [
+          "You copy one small square at a time",
+          "It hides your mistakes",
+          "It makes the colours brighter",
+          "You never have to look at the picture"
+        ],
+        "correct": "You copy one small square at a time"
+      }
     },
     "engineering": {
-      "id": "engineering", "place": "Austin Building · Electronics lab",
-      "chair": "Brother Frost (engineering chair)", "wall": "#d9d6cc", "floor": "#4a4a4a", "board": "#22262b",
+      "id": "engineering",
+      "place": "Austin Building · Electronics lab",
+      "chair": "Brother Frost (engineering chair)",
+      "wall": "#d9d6cc",
+      "floor": "#4a4a4a",
+      "board": "#22262b",
       "students": [
-        { "name": "Brother Nash", "shirt": "#5d6d7e", "hair": "#2a1d14", "skin": "#e0b48f" },
-        { "name": "Sister Ito", "shirt": "#a04000", "hair": "#1a1a1a", "skin": "#f1d2b3" },
-        { "name": "Brother Okafor", "shirt": "#1e8449", "hair": "#1a1a1a", "skin": "#7d4a26" }
+        {
+          "name": "Brother Nash",
+          "shirt": "#5d6d7e",
+          "hair": "#2a1d14",
+          "skin": "#e0b48f"
+        },
+        {
+          "name": "Sister Ito",
+          "shirt": "#a04000",
+          "hair": "#1a1a1a",
+          "skin": "#f1d2b3"
+        },
+        {
+          "name": "Brother Okafor",
+          "shirt": "#1e8449",
+          "hair": "#1a1a1a",
+          "skin": "#7d4a26"
+        }
       ],
-      "props": ["black lab benches", "oscilloscopes", "fuse panel", "the Spori's overhead projector"],
-      "followUp": { "q": "Why do two bulbs in parallel stay bright?", "options": ["Each bulb gets its own path to the battery", "They share one path", "Parallel wires are thicker", "The fuse makes them brighter"], "correct": "Each bulb gets its own path to the battery" }
+      "props": [
+        "black lab benches",
+        "oscilloscopes",
+        "fuse panel",
+        "the Spori's overhead projector"
+      ],
+      "followUp": {
+        "q": "Why do two bulbs in parallel stay bright?",
+        "options": [
+          "Each bulb gets its own path to the battery",
+          "They share one path",
+          "Parallel wires are thicker",
+          "The fuse makes them brighter"
+        ],
+        "correct": "Each bulb gets its own path to the battery"
+      }
     }
   }
 }

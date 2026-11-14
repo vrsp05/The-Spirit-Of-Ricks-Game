@@ -202,6 +202,6 @@ describe('math tutorial', () => {
 
 describe('art music', () => {
   it('points at the team recording in public/audio (silent until the file is added)', () => {
-    expect(ART_DATA.music!.src).toMatch(/^audio\/.+\.(mp3|ogg|m4a|wav)$/); expect(ART_DATA.music!.volume).toBeLessThanOrEqual(1);
+    expect(ART_DATA.music!.src).toMatch(/^music\/.+\.(mp3|ogg|m4a|wav)$/); expect(ART_DATA.music!.enabled).toBe(false); // the background playlist covers it
   });
 });

@@ -82,7 +82,11 @@
         "chair": "Class, this is our math candidate. Our computer science students keep tripping on binary. {name}, could you explain it so it finally sticks?",
         "verdict": "That's the clearest binary lesson I've seen. I'll recommend you to President Bednar.",
         "thanks": "Thank you! I think it finally clicked for them.",
-        "frame": "Of course. Binary is easier than it looks. Let's look at it through Nephite money: the gold coins in Alma 11."
+        "frame": "Of course. Binary is easier than it looks. Let's look at it through Nephite currency, in Alma 11."
+      },
+      "brief": {
+        "teach": "binary, explained with the gold coins of Alma 11. Each coin is one binary digit: holding it is a 1, leaving it out is a 0.",
+        "how": "each student asks a question about paying with the coins. Answer it, and the chalkboard writes your coins as binary digits (✔ = 1). Answer all the questions to finish the lesson."
       }
     },
     "english": {
@@ -137,10 +141,14 @@
       "intro": {
         "title": "Editing for accuracy",
         "whisper": "Is that the new English teacher?",
-        "chair": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. {name}, would you show us how to edit it for accuracy?",
+        "chair": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. {name}, would you show the class how to proofread a paper like this and get it ready to hand in?",
         "verdict": "Careful, kind and accurate. I'll recommend you to President Bednar.",
         "thanks": "Thank you — and thanks, Brother Price, for being a good sport.",
         "frame": "Happy to. Good editing starts with the facts. Let's put Brother Price's page up and check it line by line against the Church News."
+      },
+      "brief": {
+        "teach": "how to proofread a paper and get it ready to hand in, using Brother Price's write-up of the Kimball Building dedication.",
+        "how": "his page is projected on the screen with a few mistakes in it. Move through it word by word, mark each wrong word and choose the correction. Fix every mistake to finish proofreading."
       }
     },
     "art": {
@@ -195,10 +203,24 @@
       "intro": {
         "title": "Drawing what you see",
         "whisper": "Ooh — a new art teacher?",
-        "chair": "Class, meet our art candidate. Our students struggle to draw what they actually see. {name}, can you show them how? If that old projector cooperates.",
+        "chair": "Class, meet our art candidate. Our students hold a pencil out at arm's length to measure proportions, and their drawings still come out lopsided. {name}, can you show them a better way? If that old projector cooperates.",
         "verdict": "Even with the projector dying, you kept the class drawing. I'll recommend you to President Bednar.",
-        "thanks": "Thank you! Someone should look at that projector, though.",
-        "frame": "Let's try the grid method. I'll project a picture, and we'll copy it one square at a time. Today's picture: my vision of a temple on the hill."
+        "thanks": "Thank you! I'm sorry about your projector.",
+        "frame": "Let's try the grid method. It's like measuring with your pencil, one square at a time. I'll project a picture and we'll copy it square by square. Here's one to try: imagine Rexburg with a temple on the hill someday.",
+        "after": [
+          {
+            "who": "chair",
+            "text": "Well, that projector is finished. Brother Lee, would you carry it over to the electronics lab in the Austin Building? Maybe they can save it."
+          },
+          {
+            "who": "candidate",
+            "text": "I hope they can. It's a good old machine."
+          }
+        ]
+      },
+      "brief": {
+        "teach": "the grid method, a reliable way to get proportions right: copy a picture one square at a time.",
+        "how": "the projector shows the picture on the side wall. Paint it onto the drawing board square by square while the class guesses what it is. Get close enough to the picture to pass."
       }
     },
     "engineering": {
@@ -246,11 +268,15 @@
       },
       "intro": {
         "title": "Projector repair",
-        "whisper": "Hey — isn't that the Spori's projector?",
-        "chair": "Class, this is our engineering candidate. Physical Plant just brought us the Spori's projector; it shorted out during the art demo. {name}, can you fix it and explain what went wrong?",
+        "whisper": "Is that the new engineering teacher?",
+        "chair": "Class, this is our engineering candidate. Change of plans: a student just carried in the art studio's overhead projector. It shorted out in the middle of their demo this morning. {name}, instead of the lesson you planned, would you fix it in front of the class and explain what went wrong?",
         "verdict": "Fixed it live, and they understood why. I'll recommend you to President Bednar.",
-        "thanks": "Thank you! Tell the art studio their projector is ready.",
-        "frame": "Sure. A projector is just a few circuits. Let's lay its wiring out on the pegboard and follow the path the power takes."
+        "thanks": "Thank you! Let's get this projector back to the art studio.",
+        "frame": "Happy to. A projector is just a few circuits. I'll open it up on the bench, and we'll follow the path the power takes."
+      },
+      "brief": {
+        "teach": "how a short circuit happens and how to fix one, by repairing the art studio's projector live.",
+        "how": "the projector's wiring is opened up on the bench. Turn the wire tiles so power flows from + through the lamp (and fan) and back to −. Each circuit you fix is one step of the lesson."
       }
     }
   }

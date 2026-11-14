@@ -60,7 +60,7 @@ Two custom ESP32 controllers can play at the same time; either one moves the sam
   - **Drawing what you see** (art): paint the temple concept on the studio board from the projected reference — until the old projector shorts out.
   - **Fix it live** (engineering): repair that projector on the lab bench; its lamp and fan react as you wire the circuit.
   - When all four are hired, report back to Bednar.
-- **Quest 2, Build the campus (2001):** placeholder while Gio builds the real quest. The Taylor site offers a labelled "mark Quest 2 complete" panel so the story can continue.
+- **Quest 2, Build the campus (2001):** solve footprint puzzles for Taylor and the I-Center, then report to Bednar. The held-piece preview shows only the complete shape. Rotate with the visible buttons, T/G, right-click, or the mouse wheel; rotation preserves the shape. **Return piece**, Esc, or clicking its selected tray button clears your hand. A successful placement also leaves no piece selected.
 - **Quest 3, Find and place B Y U I (2011):**
   - Bednar hands over four illustrated clue cards, which you can reread any time in the Journal (J).
   - Letters are camouflaged in the architecture at the library, temple approach, Hart Building and Snow Building. Find them by looking and pressing Interact.

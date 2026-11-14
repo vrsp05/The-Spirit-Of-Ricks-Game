@@ -45,12 +45,12 @@ Read these first; they win over this brief if they disagree:
 ## Part 2: Spec (as built)
 
 ### 1. Quest flow
-1. **Bednar** (Kimball office) assigns Q1 in a cutscene (`onAssign`). The four candidates wait in Personnel Services, and art must come before engineering.
+1. **Bednar** (Kimball office) assigns Q1 in a cutscene (`onAssign`). The four candidates wait in Personnel Services. Art must come before engineering; Bednar says only that the departments scheduled it that way (nobody foreshadows the projector).
 2. **Personnel Services** is a room off the Kimball hall (classroom walls such as the coin poster, fact clipping and projected reference are dressed as soon as the rooms are built), with a counter, waiting chairs, file cabinets, a "Faculty interviews today" sign and a floating hiring board.
    - The four candidates stand there.
    - Talking to one plays a greeting, then they follow you.
-   - Toast: "The other candidates will meet you outside their buildings."
-3. **Escort:** the candidate walks **beside** the player (never between the player and the camera) and says two walk-and-talk lines, which set up their demo.
+   - Toast: "Walk me over, and then come back here for the next candidate."
+3. **Escort:** the candidate walks **beside** the player (never between the player and the camera) and says two walk-and-talk lines (shown as toasts, not bubbles), which set up their demo.
 4. **The classroom:** each department building's entrance leads into its classroom interior. **Walking in starts the walk-in automatically**: no ring, no button. It's skippable with Esc, and only the last beat plays on later attempts.
    1. Students turn to the door and one whispers, for example "Is that the new math teacher?"
    2. The candidate walks up the side aisle to the front.
@@ -58,8 +58,8 @@ Read these first; they win over this brief if they disagree:
    4. The candidate answers and frames the lesson (for example "Let's look at it through Nephite money: the gold coins in Alma 11."). This line (`intro.frame` in `classroom.json`) also plays on retries, so a demo never starts cold.
    5. The demo's title is chalked onto the board, the banner says "You are now the … candidate", and the bottom strip slides up.
    - **The bottom strip never scrolls:** one top row holds the class line (up to two lines), the Class meter, the view button and Hint/Skip/Leave; the demo's controls sit below it. Board text is laid out to stay fully visible from the default view (the lab's wall-board notes sit in the column the pegboard doesn't hide).
-5. **The demo** (§3). On a pass, a small result card appears, then the **ending**: the chair's verdict over the class, then the candidate's thanks. The candidate stays at the front of the room.
-6. **Next stop:** after the first pickup, every other candidate **waits outside their own building** (`waitAt`, a per-candidate offset in config). The objective names the next one ("the English candidate is waiting outside the Smith Building"), so there's no trip back to the Kimball between demos.
+5. **The demo** (§3). A dismissable **How this works** card opens once per room per session (and with **Brief**/B): you're the candidate, the lesson moves forward as you play, what it teaches, how to play. The minimap and the task list are hidden during demos. View tabs jump straight to a view; **T** next, **G** previous. No speech bubbles: lines appear in the caption or the strip. On a pass, a small result card appears, then the **ending**: the chair's verdict over the class, then the candidate's thanks. The candidate stays at the front of the room.
+6. **Next stop:** back to Personnel Services for the next candidate, a round trip around campus each time. **Skip challenge** plays the same ending as a pass. Walking into a classroom without its candidate plays one line from the chair ("They're waiting in Personnel Services"). After the art demo, a short scene shows the dead projector and the chair sending it to the Austin lab.
 7. **Order:** suggested route math → English → art → engineering. Math and English can be done in any order; **engineering stays locked until art is hired**.
 8. **Report:** after all four are hired, the player reports to Bednar (`readyToReport`/`onReport`) and Q1 completes.
 
@@ -82,6 +82,13 @@ Read these first; they win over this brief if they disagree:
   - the room name, a speech line and a small "Class" engagement meter;
   - the view button and a pass colour flash;
   - **Hard only:** the chair says "One more question before I decide," asks a multiple-choice follow-up, and recommends you only after a correct answer.
+
+### 2b. Playing on the board (in-world layout)
+- **You click the board itself.** `Room3D.pick` traces the mouse from the screen onto the board, screen or bench surface (it mirrors the game camera: Q1's `focusCamera` position and the 55° field of view), and demos register clickable areas with `setHotspots`: math answers and coins, English words and the red correction bubble (with a tail), art cells (drag to paint, right-click erases), engineering tiles.
+- **Hint, Brief and More…** are chalk words drawn on the board (`setOverlay`), clickable; More… opens Skip / Leave (Tab also opens it).
+- **The lectern** (bottom strip): a paper index card with the class's line, the Class meter, and the view switcher `G  < Chalkboard >  T`. Demo-specific status sits below it.
+- **First demo ever:** a small window explains that you're playing the candidate and that completing the challenge delivers the demonstration. Then the room's How this works card, then tutorial coach marks (`q1/coach.ts`, once per room per session) that highlight board regions the demos mark with `setRegion`.
+- **Engineering bench:** the projector (2.0 m wide) sits on the bench beside its opened circuit board (1.7 × 1.15 m on a tilted stand).
 
 ### 3. The four demos
 

@@ -3,8 +3,9 @@
 // Fall 1999. Bednar sends the assistant to Personnel Services in the Kimball Building,
 // where four fictional candidates wait. The assistant walks one candidate at a time to
 // their department; at the demo door the player plays the candidate's teaching
-// demonstration (a classroom-framed challenge). Art must be passed before Engineering
-// (Engineering repairs the projector that broke in the art demo). Reporting back to
+// demonstration (a classroom-framed challenge), then comes back for the next one. Art
+// must be passed before Engineering (Engineering repairs the projector that dies in the
+// art demo; nobody foreshadows it). Reporting back to
 // Bednar after all four are hired completes the quest.
 // Content: ./data/*.json (dialogue, classroom, math, art, circuit, english).
 // ============================================================================
@@ -25,14 +26,14 @@ export interface Candidate { id: 'math' | 'engineering' | 'art' | 'english'; nam
 const BODIES: Record<Candidate['challenge'], { body: ChallengeBody; title: string; intro: string; pass: string; fail: string }> = {
   math: { body: mathChallenge, title: 'Binary, the Nephite way', intro: 'The computer science students keep tripping on binary. Use the gold coins of Alma 11 to explain it so it sticks — answer each student’s question.', pass: 'Hired: math candidate!', fail: 'The class is still lost' },
   art: { body: artChallenge, title: 'Drawing what you see', intro: 'Teach the grid method: copy the projected reference onto the board, square by square. Anywhere on the board counts. Watch out — that old projector won’t last the whole demo.', pass: 'Hired: art candidate!', fail: 'The drawing doesn’t match closely enough' },
-  circuit: { body: circuitChallenge, title: 'Fix it live', intro: 'Physical Plant just wheeled in the Spori’s overhead projector — it shorted out during the art demo. Rotate the wire tiles to repair its circuits in front of the class.', pass: 'Hired: engineering candidate!', fail: 'The projector still doesn’t work' },
+  circuit: { body: circuitChallenge, title: 'Fix it live', intro: 'A student just carried in the art studio’s overhead projector; it shorted out during the art demo. Rotate the wire tiles to repair its circuits in front of the class.', pass: 'Hired: engineering candidate!', fail: 'The projector still doesn’t work' },
   english: { body: englishChallenge, title: 'Editing for accuracy', intro: 'Brother Price’s summary of the Kimball Building dedication is projected on the whiteboard — with mistakes. Move along the page, mark each wrong word and write the correction in red.', pass: 'Hired: English candidate!', fail: 'Too many wrong marks' },
 };
 const D = dialogue as {
   assign: { speaker: string; text: string }[]; report: { speaker: string; text: string }[];
   reminder: string; readyReminder: string; greetings: Record<string, string>; waiting: Record<string, string>;
   busy: string; arrive: string; notYet: string; boardTitle: string;
-  walk: Record<string, string[]>; othersWait: string; waitingOutside: Record<string, string>;
+  walk: Record<string, string[]>; othersWait: string; backFor: string; notHere: string;
 };
 
 export function createProfessors(): QuestModule {
@@ -44,8 +45,6 @@ export function createProfessors(): QuestModule {
   const attempts = () => ctx.progress.get<Record<string, number>>('attempts', {});
   const escorting = () => ctx.progress.get<string | null>('escort', null);
   const firstPicked = () => ctx.progress.get<boolean>('firstPicked', false);
-  /** Where a candidate waits outside their building once the first candidate has been picked up. */
-  const waitAt = (c: Candidate) => { const p = ctx.world.position(c.anchor), [dx, dz] = c.wait ?? [2.6, 0]; return { x: p.x + dx, z: p.z + dz }; };
   const remaining = () => cands().filter(c => !hired()[c.id]);
   const byId = (id: string) => cands().find(c => c.id === id)!;
   const locked = (c: Candidate) => !!c.requires && !hired()[c.requires];
@@ -56,7 +55,7 @@ export function createProfessors(): QuestModule {
 
   // ---------- hiring board (floating labels in the Kimball hall) ----------
   let removeBoard: (() => void) | null = null;
-  const boardText = () => cands().map(c => `${short(c)}: ${hired()[c.id] ? 'HIRED' : escorting() === c.id ? 'in demo' : locked(c) ? 'waiting on art demo' : 'waiting'}`).join('  ·  ');
+  const boardText = () => cands().map(c => `${short(c)}: ${hired()[c.id] ? 'HIRED' : escorting() === c.id ? 'in demo' : locked(c) ? 'after art' : 'waiting'}`).join('  ·  ');
   const refreshBoard = () => {
     removeBoard?.(); removeBoard = null;
     if (!ctx.isActive() || ctx.world.era() !== 'ricks1999') return;
@@ -76,6 +75,7 @@ export function createProfessors(): QuestModule {
     if (m) drawCoinPoster(m); if (e) drawFactClipping(e); if (a) drawProjectedRef(a, !hired().art);
     rooms.get('art')?.signal('beam', !hired().art);
   };
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__q1rooms = rooms;   // test hook (dev builds only)
   const destroyRooms = () => { rooms.forEach(r => r.destroy()); rooms.clear(); };
   const roomAnchor = (c: Candidate) => `q1.room.${c.id}`;
 
@@ -103,32 +103,23 @@ export function createProfessors(): QuestModule {
       return;
     }
     const next = rem.find(c => !locked(c)) ?? rem[0];
-    if (firstPicked()) {
-      ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.anchor));
-      ctx.ui.setObjective(`Hire the professors (${n}/4) — ${who(next)} is waiting outside the ${next.building}`, waitAt(next));
-      return;
-    }
     ctx.ui.setWaypoints(rem.filter(c => !locked(c)).map(c => c.lobby));
-    ctx.ui.setObjective(`Hire the professors (${n}/4) — pick up a candidate in Personnel Services (Kimball Building)`, next.lobby);
+    ctx.ui.setObjective(`Hire the professors (${n}/4) — ${n ? 'back to' : 'pick up a candidate in'} Personnel Services (Kimball Building)${n ? ' for the next candidate' : ''}`, next.lobby);
   };
 
   // ---------- walk-and-talk ----------
   let talkTimers: number[] = [];
-  const say = (text: string) => { if (!follower) return; const lbl = ctx.world.label(text.length > 60 ? text.slice(0, 58) + '…' : text); lbl.position.set(0, 3.3, 0); follower.add(lbl); window.setTimeout(() => lbl.removeFromParent(), 5200); };
-  const startTalk = (c: Candidate) => { talkTimers.forEach(clearTimeout); talkTimers = (D.walk[c.id] ?? []).map((t, i) => window.setTimeout(() => { if (escorting() === c.id && !demoRoom) say(t); }, 4000 + i * 9000)); };
+  const startTalk = (c: Candidate) => { talkTimers.forEach(clearTimeout); talkTimers = (D.walk[c.id] ?? []).map((t, i) => window.setTimeout(() => { if (escorting() === c.id && !demoRoom && follower) ctx.ui.toast(`${nameOf(c)}: “${t}”`); }, 4000 + i * 9000)); };
 
-  async function lobbyTalk(c: Candidate, outside = false) {
+  async function lobbyTalk(c: Candidate) {
     if (hired()[c.id]) { ctx.ui.toast(`${c.label} is already hired.`); return; }
     const esc = escorting();
     if (esc === c.id) { await ctx.ui.dialogue([{ speaker: who(c), text: D.arrive.replace('{building}', c.building) }]); return; }
     if (esc) { await ctx.ui.dialogue([{ speaker: who(c), text: D.busy.replace('{other}', byId(esc).label) }]); return; }
     if (locked(c)) { await ctx.ui.dialogue([{ speaker: who(c), text: D.waiting[c.id] ?? D.notYet }]); return; }
-    void outside;
     const pp = ctx.world.playerPosition();
-    const cp = outside ? { ...waitAt(c), y: pp.y } : ctx.world.position(c.lobby);
-    const cam = shoulderCam(cp, pp);
+    const cam = shoulderCam(ctx.world.position(c.lobby), pp);
     const lines = [D.greetings[c.id] ?? 'Hello!'];
-    if (outside) lines.unshift(D.waitingOutside[c.id] ?? 'Hi!');
     await ctx.cutscene({ id: `q1-greet-${c.id}`, steps: lines.map((t, i) => ({
       ...(i === 0 ? { camera: { from: { ...cam.pos, y: cam.pos.y + 1.5 }, to: cam.pos, dur: 0.9 } } : {}), look: cam.look, say: { speaker: who(c), text: t } })),
       onDone: () => { ctx.progress.set('escort', c.id); } });
@@ -136,7 +127,7 @@ export function createProfessors(): QuestModule {
     ctx.progress.set('firstPicked', true);
     spawnFollower(); startTalk(c);
     ctx.ui.toast(`${nameOf(c)} (${short(c).toLowerCase()} candidate) is following you to the ${c.building}.`);
-    if (first) window.setTimeout(() => ctx.ui.toast(D.othersWait), 2500);
+    if (first) window.setTimeout(() => ctx.ui.toast(`${nameOf(c)}: “${D.othersWait}”`), 2500);
     updateObjective();
   }
 
@@ -160,12 +151,13 @@ export function createProfessors(): QuestModule {
     const steps: Parameters<QuestContext['cutscene']>[0]['steps'] = [];
     if (full) {
       steps.push({ camera: { from: doorEye, to: room.w(3.6, 2.8, 5.0), dur: 1.4 }, look: classLook, dur: 2.2,
-        run: () => { room.faceDoor(true); room.bubble(room.who(1)[0], I.whisper); if (follower) { follower.position.set(door.x, door.y, door.z); follower.rotation.y = Math.PI; } } });
+        say: { speaker: CLASSROOM.rooms[c.id].students[1]?.name ?? 'A student', text: I.whisper },
+        run: () => { room.faceDoor(true); room.hop([room.who(1)[0]]); if (follower) { follower.position.set(door.x, door.y, door.z); follower.rotation.y = Math.PI; } } });
       steps.push({ camera: { from: room.w(-1.6, 2.7, -6.0), to: room.w(-2.6, 2.4, -6.2), dur: 3.0 }, look: room.w(-6.4, 1.1, 1.5), dur: 3.0,
         run: () => room.faceDoor(false),
         tick: (_dt, k) => { if (follower) { const q = along(k); follower.position.set(q.x, spot.y, q.z); follower.rotation.y = q.ry; } } });
       steps.push({ camera: { from: room.w(-2.6, 2.4, -6.2), to: room.w(2.2, 2.6, 0.8), dur: 1.2 }, look: { x: chairPos.x, y: chairPos.y + 1.8, z: chairPos.z },
-        run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } room.bubble(chairNpc, ask, 6); room.hop([chairNpc]); },
+        run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } room.hop([chairNpc]); },
         say: { speaker: CLASSROOM.rooms[c.id].chair, text: ask } });
     }
     // the candidate answers the chair and frames the lesson (also on retries, so the demo never starts cold)
@@ -188,7 +180,20 @@ export function createProfessors(): QuestModule {
       { camera: { from: room.w(0, 2.6, -5.5), to: room.w(1.6, 2.4, -4.6), dur: 1.2 }, look: room.w(-2, 1.4, 2), run: () => { room.hop(room.who('all')); ctx.world.sound('cheer'); },
         say: { speaker: CLASSROOM.rooms[c.id].chair, text: I.verdict } },
       { look: { x: spot.x, y: spot.y + 1.7, z: spot.z }, camera: { from: room.w(1.6, 2.4, -4.6), to: { x: spot.x + 2.6, y: spot.y + 2.0, z: spot.z + 3.0 }, dur: 1.0 }, say: { speaker: who(c), text: I.thanks } },
+      // art: make it obvious the projector died and where it's going (the engineering demo picks it up)
+      ...(I.after ?? []).map((l, i) => ({
+        ...(i === 0 ? { camera: { from: { x: spot.x + 2.6, y: spot.y + 2.0, z: spot.z + 3.0 }, to: room.w(0.4, 2.9, 0.4), dur: 1.2 } } : {}),
+        look: room.w(-3.6, 0.9, -4.4),
+        run: i === 0 ? () => { room.signal('beam', false); const a = room.get('poster'); if (a) drawProjectedRef(a, false); } : undefined,
+        say: { speaker: l.who === 'chair' ? CLASSROOM.rooms[c.id].chair : who(c), text: l.text } })),
     ] });
+  };
+
+  /** Walking into a classroom without its candidate: the chair says where they are. */
+  const emptyRoom = async (id: string, room: Room3D) => {
+    const chair = room.who('chair')[0].position;
+    await ctx.cutscene({ id: `q1-empty-${id}`, steps: [{ camera: { from: room.w(2.6, 2.8, 2.0), to: room.w(2.0, 2.4, 0.6), dur: 1.0 }, look: { x: chair.x, y: chair.y + 1.6, z: chair.z },
+      run: () => room.hop([room.who('chair')[0]]), say: { speaker: CLASSROOM.rooms[id].chair, text: D.notHere } }] });
   };
 
   async function demo(c: Candidate, opts: { auto?: boolean } = {}) {
@@ -212,12 +217,11 @@ export function createProfessors(): QuestModule {
     ctx.progress.set('attempts', { ...attempts(), [c.id]: (attempts()[c.id] ?? 0) + 1 });
     const def = BODIES[c.challenge];
     const r = await runChallenge(ctx, { title: def.title, playingAs: who(c), intro: def.intro, allowSkip: ctx.config.allowSkipChallenge,
-      body: withClassroom(ctx, c.id, def.body, room), passText: def.pass, failText: def.fail,
+      body: withClassroom(ctx, c.id, def.body, room, who(c)), passText: def.pass, failText: def.fail,
       className: `ch-${c.challenge} q1-demo ${room ? 'q1-inroom' : ''} ${room && (c.id === 'art' || c.id === 'engineering') ? 'q1-pad' : ''}` });
     room?.stop();
     ctx.ui.setBanner(null); ctx.world.releaseCamera();
-    if (r.outcome === 'pass' && room) { despawnFollower(); room.showCeiling(true); await outro(c, room); }
-    else if (r.outcome === 'skip' && room) room.standHired(nameOf(c), c.shirt);
+    if ((r.outcome === 'pass' || r.outcome === 'skip') && room) { despawnFollower(); room.showCeiling(true); await outro(c, room); }
     room?.showCeiling(false);
     demoRoom = null; demoBusy = false;
     if (r.outcome === 'pass' || r.outcome === 'skip') {
@@ -226,8 +230,8 @@ export function createProfessors(): QuestModule {
       if (r.outcome === 'skip') ctx.progress.set('skipped', { ...skipped(), [c.id]: true });
       else ctx.progress.set('quality', { ...quality(), [c.id]: Math.max(0, Math.min(1, r.quality)) });
       ctx.progress.set('escort', null); despawnFollower();
-      ctx.ui.toast(r.outcome === 'skip' ? `${nameOf(c)} hired (demo skipped — no bonus)` : `${nameOf(c)} hired as ${short(c).toLowerCase()} professor! (${4 - remaining().length}/4) Back to you.`);
-      if (c.id === 'art' && !hired().engineering) ctx.ui.toast('The art studio’s projector shorted out — the engineering candidate can demo now (fixing it).');
+      const left = remaining().length;
+      ctx.ui.toast(`${nameOf(c)} hired as ${short(c).toLowerCase()} professor${r.outcome === 'skip' ? ' (demo skipped, no bonus)' : '!'} (${4 - left}/4). ${left ? D.backFor : ''}`);
       updateObjective();
     }
   }
@@ -241,19 +245,10 @@ export function createProfessors(): QuestModule {
         ctx.addInteractable({
           id: `lobby-${cand.id}`, kind: 'npc', at: cand.lobby, radius: 2.2, eras: ['ricks1999'],
           visual: ctx.world.npc({ label: nameOf(cand), sub: `${cand.label} · Personnel Services`, shirt: cand.shirt, pants: '#2c2540' }),
-          enabled: () => ctx.isActive() && !firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
-          prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
+          enabled: () => ctx.isActive() && !hired()[cand.id] && escorting() !== cand.id,
+          prompt: () => locked(cand) ? `${cand.label} (after the art demo)` : `Talk to the ${cand.label}`,
           objective: () => ctx.isActive() && !escorting() && !hired()[cand.id] && !locked(cand),
           onInteract: () => lobbyTalk(cand),
-        });
-        // Waiting outside their building after the first pickup
-        ctx.addInteractable({
-          id: `outside-${cand.id}`, kind: 'npc', at: waitAt(cand), radius: 2.6, eras: ['ricks1999'],
-          visual: ctx.world.npc({ label: nameOf(cand), sub: `${cand.label} · waiting`, shirt: cand.shirt, pants: '#2c2540' }),
-          enabled: () => ctx.isActive() && firstPicked() && !hired()[cand.id] && escorting() !== cand.id,
-          prompt: () => locked(cand) ? `${cand.label} (waiting on the art demo)` : `Talk to the ${cand.label}`,
-          objective: () => ctx.isActive() && firstPicked() && !escorting() && !hired()[cand.id] && !locked(cand),
-          onInteract: () => lobbyTalk(cand, true),
         });
         // Teaching spot inside the department classroom (the building's demo door leads in)
         ctx.addInteractable({
@@ -282,6 +277,10 @@ export function createProfessors(): QuestModule {
         const was = lastSpace; lastSpace = here;
         const esc = escorting();
         if (esc && here === `q1-room-${esc}` && was !== here && !hired()[esc] && !demoBusy) window.setTimeout(() => demo(byId(esc), { auto: true }), 700);
+        else if (here.startsWith('q1-room-') && was !== here && !demoBusy) {
+          const id = here.slice(8), room = rooms.get(id);
+          if (room && cands().some(c => c.id === id) && !hired()[id] && esc !== id) window.setTimeout(() => emptyRoom(id, room), 700);
+        }
       }
       if (!follower || demoRoom) return;
       const p = ctx.world.playerPosition();

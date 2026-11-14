@@ -89,13 +89,23 @@ export function voxelReveal(el: HTMLElement, canvas: Grid): () => void {
   return () => { cancelAnimationFrame(id); geo.dispose(); mat.dispose(); renderer.dispose(); renderer.forceContextLoss(); };
 }
 
+/** A mark on each painted colour so the colours stay readable under the 1999 sepia filter (luminance alone isn't enough). */
+export function cellMark(g: CanvasRenderingContext2D, id: string, x: number, y: number, cs: number) {
+  const ink = 'rgba(20,16,12,.75)', m = Math.max(2, cs * 0.12);
+  g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = Math.max(2, cs * 0.09);
+  if (id === 'g') { g.beginPath(); g.arc(x + cs / 2, y + cs / 2, cs * 0.17, 0, 7); g.fill(); }                                   // gold: a dot
+  else if (id === 'b') { g.beginPath(); g.moveTo(x + cs / 2, y + m); g.lineTo(x + cs / 2, y + cs - m); g.moveTo(x + m, y + cs / 2); g.lineTo(x + cs - m, y + cs / 2); g.stroke(); }   // window: a cross
+  else if (id === 'd') { g.beginPath(); for (const f of [0.33, 0.66]) { g.moveTo(x + cs * f, y + m); g.lineTo(x + cs * f, y + cs - m); } g.stroke(); }   // door: planks
+  else if (id === 's') { g.beginPath(); for (const f of [0.33, 0.66]) { g.moveTo(x + m, y + cs * f); g.lineTo(x + cs - m, y + cs * f); } g.stroke(); }   // steps: treads
+}
+
 /** The temple reference projected on the studio wall (dark when the projector is out). */
 export function drawProjectedRef(p: Surface, on: boolean) {
   const ref = refGrid(), colorOf = (id: string) => ART.palette.find(q => q.id === id)!.color;
   const g = p.g; g.fillStyle = on ? '#4f5a63' : '#151515'; g.fillRect(0, 0, p.w, p.h);
   if (on) {
     const cs = Math.floor(Math.min((p.w - 40) / ref[0].length, (p.h - 40) / ref.length)), ox = (p.w - cs * ref[0].length) / 2, oy = (p.h - cs * ref.length) / 2;
-    ref.forEach((r, y) => r.forEach((c, x) => { g.fillStyle = c ? colorOf(c) : '#6f7b86'; g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2); }));
+    ref.forEach((r, y) => r.forEach((c, x) => { g.fillStyle = c ? colorOf(c) : '#6f7b86'; g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2); if (c) cellMark(g, c, ox + x * cs, oy + y * cs, cs - 2); }));
   }
   p.refresh();
 }
@@ -135,11 +145,18 @@ export const artChallenge: ChallengeBody = (root, api) => {
     chalk(b, '#34463d');
     const cs = Math.floor(Math.min((b.w - 60) / W, (b.h - 60) / H)), ox = (b.w - cs * W) / 2, oy = (b.h - cs * H) / 2;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const v = canvas[y][x]; b.g.fillStyle = v ? colorOf(v) : 'rgba(255,255,255,.06)'; b.g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2);
+      const v = canvas[y][x]; b.g.fillStyle = v ? colorOf(v) : 'rgba(255,255,255,.06)'; b.g.fillRect(ox + x * cs, oy + y * cs, cs - 2, cs - 2); if (v) cellMark(b.g, v, ox + x * cs, oy + y * cs, cs - 2);
       if (ghost) { const r = ref[y - ghost.oy]?.[x - ghost.ox]; if (r) { b.g.strokeStyle = colorOf(r); b.g.lineWidth = 3; b.g.strokeRect(ox + x * cs + 2, oy + y * cs + 2, cs - 6, cs - 6); } }
       if (x === cx && y === cy) { b.g.strokeStyle = '#ffd34d'; b.g.lineWidth = 5; b.g.strokeRect(ox + x * cs - 3, oy + y * cs - 3, cs + 4, cs + 4); }
     }
     b.refresh();
+    room?.setRegion('canvas', 'board', { x: ox - 10, y: oy - 10, w: cs * W + 20, h: cs * H + 20 });
+    // paint straight onto the board: click / drag (right button erases)
+    room?.setHotspots('board', [{ x: ox, y: oy, w: cs * W, h: cs * H, drag: true, on: (pt, kind, button) => {
+      const x = Math.min(W - 1, Math.floor((pt.x - ox) / cs)), y = Math.min(H - 1, Math.floor((pt.y - oy) / cs)); cx = x; cy = y;
+      if (kind === 'down' && bucket) { fill(button === 2 ? null : color().id); return; }
+      set(x, y, button === 2 ? null : color().id); paintUI();
+    } }]);
   };
   let guessAt = -1, oohed = false, bulb: 'on' | 'out' = 'on', finished = false;
   const set = (x: number, y: number, v: string | null) => {

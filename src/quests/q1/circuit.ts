@@ -174,7 +174,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const cv = h('canvas', { class: 'cx-board', 'aria-label': 'Circuit board' }) as HTMLCanvasElement;
   const goal = h('div', { class: 'cx-goal' }), bulbsEl = h('div', { class: 'cx-bulbs' }), info = h('div', { class: 'cx-info' });
   root.append(h('div', { class: 'cx-wrap' }, h('div', { class: 'cx-boardbox' }, cv), h('div', { class: 'cx-side' }, goal, bulbsEl, info)));
-  api.setControls([['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['RU', 'flip switch'], ['3', 'hint'], ['4', 'tools']]);
+  api.setControls([['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['3', 'hint'], ['4', 'tools']]);
 
   const load = () => {
     const l = levels[li]; board = parseLevel(l);
@@ -205,7 +205,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
       return h('div', { class: `cx-bulb ${got === w ? 'ok' : ''}` }, h('span', { class: `dot ${got}` }), `${lab}: `, h('b', { text: word(got) }), ` (wants ${word(w)}) ${got === w ? '✔' : ''}`);
     }), sim.short ? h('div', { class: 'cx-short', text: '⚡ The fuse blew — there’s a short (+ wired straight to −). A new fuse is in; fix the wiring.' }) : "");
     const sw = Object.keys(switchState);
-    info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — flip with right stick ↑ / T` }) : "");
+    info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — click it (or ①) to flip` }) : "");
     api.setStatus(sim.short ? 'Pop! The fuse blew — something connects the plug to itself.' : '');
     if (sim.short && !wasShort) classroom()?.react('gasp', 'Whoa! The fuse popped!');
     wasShort = sim.short;
@@ -238,7 +238,17 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     if (board) {
       drawBoard(cv, levels[li] ?? levels[levels.length - 1], board, simulate(board, switchState), cur, hintTile, t, flash, switchState);
       const peg = classroom()?.room?.get('peg');
-      if (peg && cv.width) { peg.g.fillStyle = '#c9a46a'; peg.g.fillRect(0, 0, peg.w, peg.h); const k = Math.min(peg.w / cv.width, peg.h / cv.height); peg.g.drawImage(cv, (peg.w - cv.width * k) / 2, (peg.h - cv.height * k) / 2, cv.width * k, cv.height * k); peg.refresh(); }
+      if (peg && cv.width) {
+        // the circuit on the bench board (bottom band left free for the chalk Hint / Brief / More); click a tile to turn it
+        const FOOT = 54, k = Math.min((peg.w - 24) / cv.width, (peg.h - FOOT - 16) / cv.height), ox = (peg.w - cv.width * k) / 2, oy = 10;
+        peg.g.fillStyle = '#1d2a33'; peg.g.fillRect(0, 0, peg.w, peg.h); peg.g.strokeStyle = '#c9a46a'; peg.g.lineWidth = 10; peg.g.strokeRect(5, 5, peg.w - 10, peg.h - 10);
+        peg.g.drawImage(cv, ox, oy, cv.width * k, cv.height * k); peg.refresh();
+        classroom()?.room?.setRegion('circuit', 'peg', { x: ox - 6, y: oy - 6, w: cv.width * k + 12, h: cv.height * k + 12 });
+        classroom()?.room?.setHotspots('peg', [{ x: ox, y: oy, w: cv.width * k, h: cv.height * k, on: (pt, _kind, button) => {
+          const x = Math.floor(((pt.x - ox) / k - 8) / T), y = Math.floor(((pt.y - oy) / k - 8) / T);
+          if (x >= 0 && y >= 0 && x < board.w && y < board.h) { cur = { x, y }; if (board.tiles[y][x].kind === 'switch') flip(); else rotate(button === 2 ? -1 : 1); }
+        } }]);
+      }
     }
   });
   const finish = () => {
@@ -274,7 +284,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   });
   load();
   const intro = [
-    window.setTimeout(() => classroom()?.react('gasp', 'It shorted out in the middle of the art demo. The art department needs it back.', 'Physical Plant worker'), 300),
+    window.setTimeout(() => classroom()?.react('gasp', 'It died halfway through our art demo this morning. We really need it back!', 'Brother Lee (art student)'), 300),
     window.setTimeout(() => classroom()?.react('nod', 'Forget the lesson plan. Show us.', 'Brother Frost (engineering chair)'), 2600),
   ];
   return () => { stop(); intro.forEach(clearTimeout); };

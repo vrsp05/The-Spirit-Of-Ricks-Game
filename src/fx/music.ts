@@ -10,6 +10,9 @@ export const TRACKS = [
   { title: 'The Spirit of God', file: 'the-spirit-of-god.m4a' },
 ];
 
+/** Music level while a dialogue line is on screen (so speech is easy to follow). */
+const DUCK = 0.35;
+
 export class MusicPlayer {
   private audio = new Audio();
   private index = Math.floor(Math.random() * TRACKS.length);
@@ -31,9 +34,10 @@ export class MusicPlayer {
   get title() { return TRACKS[this.index].title; }
 
   /** Call every frame. allowed = not in a cutscene / card / finale. */
-  update(dt: number, allowed: boolean) {
-    const want = allowed && SETTINGS.music && SETTINGS.musicVolume > 0 && !SETTINGS.muted ? 1 : 0;
-    this.level += Math.sign(want - this.level) * Math.min(Math.abs(want - this.level), dt / (want ? 1.5 : 0.6));   // fade in 1.5 s, out 0.6 s
+  update(dt: number, allowed: boolean, duck = false) {
+    const on = allowed && SETTINGS.music && SETTINGS.musicVolume > 0 && !SETTINGS.muted;
+    const want = on ? (duck ? DUCK : 1) : 0;   // softer while someone is talking
+    this.level += Math.sign(want - this.level) * Math.min(Math.abs(want - this.level), dt / (want > this.level ? 1.5 : 0.6));   // fade in 1.5 s, out 0.6 s
     this.audio.volume = Math.max(0, Math.min(1, this.level * SETTINGS.musicVolume));   // Audio settings → Music
     if (this.level > 0 && this.audio.paused && this.unlocked) {
       const first = this.audio.currentTime === 0;

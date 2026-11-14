@@ -52,7 +52,7 @@
   "voice": "Bednar",
   "speaker": "President Bednar",
   "when": "Quest 1 (Bednar)",
-  "text": "Walk each one to their department for a teaching demonstration. The art studio's projector has been acting up, so start with art before engineering. Then come back and report to me.",
+  "text": "Walk each one over to their department for a teaching demonstration, then come back for the next. Please take the art candidate before the engineering candidate; that's how the departments scheduled them. When all four are done, report to me.",
   "live": false
  },
  {
@@ -60,7 +60,7 @@
   "voice": "Bednar",
   "speaker": "President Bednar",
   "when": "Quest 1 (Bednar)",
-  "text": "Math, English, art and engineering — and I hear the Spori's projector works again.",
+  "text": "Math, English, art and engineering, all hired. And I hear the art studio's projector works again.",
   "live": false
  },
  {
@@ -93,6 +93,134 @@
   "speaker": "President Bednar",
   "when": "Quest 3",
   "text": "Once you have them, bring them to the sign by the roundabout. Let’s finish it together.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "Our campus is growing. I have two blueprints that need careful hands.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "One is the John Taylor Building. Its site is fenced off and waiting for the right plan.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-3",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "The other is a great gathering place west of the Manwaring Center. Solve both blueprints, then report back.",
+  "live": false
+ },
+ {
+  "id": "q2-report-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "The Taylor Building and the Campus Center both stand now. Thank you.",
+  "live": false
+ },
+ {
+  "id": "q2-report-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "Let's see what the years bring to this campus.",
+  "live": false
+ },
+ {
+  "id": "q2-montage-taylor-1",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The blueprint lines rise from the site…",
+  "live": false
+ },
+ {
+  "id": "q2-montage-taylor-2",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The John Taylor Building now stands. (Symbolic build — the real building first opened in 1997.)",
+  "live": false
+ },
+ {
+  "id": "q2-montage-icenter-1",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "A great gathering place rises from the blueprint…",
+  "live": false
+ },
+ {
+  "id": "q2-montage-icenter-2",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The Campus Center now stands. (Symbolic build — the real BYU–Idaho Center was dedicated in 2010.)",
+  "live": false
+ },
+ {
+  "id": "opening-1",
+  "voice": "Hinckley",
+  "speaker": "President Gordon B. Hinckley",
+  "when": "Opening movie",
+  "text": "David, Ricks College is going to become a four-year institution.",
+  "live": false
+ },
+ {
+  "id": "opening-2",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "President, what would you have me do?",
+  "live": false
+ },
+ {
+  "id": "opening-3",
+  "voice": "Hinckley",
+  "speaker": "President Gordon B. Hinckley",
+  "when": "Opening movie",
+  "text": "Make it happen.",
+  "live": false
+ },
+ {
+  "id": "opening-5",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "Come in.",
+  "live": false
+ },
+ {
+  "id": "opening-6",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "We have a great deal of work ahead of us. Let’s begin.",
+  "live": false
+ },
+ {
+  "id": "ending-1",
+  "voice": "Bednar",
+  "speaker": "Elder David A. Bednar",
+  "when": "Ending movie",
+  "text": "The Spirit of Ricks lives on.",
+  "live": false
+ },
+ {
+  "id": "ending-2",
+  "voice": "Bednar",
+  "speaker": "Elder David A. Bednar",
+  "when": "Ending movie",
+  "text": "Together, we made it happen.",
   "live": false
  },
  {
@@ -204,7 +332,7 @@
   "voice": "Chair english",
   "speaker": "Department chair",
   "when": "Quest 1 classroom",
-  "text": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. Brother Nielsen, would you show us how to edit it for accuracy?",
+  "text": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. Brother Nielsen, would you show the class how to proofread a paper like this and get it ready to hand in?",
   "live": false
  },
  {
@@ -236,7 +364,7 @@
   "voice": "Candidate art",
   "speaker": "Sister Okada",
   "when": "Quest 1 walk",
-  "text": "I just hope that old projector in the Spori survives the demo.",
+  "text": "The Spori's art studio has a wonderful old overhead projector. I'm counting on it today.",
   "live": false
  },
  {
@@ -260,7 +388,7 @@
   "voice": "Chair art",
   "speaker": "Department chair",
   "when": "Quest 1 classroom",
-  "text": "Class, meet our art candidate. Our students struggle to draw what they actually see. Sister Okada, can you show them how? If that old projector cooperates.",
+  "text": "Class, meet our art candidate. Our students hold a pencil out at arm's length to measure proportions, and their drawings still come out lopsided. Sister Okada, can you show them a better way? If that old projector cooperates.",
   "live": false
  },
  {
@@ -276,7 +404,7 @@
   "voice": "Chair art",
   "speaker": "Department chair",
   "when": "Quest 1 classroom",
-  "text": "Thank you! Someone should look at that projector, though.",
+  "text": "Thank you! I'm sorry about your projector.",
   "live": false
  },
  {
@@ -292,7 +420,7 @@
   "voice": "Candidate engineering",
   "speaker": "Brother Ruiz",
   "when": "Quest 1 waiting",
-  "text": "I'm waiting on the art department's demo first — I hear their old projector is about to short out — that's what I'll be fixing.",
+  "text": "I'm scheduled after the art candidate. Come get me once the art demo is done.",
   "live": false
  },
  {
@@ -300,7 +428,7 @@
   "voice": "Candidate engineering",
   "speaker": "Brother Ruiz",
   "when": "Quest 1 walk",
-  "text": "I heard the Spori's projector died in the middle of the art demo. Perfect timing, honestly.",
+  "text": "I brought a whole lesson on circuits. Let's see if I get to use it.",
   "live": false
  },
  {
@@ -308,7 +436,7 @@
   "voice": "Candidate engineering",
   "speaker": "Brother Ruiz",
   "when": "Quest 1 walk",
-  "text": "A short circuit is just electricity taking the lazy way home. Let's fix that.",
+  "text": "A short circuit is just electricity taking the lazy way home. That's my favourite thing to explain.",
   "live": false
  },
  {
@@ -324,7 +452,7 @@
   "voice": "Chair engineering",
   "speaker": "Department chair",
   "when": "Quest 1 classroom",
-  "text": "Class, this is our engineering candidate. Physical Plant just brought us the Spori's projector; it shorted out during the art demo. Brother Ruiz, can you fix it and explain what went wrong?",
+  "text": "Class, this is our engineering candidate. Change of plans: a student just carried in the art studio's overhead projector. It shorted out in the middle of their demo this morning. Brother Ruiz, instead of the lesson you planned, would you fix it in front of the class and explain what went wrong?",
   "live": false
  },
  {
@@ -340,7 +468,7 @@
   "voice": "Chair engineering",
   "speaker": "Department chair",
   "when": "Quest 1 classroom",
-  "text": "Thank you! Tell the art studio their projector is ready.",
+  "text": "Thank you! Let's get this projector back to the art studio.",
   "live": false
  },
  {
@@ -356,7 +484,7 @@
   "voice": "Candidate math",
   "speaker": "Sister Ames",
   "when": "Quest 1",
-  "text": "The other candidates will meet you outside their buildings — they're marked on your map.",
+  "text": "Walk me over, and then come back here for the next candidate.",
   "live": false
  },
  {

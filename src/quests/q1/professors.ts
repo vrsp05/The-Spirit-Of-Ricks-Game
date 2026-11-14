@@ -213,8 +213,9 @@ export function createProfessors(): QuestModule {
     }
     room?.start(c.id === 'engineering' ? 'bench' : 'board');
     if (room && follower) follower.visible = false;   // you play the candidate: keep them out of the board / wall views
-    // you stand beside the board (the teaching spot, left of it), never between the camera and the board
-    if (room) { const t = room.teachSpot(); ctx.world.placePlayer(t.x, t.z, 0); }
+    // you stand beside the board on the opposite side from the teaching spot (where the candidate / chair stand),
+    // so nobody overlaps and nobody is between the camera and the board
+    if (room) { const t = room.teachSpot(), cx = room.w(0, 0, 0).x; ctx.world.placePlayer(2 * cx - t.x, t.z, 0); }
     ctx.ui.setBanner(`You are now ${nameOf(c)}, the ${short(c).toLowerCase()} candidate`);
     window.setTimeout(() => { if (demoRoom === room) ctx.ui.setBanner(`Playing as: ${who(c)}`); }, 2600);
     ctx.progress.set('attempts', { ...attempts(), [c.id]: (attempts()[c.id] ?? 0) + 1 });

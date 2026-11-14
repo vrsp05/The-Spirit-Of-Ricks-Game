@@ -298,11 +298,13 @@ export class OpeningCutscene {
         this.overlay.querySelector<HTMLElement>('.oc-speaker')!.hidden = !line.speaker;
         this.overlay.querySelector('.oc-speaker')!.textContent = line.speaker + (line.context ? ` · ${line.context}` : '');
         this.overlay.querySelector('.oc-text')!.textContent = line.text;
+        if (!line.text.startsWith('[')) this.game.voice.speak(line.speaker || 'Narrator', line.text);   // ElevenLabs recording (browser voice fallback)
       }
     }
   }
 
   finish() {
+    this.game.voice.stop();
     if (!this.active || !this.saved) return;
     const g = this.game, saved = this.saved;
     this.active = false;

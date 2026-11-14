@@ -8,6 +8,9 @@ import { STORY } from '../src/story/story';
 import q1 from '../src/quests/q1/data/dialogue.json';
 import classroom from '../src/quests/q1/data/classroom.json';
 import q3 from '../src/quests/q3/data/cards.json';
+import q2 from '../src/quests/q2/data/dialogue.json';
+import { OPENING } from '../src/opening_cutscene/opening.script';
+import { ENDING } from '../src/ending_cutscene/ending.script';
 
 export interface VoiceLine { id: string; voice: string; speaker: string; when: string; text: string; live: boolean }
 const out: VoiceLine[] = [];
@@ -17,7 +20,7 @@ const add = (id: string, voice: string, speaker: string, when: string, text: str
   const t = text.replace(/\s+/g, ' ').trim(); if (!t || seen.has(t)) return; seen.add(t);
   out.push({ id, voice, speaker: clean(speaker), when, text: t, live: /\{[a-z]+\}/i.test(t) });
 };
-const voiceOf = (speaker: string) => /Bednar|President/i.test(speaker) ? 'Bednar' : /^$|Narrator|Construction/i.test(speaker) ? 'Narrator' : speaker;
+const voiceOf = (speaker: string) => /Hinckley/i.test(speaker) ? 'Hinckley' : /Bednar|President/i.test(speaker) ? 'Bednar' : /^$|Narrator|Construction/i.test(speaker) ? 'Narrator' : speaker;
 
 // story + quest dialogue ({speaker, text} objects anywhere in the data)
 STORY.bednarGreeting().forEach((l, i) => add(`story-greeting-${i + 1}`, 'Bednar', l.speaker, 'First talk with Bednar', l.text));
@@ -32,6 +35,10 @@ const walk = (node: unknown, path: string, when: string) => {
 };
 walk({ assign: q1.assign, report: q1.report }, 'q1', 'Quest 1 (Bednar)');
 walk(q3.dialogue, 'q3', 'Quest 3');
+walk(q2, 'q2', 'Quest 2');
+// opening and ending movies
+OPENING.cues.forEach((c, i) => { if (!c.text.startsWith('[')) add(`opening-${i + 1}`, voiceOf(c.speaker), c.speaker || 'Narrator', 'Opening movie', c.text); });
+ENDING.cues.forEach((c, i) => add(`ending-${i + 1}`, 'Bednar', 'Elder David A. Bednar', 'Ending movie', c.text));
 add('q1-ready', 'Bednar', 'President Bednar', 'Quest 1 report prompt', q1.readyReminder);
 add('q3-reminder', 'Bednar', 'President Bednar', 'Quest 3 reminder', q3.dialogue.reminder);
 

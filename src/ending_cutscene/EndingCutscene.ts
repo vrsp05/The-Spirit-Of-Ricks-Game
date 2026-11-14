@@ -155,12 +155,13 @@ export class EndingCutscene {
     if (cue !== this.lastCue) {
       this.lastCue = cue;
       this.overlay.querySelector<HTMLElement>('.oc-subtitles')!.hidden = cue < 0;
-      if (cue >= 0) this.overlay.querySelector('.oc-text')!.textContent = ENDING.cues[cue].text;
+      if (cue >= 0) { this.overlay.querySelector('.oc-text')!.textContent = ENDING.cues[cue].text; this.game.voice.speak('Elder David A. Bednar', ENDING.cues[cue].text); }
     }
   }
 
   private finish() {
     if (!this.active || this.completed) return;
+    this.game.voice.stop();
     this.elapsed = ENDING.duration; this.completed = true; this.paused = false;
     this.stage?.bednar.mouthOpen(0);
     this.overlay?.remove(); this.overlay = undefined;

@@ -87,26 +87,18 @@ export class EndingCutscene {
       <div class="oc-subtitles" role="status" aria-live="polite" aria-atomic="true"><div class="oc-caption"><span class="oc-speaker">Elder David A. Bednar</span><p class="oc-text"></p></div></div>
       <div class="oc-black"></div><div class="oc-title"><span>The legacy continues.</span><h1>The Spirit of Ricks</h1></div>
       ${this.previewing ? '<span class="oc-preview">Ending preview</span>' : ''}
-      <div class="oc-controls"><span class="oc-hint">Enter: pause · Esc: skip</span><button type="button" data-pause aria-pressed="false">Pause</button><button type="button" data-skip>Skip ending</button></div>
-      <div class="oc-progress" aria-hidden="true"><span></span></div>`;
-    el.querySelector('[data-pause]')!.addEventListener('click', () => this.togglePause());
+      <div class="oc-controls"><button type="button" data-skip>Skip ▸</button></div>`;
     el.querySelector('[data-skip]')!.addEventListener('click', () => this.finish());
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); });
     this.game.ui.root.appendChild(el); this.overlay = el;
   }
 
-  private togglePause() {
-    this.paused = !this.paused;
-    const button = this.overlay?.querySelector<HTMLButtonElement>('[data-pause]');
-    if (button) { button.textContent = this.paused ? 'Resume' : 'Pause'; button.setAttribute('aria-pressed', String(this.paused)); }
-  }
 
   update(dt: number, input?: ActionState) {
     if (!this.active || this.completed) return;
     if (input?.pressed('back') || input?.pressed('pause')) {
       input.consume('back'); input.consume('pause'); this.finish(); return;
     }
-    if (input?.pressed('confirm')) { input.consume('confirm'); input.consume('interact'); this.togglePause(); }
     if (!this.paused && !document.hidden && !this.skipNextFrame) this.elapsed = Math.min(ENDING.duration, this.elapsed + dt);
     this.skipNextFrame = false;
     this.render();
@@ -159,7 +151,6 @@ export class EndingCutscene {
     // The title is now physically on the STC screen, making the pullback continuous.
     (this.overlay.querySelector('.oc-title') as HTMLElement).style.opacity = '0';
     (this.overlay.querySelector('.oc-location') as HTMLElement).style.opacity = String(ramp(t, 4.25, 4.5) * (1 - ramp(t, 5.7, 6)));
-    (this.overlay.querySelector('.oc-progress span') as HTMLElement).style.width = `${t / ENDING.duration * 100}%`;
     const cue = ENDING.cues.findIndex(c => t >= c.start && t < c.end);
     if (cue !== this.lastCue) {
       this.lastCue = cue;

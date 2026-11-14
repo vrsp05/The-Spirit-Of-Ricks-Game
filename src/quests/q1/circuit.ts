@@ -191,7 +191,8 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     const want = l.expect.find(e => Object.entries(e.switches).every(([k, v]) => switchState[k] === v)) ?? l.expect[0];
     bulbsEl.replaceChildren(...Object.entries(want.bulbs).map(([id, w]) => {
       const got = sim.short ? 'off' : sim.bulbs[id]?.brightness ?? 'off';
-      return h('div', { class: `cx-bulb ${got === w ? 'ok' : ''}` }, h('span', { class: `dot ${got}` }), `${l.labels[id] ?? id}: `, h('b', { text: got }), ` (wants ${w}) ${got === w ? '✔' : ''}`);
+      const lab = l.labels[id] ?? id, word = (v: string) => (/^Fan/.test(lab) ? ({ off: 'stopped', dim: 'slow', bright: 'full' } as Record<string, string>)[v] ?? v : v);
+      return h('div', { class: `cx-bulb ${got === w ? 'ok' : ''}` }, h('span', { class: `dot ${got}` }), `${lab}: `, h('b', { text: word(got) }), ` (wants ${word(w)}) ${got === w ? '✔' : ''}`);
     }), sim.short ? h('div', { class: 'cx-short', text: '⚡ The fuse blew — there’s a short (+ wired straight to −). A new fuse is in; fix the wiring.' }) : "");
     const sw = Object.keys(switchState);
     info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — flip with right stick ↑ / T` }) : "");

@@ -15,13 +15,17 @@ export interface InteriorDef {
 // Layout extras per interior. STC layout is an APPROXIMATION (no verified floor
 // plan used): entrance lobby + opening into a celebration hall to the north.
 const LAYOUTS: Record<string, Partial<InteriorDef>> = {
-  // Simple, not a floor plan: entrance hall leading north into the president's office.
+  // Simple, not a floor plan: entrance hall leading north into the president's office,
+  // with Personnel Services opening off the east side of the hall. The Kimball Building
+  // housed "personnel" among its administrative services (Church News, Sept 11, 1999).
+  // CONTRACT ADDITION (Q1): Personnel Services room for the Quest 1 faculty candidates.
   'kimball-office': {
     floor: '#8b6f55', wall: '#ece4d4',
     walls: [
-      { x0: -7, z0: -2.3, x1: -1.6, z1: -1.8 }, { x0: 1.6, z0: -2.3, x1: 7, z1: -1.8 },   // office wall with doorway
-      { x0: -7, z0: -1.8, x1: -2.6, z1: 11, h: 3.6, color: '#d8cfbe' },                   // hall side blocks
-      { x0: 2.6, z0: -1.8, x1: 7, z1: 11, h: 3.6, color: '#d8cfbe' },
+      { x0: -10, z0: -2.3, x1: -1.6, z1: -1.8 }, { x0: 1.6, z0: -2.3, x1: 10, z1: -1.8 },  // office wall with doorway
+      { x0: -10, z0: -1.8, x1: -2.6, z1: 11, h: 3.6, color: '#d8cfbe' },                  // west hall block
+      { x0: 2.6, z0: -1.8, x1: 3.0, z1: 2.4 }, { x0: 2.6, z0: 5.8, x1: 3.0, z1: 8.6 },    // Personnel Services wall, doorway z 2.4–5.8
+      { x0: 2.6, z0: 8.6, x1: 10, z1: 11, h: 3.6, color: '#d8cfbe' },                     // block south of Personnel Services
     ],
     props: [
       { x0: -2.4, z0: -9.2, x1: 2.4, z1: -8.0, h: 0.95, color: '#5a3a22' },   // desk
@@ -29,10 +33,17 @@ const LAYOUTS: Record<string, Partial<InteriorDef>> = {
       { x0: 3.4, z0: -10.6, x1: 6.6, z1: -10.2, h: 2.4, color: '#4a3020' },
       { x0: -5.5, z0: -5, x1: -4.3, z1: -3.8, h: 0.6, color: '#6b2f2a' },     // chairs
       { x0: 4.3, z0: -5, x1: 5.5, z1: -3.8, h: 0.6, color: '#6b2f2a' },
+      // Personnel Services: reception counter, waiting chairs, file cabinets
+      { x0: 8.2, z0: -0.6, x1: 9.6, z1: 3.6, h: 1.1, color: '#7b5a3e' },
+      { x0: 9.2, z0: 5.0, x1: 9.8, z1: 5.6, h: 0.5, color: '#3f5a6b' }, { x0: 9.2, z0: 6.2, x1: 9.8, z1: 6.8, h: 0.5, color: '#3f5a6b' },
+      { x0: 9.2, z0: 7.4, x1: 9.8, z1: 8.0, h: 0.5, color: '#3f5a6b' },
+      { x0: 3.3, z0: -1.7, x1: 4.3, z1: -1.2, h: 1.4, color: '#8a8a80' }, { x0: 4.4, z0: -1.7, x1: 5.4, z1: -1.2, h: 1.4, color: '#8a8a80' },
     ],
     signs: [
       { text: ['Office of the President'], x: 0, z: -10.9, ry: 0 },
       { text: ['Kimball Building'], x: 0, z: -2.0, ry: Math.PI },
+      { text: ['Personnel Services'], x: 2.5, z: 4.1, ry: -Math.PI / 2 },
+      { text: ['Faculty interviews today'], x: 7.2, z: -1.7, ry: 0 },
     ],
   },
   'dev-quest-room': {

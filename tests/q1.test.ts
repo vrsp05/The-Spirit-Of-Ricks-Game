@@ -163,3 +163,14 @@ describe('english answer keys', () => {
   });
   it('wrong-stamp allowance: Easy unlimited, Hard 2; Hard press is faster', () => { expect(ENGLISH.modes.easy.wrongAllowance).toBe(-1); expect(ENGLISH.modes.hard.wrongAllowance).toBe(2); expect(ENGLISH.modes.hard.speed).toBeGreaterThan(ENGLISH.modes.easy.speed); });
 });
+
+describe('art subjects', () => {
+  it('temple and Tabernacle templates are symmetric 12 × 16 grids using palette colours', () => {
+    const ids = new Set(ART_DATA.palette.map(p => p.id));
+    for (const [k, rows] of Object.entries(ART_DATA.references!)) {
+      expect(rows, k).toHaveLength(16);
+      for (const r of rows) { expect(r).toHaveLength(12); expect([...r].every(c => c === '.' || ids.has(c)), k).toBe(true); }
+    }
+    expect(ART_DATA.references!.tabernacle.every(r => r === [...r].reverse().join(''))).toBe(true);
+  });
+});

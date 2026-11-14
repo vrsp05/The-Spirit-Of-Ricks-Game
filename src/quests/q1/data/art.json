@@ -90,5 +90,47 @@
       "at": 0.8,
       "text": "It's a temple on the hill!"
     }
-  ]
+  ],
+  "references": {
+    "temple": [
+      ".....gg.....",
+      ".....gg.....",
+      ".....ww.....",
+      ".....ww.....",
+      "....wwww....",
+      "....wbbw....",
+      "....wwww....",
+      "...wwwwww...",
+      ".wwwwwwwwww.",
+      ".wbwwbbwwbw.",
+      ".wbwwbbwwbw.",
+      ".wwwwwwwwww.",
+      ".wbwwwwwwbw.",
+      ".wwwwddwwww.",
+      ".wwwwddwwww.",
+      "ssssssssssss"
+    ],
+    "tabernacle": [
+      "s.s......s.s",
+      "sss......sss",
+      "sbs......sbs",
+      "sss......sss",
+      "sbs.wwww.sbs",
+      "ssswwbbwwsss",
+      "sssswwwwssss",
+      "ssssssssssss",
+      "sbssbssbssbs",
+      "sbssbssbssbs",
+      "ssssssssssss",
+      "sbsssddsssbs",
+      "sbsssddsssbs",
+      "sssssddsssss",
+      "wwwwwwwwwwww",
+      "............"
+    ]
+  },
+  "subjects": {
+    "temple": "Projected reference (future temple concept)",
+    "tabernacle": "Projected reference (Rexburg Stake Tabernacle, 1911)"
+  }
 }

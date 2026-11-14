@@ -17,7 +17,7 @@ export const GAME_CONFIG = {
 
   player: { walkSpeed: 5, runSpeed: 11, radius: 0.45, jumpSpeed: 7, gravity: 22 },
   cart: { maxSpeed: 17, reverseSpeed: 6, accel: 9, turnRate: 2.0, radius: 0.95 },
-  camera: { distance: 12, minDistance: 4, maxDistance: 40, pitch: 0.5, minPitch: 0.12, maxPitch: 1.35, interiorMaxDistance: 10, interiorMinPitch: 0.8 },
+  camera: { distance: 12, minDistance: 4, maxDistance: 40, pitch: 0.5, minPitch: 0.12, maxPitch: 1.35, interiorMaxDistance: 16, interiorMinPitch: 0.42 },
 
   // Stable anchor ids (quest prompt): npc.bednar.office, candidate.*, construction.*, letter.*, sign.byui, door.stc.main
   locations: {
@@ -27,13 +27,13 @@ export const GAME_CONFIG = {
     'door.stc.main':         { x: -140, z: 236, building: 'stc', label: 'Science and Technology Center, north entrance' },
     // President Bednar's office inside the Kimball Building (executive offices, HOB p.26). Room-local.
     'npc.bednar.office':     { x: 0, z: -7, space: 'kimball-office', yaw: 0, label: 'President’s office, Kimball Building' },
-    // Quest 1: candidates wait in Personnel Services (the Kimball hall for now; room-local),
+    // Quest 1: candidates wait in Personnel Services (east of the Kimball hall; room-local),
     // then the assistant walks each one to a teaching-demo door beside their department building.
-    'q1.lobby.math':         { x: -1.9, z: 2.5, space: 'kimball-office', yaw: Math.PI / 2, label: 'Personnel Services, Kimball Building' },
-    'q1.lobby.engineering':  { x: 1.9, z: 2.5, space: 'kimball-office', yaw: -Math.PI / 2, label: 'Personnel Services, Kimball Building' },
-    'q1.lobby.art':          { x: -1.9, z: 5.5, space: 'kimball-office', yaw: Math.PI / 2, label: 'Personnel Services, Kimball Building' },
-    'q1.lobby.english':      { x: 1.9, z: 5.5, space: 'kimball-office', yaw: -Math.PI / 2, label: 'Personnel Services, Kimball Building' },
-    'q1.lobby.board':        { x: 0, z: 0.2, space: 'kimball-office', label: 'Personnel Services hiring board' },
+    'q1.lobby.math':         { x: 5.0, z: 1.2, space: 'kimball-office', yaw: Math.PI, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.english':      { x: 7.0, z: 1.2, space: 'kimball-office', yaw: Math.PI, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.art':          { x: 5.0, z: 7.0, space: 'kimball-office', yaw: 0, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.engineering':  { x: 7.0, z: 7.0, space: 'kimball-office', yaw: 0, label: 'Personnel Services, Kimball Building' },
+    'q1.lobby.board':        { x: 6.2, z: -0.6, space: 'kimball-office', label: 'Personnel Services hiring board' },
     'candidate.math':        { x: -12, z: -318, building: 'romney', offset: 3.5, label: 'Romney Building' },
     'candidate.engineering': { x: -82, z: 108, building: 'austin', offset: 3.5, label: 'Austin Building' },
     'candidate.art':         { x: 44, z: -395, building: 'spori-original', offset: 3.5, label: 'Spori Building' },
@@ -124,7 +124,7 @@ export const GAME_CONFIG = {
   },
 
   interiors: {
-    'kimball-office': { label: 'Kimball Building — President’s office', width: 14, depth: 22, exteriorDoor: 'door-kimball', eras: null as EraId[] | null },
+    'kimball-office': { label: 'Kimball Building — President’s office & Personnel Services', width: 20, depth: 22, exteriorDoor: 'door-kimball', eras: null as EraId[] | null },
     'stc-first-floor': { label: 'Science and Technology Center — first floor (approximation)', width: 48, depth: 30, exteriorDoor: 'door.stc.main', eras: ['presentFinale'] as EraId[] | null },
   },
 

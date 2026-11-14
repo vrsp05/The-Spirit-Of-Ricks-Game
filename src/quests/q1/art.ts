@@ -7,14 +7,15 @@ import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
 
-export const ART = data as unknown as { note: string; subject: string; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
+export const ART = data as unknown as { note: string; subject: string; references?: Record<string, string[]>; subjects?: Record<string, string>; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
   modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number; bulbAtScore?: number; bulbAtSeconds?: number; bulbSeconds?: number }> };
 
 /** Index of the furthest class guess reached for a live score (−1 = none yet). */
 export const guessIndex = (score: number) => ART.guesses.reduce((k, g, i) => (score >= g.at ? i : k), -1);
 
 export type Grid = (string | null)[][];
-export const refGrid = (): Grid => ART.reference.map(r => [...r].map(c => (c === '.' ? null : c)));
+export const refRows = (): string[] => ART.references?.[ART.subject] ?? ART.reference;
+export const refGrid = (): Grid => refRows().map(r => [...r].map(c => (c === '.' ? null : c)));
 
 /**
  * Best-offset score: the reference may be painted anywhere on the larger canvas.
@@ -98,7 +99,7 @@ export const artChallenge: ChallengeBody = (root, api) => {
   for (let y = 0; y < H; y++) { cells.push([]); for (let x = 0; x < W; x++) { const c = h('div', { class: 'cell' }); c.dataset.x = String(x); c.dataset.y = String(y); grid.append(c); cells[y].push(c); } }
   const refEl = h('div', { class: 'art-ref', style: `grid-template-columns: repeat(${ref[0].length}, 1fr)` });
   for (const row of ref) for (const c of row) refEl.append(h('div', { class: 'cell', style: c ? `background:${ART.palette.find(p => p.id === c)!.color}` : '' }));
-  const refBox = h('div', { class: 'art-refbox' }, h('div', { class: 'ref-title', text: 'Projected reference (future concept)' }), refEl);
+  const refBox = h('div', { class: 'art-refbox' }, h('div', { class: 'ref-title', text: ART.subjects?.[ART.subject] ?? 'Projected reference' }), refEl);
   const meter = h('div', { class: 'meter' }, h('div', { class: 'meter-fill' }), h('span', { class: 'meter-text' }));
   const palette = h('div', { class: 'palette' }, ...ART.palette.map((p, i) => { const b = btn(p.name, () => { colorIdx = i; paintUI(); }, 'swatch'); b.style.setProperty('--sw', p.color); return b; }));
   const mirrorBtn = btn('Mirror: off', () => { mirror = !mirror; paintUI(); });

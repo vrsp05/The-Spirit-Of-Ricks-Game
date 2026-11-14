@@ -72,11 +72,14 @@ export class InputManager {
     }
     // Stick-driven menu navigation with auto-repeat (keyboard sources emit nav* directly).
     // right stick (controllers) → rLeft/rRight/rUp/rDown edges (lookX = -stick x)
+    // only the stronger direction of a stick counts, so a diagonal push never fires both (e.g. view + colour)
+    const mx = merged.axes.moveX ?? 0, my = merged.axes.moveY ?? 0, lx = merged.axes.lookX ?? 0, ly = merged.axes.lookY ?? 0;
+    const lh = Math.abs(mx) >= Math.abs(my), rh = Math.abs(lx) >= Math.abs(ly);
     const stick: [ButtonName, boolean][] = [
-      ['navUp', (merged.axes.moveY ?? 0) > 0.6], ['navDown', (merged.axes.moveY ?? 0) < -0.6],
-      ['navLeft', (merged.axes.moveX ?? 0) < -0.6], ['navRight', (merged.axes.moveX ?? 0) > 0.6],
-      ['rRight', (merged.axes.lookX ?? 0) < -0.6], ['rLeft', (merged.axes.lookX ?? 0) > 0.6],
-      ['rUp', (merged.axes.lookY ?? 0) > 0.6], ['rDown', (merged.axes.lookY ?? 0) < -0.6],
+      ['navUp', !lh && my > 0.6], ['navDown', !lh && my < -0.6],
+      ['navLeft', lh && mx < -0.6], ['navRight', lh && mx > 0.6],
+      ['rRight', rh && lx < -0.6], ['rLeft', rh && lx > 0.6],
+      ['rUp', !rh && ly > 0.6], ['rDown', !rh && ly < -0.6],
     ];
     for (const [b, active] of stick) {
       if (merged.buttons.has(b)) continue;

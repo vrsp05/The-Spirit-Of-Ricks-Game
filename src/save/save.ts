@@ -19,6 +19,7 @@ export interface SaveData {
   coins: string[];                    // collected coin ids
   introSeen: boolean;
   finaleReached: boolean;
+  playerName?: string;                // asked when a new game starts
 }
 
 type Migration = (old: any) => any;

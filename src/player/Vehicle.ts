@@ -1,7 +1,7 @@
 // Drivable vehicles: golf carts, era-styled parked cars, and bicycles.
 import * as THREE from 'three';
 
-export type VehicleKind = 'cart' | 'car' | 'bike';
+export type VehicleKind = 'cart' | 'car' | 'bike' | 'scooter';
 export type CarStyle = 'boxy90s' | 'pickup90s' | 'rounded2010s' | 'modern';
 export interface VehicleParams { maxSpeed: number; reverseSpeed: number; accel: number; turnRate: number; radius: number }
 
@@ -9,6 +9,7 @@ export const PARAMS: Record<VehicleKind, VehicleParams> = {
   cart: { maxSpeed: 17, reverseSpeed: 6, accel: 9, turnRate: 2.0, radius: 0.95 },
   car: { maxSpeed: 22, reverseSpeed: 7, accel: 10, turnRate: 1.7, radius: 1.25 },
   bike: { maxSpeed: 10, reverseSpeed: 2, accel: 7, turnRate: 2.6, radius: 0.5 },
+  scooter: { maxSpeed: 8.5, reverseSpeed: 1.5, accel: 6, turnRate: 2.8, radius: 0.45 },
 };
 
 export class Vehicle {
@@ -25,7 +26,7 @@ export class Vehicle {
   /** Rider placement in vehicle-local space (x right, y up, z forward). */
   seat = { x: 0, y: 0.42, z: 0 };
   hideRider = false;
-  pose: 'sit' | 'bike' = 'sit';
+  pose: 'sit' | 'bike' | 'stand' = 'sit';
   eras: string[] | null = null;
   constructor(public id: string, public kind: VehicleKind, style: CarStyle = 'boxy90s', color = '#f4f1e8') {
     this.root.add(this.body);
@@ -69,6 +70,14 @@ export class Vehicle {
       void dark;
       for (const [x, z] of [[-0.9, -1.4], [0.9, -1.4], [-0.9, 1.4], [0.9, 1.4]]) wheel(0.28, 0.66, x, 0.33, z);
       this.hideRider = true; this.seat = { x: -0.4, y: 0.2, z: 0 };
+    } else if (kind === 'scooter') {
+      // electric kick scooter: low deck, two small wheels, tall stem + handlebar, a little headlight
+      const body = color === '#f4f1e8' ? '#2fbf71' : color;
+      wheel(0.07, 0.24, 0, 0.12, 0.42, this.body); wheel(0.07, 0.24, 0, 0.12, -0.38, this.body);
+      box(0.2, 0.06, 0.88, '#1f2328', 0, 0.16, 0); box(0.16, 0.012, 0.7, '#3a3f45', 0, 0.195, -0.02);      // deck + grip tape
+      box(0.06, 0.95, 0.06, body, 0, 0.66, 0.4); box(0.5, 0.05, 0.05, '#1f2328', 0, 1.13, 0.4);             // stem + bar
+      box(0.12, 0.06, 0.16, body, 0, 0.2, -0.42); lamp(box(0.08, 0.05, 0.03, '#fff6c8', 0, 0.95, 0.44));   // rear fender + light
+      this.pose = 'stand'; this.seat = { x: 0, y: 0.2, z: -0.05 };
     } else {
       // bicycle: frame, two wheels, handlebar, seat, pedals
       const frame = '#c0392b';
@@ -82,7 +91,7 @@ export class Vehicle {
   }
   /** steer: −1..1 (A/D). Wheels spin with speed, front wheels steer, the body leans and pitches. */
   animate(dt: number, steer = 0) {
-    for (const w of this.wheels) w.rotation.x += this.speed * dt * (this.kind === 'bike' ? 2.9 : 3);
+    for (const w of this.wheels) w.rotation.x += this.speed * dt * (this.kind === 'bike' ? 2.9 : this.kind === 'scooter' ? 8 : 3);
     if (this.pedals) this.pedals.rotation.x += this.speed * dt * 1.5;
     this.steerS += (steer - this.steerS) * Math.min(1, dt * 8);
     for (const w of this.frontWheels) w.rotation.y = -this.steerS * 0.45;
@@ -90,8 +99,9 @@ export class Vehicle {
     const accel = (this.speed - this.lastSpeed) / Math.max(dt, 1e-3); this.lastSpeed = this.speed;
     this.pitch += (Math.max(-1, Math.min(1, accel / 12)) * 0.03 - this.pitch) * Math.min(1, dt * 5);
     // cars/carts roll outward in a turn; bikes lean into it
-    this.body.rotation.z = (this.kind === 'bike' ? -1 : 0.35) * this.steerS * sp * (this.kind === 'bike' ? 0.32 : 0.12);
-    this.body.rotation.x = this.kind === 'bike' ? 0 : -this.pitch;
+    const lean = this.kind === 'bike' || this.kind === 'scooter';
+    this.body.rotation.z = (lean ? -1 : 0.35) * this.steerS * sp * (lean ? 0.3 : 0.12);
+    this.body.rotation.x = lean ? 0 : -this.pitch;
     for (const t of this.tails) t.emissiveIntensity = accel < -4 ? 1.8 : 0.25;   // brake lights
   }
 }

@@ -20,6 +20,10 @@ interface Screen {
   focusIndex: number;
   cleanup?: () => void;
   actionHandler?: (a: PanelAction) => boolean;
+  /** Called every frame while this screen is on top (continuous stick input, e.g. map zoom). */
+  tick?: (a: ActionState) => void;
+  /** The left stick is used by the screen itself (e.g. panning the map), not for moving the focus. */
+  noNav?: boolean;
   toolsMode?: boolean;
 }
 export interface MenuItem { label: string; action: () => void; disabled?: boolean; hint?: string }
@@ -30,6 +34,8 @@ export interface HudData {
   px: number; pz: number; pyaw: number; camYaw: number;
   map: HTMLCanvasElement | null; /** current era (the map's default view fits the buildings standing in it) */ eraId?: EraId; target: { x: number; z: number } | null; interior: string | null;
   markers: { x: number; z: number }[];   // every current objective point (minimap / map)
+  /** Minimap centre (the building's entrance while indoors); defaults to px/pz. */
+  mapX?: number; mapZ?: number;
   doors: { x: number; z: number; label: string }[]; // enterable entrances
   targetLabel: string | null;            // where the pointer leads ("Romney Building")
   coins: string;
@@ -115,11 +121,20 @@ export class UI {
   setBanner(text: string | null) { this.banner.classList.toggle('hidden', !text); if (text) this.banner.textContent = text; }
   setReticle(visible: boolean, active = false) { this.reticle.classList.toggle('hidden', !visible); this.reticle.classList.toggle('active', active); }
   setHudButton(label: string | null, action: (() => void) | null) { this.hudBtn.classList.toggle('hidden', !label); if (label) this.hudBtn.textContent = label; this.hudBtnAction = action; }
+  /** Player name used for "{player}" in dialogue and for the "You" speaker. */
+  playerName = '';
+  /** Clean a line for display: no "(game character)" notes, {player} → the player's name. */
+  cleanLine<T extends { speaker: string; text: string }>(l: T): T {
+    const name = this.playerName || 'friend';
+    const speaker = l.speaker.replace(/\s*\(game character\)/gi, '').replace(/^You$/, this.playerName || 'You');
+    return { ...l, speaker, text: l.text.replace(/\{player\}/g, name) };
+  }
   /** Called when a spoken line starts (or with null when the conversation/scene ends) — drives the voices. */
   onLine: ((line: { speaker: string; text: string } | null) => void) | null = null;
   private lastSub = '';
-  subtitle(line: { speaker: string; text: string } | null, hint: string) {
-    this.currentSpeaker = line?.speaker || null;
+  subtitle(raw: { speaker: string; text: string } | null, hint: string) {
+    this.currentSpeaker = raw?.speaker || null;            // raw name: drives the speaker's mouth
+    const line = raw ? this.cleanLine(raw) : null;
     const key = line ? `${line.speaker}|${line.text}` : '';
     if (line && key !== this.lastSub) this.onLine?.(line);
     if (!line && !hint) this.onLine?.(null);          // scene finished / skipped
@@ -169,6 +184,7 @@ export class UI {
   /** Route actions to the top screen. Returns true if the UI consumed input. */
   update(a: ActionState): boolean {
     const s = this.top; if (!s) return false;
+    s.tick?.(a);
     if (s.actionHandler) {
       // Minigames: 4 buttons + 2 sticks. ③ (map) = hint, ④ (pause / Tab) = tools bar, right stick = alt/alt2/rup/rdown.
       const backNow = a.pressed('back');
@@ -188,8 +204,8 @@ export class UI {
     }
     const f = this.focusables(s);
     const move = (d: number) => { if (f.length) { s.focusIndex = (s.focusIndex + d + f.length) % f.length; this.paintFocus(s); } };
-    if (a.pressed('navUp') || a.pressed('navLeft')) move(-1);
-    if (a.pressed('navDown') || a.pressed('navRight')) move(1);
+    if (!s.noNav && (a.pressed('navUp') || a.pressed('navLeft'))) move(-1);
+    if (!s.noNav && (a.pressed('navDown') || a.pressed('navRight'))) move(1);
     if (a.pressed('confirm')) {
       a.consume('confirm'); a.consume('interact');
       if (f.length) f[s.focusIndex]?.click(); else s.onConfirmEmpty?.();
@@ -220,8 +236,8 @@ export class UI {
       const el = document.createElement('div'); el.className = 'screen dialogue';
       el.innerHTML = `<div class="dlg"><div class="dlg-speaker"></div><div class="dlg-text"></div><div class="dlg-next">Confirm ▸</div></div>`;
       const render = () => {
-        const l = lines[i];
-        this.currentSpeaker = l.speaker;
+        const raw = lines[i], l = this.cleanLine(raw);
+        this.currentSpeaker = raw.speaker;
         el.querySelector('.dlg-speaker')!.innerHTML = esc(l.speaker) + (l.placeholder ? ' <span class="badge">PLACEHOLDER DIALOGUE</span>' : '');
         el.querySelector('.dlg-text')!.textContent = l.text;
         this.onLine?.(l);
@@ -288,6 +304,29 @@ export class UI {
     });
   }
 
+  /** Ask the player's name and season (keyboard for the name; controllers can keep the suggestion). */
+  askName(suggestion: string, season: 'spring' | 'summer' | 'autumn' | 'winter'): Promise<{ name: string; season: 'spring' | 'summer' | 'autumn' | 'winter' }> {
+    const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
+    return new Promise(resolve => {
+      const el = document.createElement('div'); el.className = 'screen menu name-screen';
+      el.innerHTML = `<div class="panel"><h2>What’s your name?</h2><p class="sub">President Bednar’s new assistant needs a name. Characters will call you by it.</p>
+        <input class="name-input" data-focus maxlength="18" autocomplete="off" spellcheck="false" placeholder="Your name">
+        <p class="sub">Season for the whole game (you can change it later in Settings):</p>
+        <div class="season-row">${SEASONS.map(x => `<button type="button" data-focus data-season="${x}">${x[0].toUpperCase()}${x.slice(1)}</button>`).join('')}</div>
+        <div class="items"><button data-focus type="button" class="name-ok primary">Start</button></div></div>`;
+      const input = el.querySelector('.name-input') as HTMLInputElement; input.value = suggestion;
+      let pick = season, done = false;
+      const paint = () => el.querySelectorAll<HTMLButtonElement>('[data-season]').forEach(b => b.classList.toggle('chosen', b.dataset.season === pick));
+      el.querySelectorAll<HTMLButtonElement>('[data-season]').forEach(b => b.addEventListener('click', () => { pick = b.dataset.season as typeof pick; paint(); }));
+      paint();
+      const finish = () => { if (done) return; done = true; const v = input.value.trim().replace(/[<>{}]/g, '').slice(0, 18) || suggestion; this.pop(s); resolve({ name: v, season: pick }); };
+      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(); });   // typing doesn't move the game
+      el.querySelector('.name-ok')!.addEventListener('click', finish);
+      const s = this.push(el, { onBack: finish });
+      setTimeout(() => { input.focus(); input.select(); }, 50);
+    });
+  }
+
   toast(text: string, ms = 3500) {
     const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
     this.toastEl.appendChild(t); setTimeout(() => t.classList.add('out'), ms); setTimeout(() => t.remove(), ms + 600);
@@ -308,10 +347,10 @@ export class UI {
     this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
     const g = this.mini.getContext('2d')!, S = 180;
     g.fillStyle = '#2b2622'; g.fillRect(0, 0, S, S);
-    if (d.map && !d.interior) {
+    if (d.map) {
       const scale = d.map.width / (CAMPUS.bounds.maxX - CAMPUS.bounds.minX); // px per metre in map canvas
-      const viewM = 130, src = viewM * scale;
-      const cx = (d.px - CAMPUS.bounds.minX) * scale, cy = (d.pz - CAMPUS.bounds.minZ) * scale;
+      const viewM = 130, src = viewM * scale, mx = d.mapX ?? d.px, mz = d.mapZ ?? d.pz;
+      const cx = (mx - CAMPUS.bounds.minX) * scale, cy = (mz - CAMPUS.bounds.minZ) * scale;
       g.drawImage(d.map, cx - src / 2, cy - src / 2, src, src, 0, 0, S, S);
       const drawMarker = (m: { x: number; z: number }, primary: boolean) => {
         let tx = (m.x - d.px) / viewM * S + S / 2, ty = (m.z - d.pz) / viewM * S + S / 2;
@@ -329,8 +368,7 @@ export class UI {
         if (tx < 6 || ty < 6 || tx > S - 6 || ty > S - 6) continue;
         drawDoorIcon(g, tx, ty, 6);
       }
-      for (const m of d.markers) drawMarker(m, false);
-      if (d.target) drawMarker(d.target, true);
+      if (!d.interior) { for (const m of d.markers) drawMarker(m, false); if (d.target) drawMarker(d.target, true); }   // indoor targets use room coordinates
     }
     const dist = d.target ? Math.round(Math.hypot(d.target.x - d.px, d.target.z - d.pz)) : 0;
     this.distEl.textContent = d.target ? `${dist} m` : '';
@@ -345,52 +383,123 @@ export class UI {
     }
     this.coinsEl.textContent = d.coins;
     this.helpEl.textContent = d.driving ? 'Golf cart: W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause';
+    if (d.interior) {   // indoors: the campus map stays visible, centred on the building you're in
+      g.fillStyle = 'rgba(20,16,12,0.72)'; g.fillRect(0, S - 22, S, 22);
+      g.fillStyle = '#ffd34d'; g.font = 'bold 11px system-ui'; g.textAlign = 'center'; g.fillText(`Inside: ${d.interior.split('—')[0].trim()}`.slice(0, 30), S / 2, S - 8); g.textAlign = 'start';
+      g.strokeStyle = '#ffd34d'; g.lineWidth = 2; g.beginPath(); g.arc(S / 2, S / 2, 13, 0, Math.PI * 2); g.stroke();
+    }
     // player arrow (north-up map)
     g.save(); g.translate(S / 2, S / 2); g.rotate(-d.pyaw + Math.PI);
     g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 1.5;
     g.beginPath(); g.moveTo(0, -8); g.lineTo(6, 6); g.lineTo(0, 3); g.lineTo(-6, 6); g.closePath(); g.fill(); g.stroke(); g.restore();
   }
 
-  bigMap(onClose: () => void) {
-    const d = this.lastHud; if (!d?.map) return;
-    const map = d.map, B = CAMPUS.bounds, s = map.width / (B.maxX - B.minX);   // map px per game metre
-    // Default view: the campus buildings plus a small margin (and wherever you are); "Whole map" shows everything.
-    const campusView = () => {
+  /**
+   * A zoomable campus map (canvas). Opens on the campus buildings (plus wherever you are) with a small margin;
+   * wheel / +− / right stick zoom, drag (or the stick, in the full-screen map) pans, "Whole map" toggles everything.
+   */
+  private mapWidget(size: () => { w: number; h: number }) {
+    const d = this.lastHud!, map = d.map!, B = CAMPUS.bounds, s = map.width / (B.maxX - B.minX);   // map px per game metre
+    const me = { x: d.mapX ?? d.px, z: d.mapZ ?? d.pz };
+    const campusRect = () => {
       let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-      const polys = d.eraId ? buildingsForEra(d.eraId).filter(b => b.registryId && b.state !== 'site').map(b => b.poly) : allFootprints();
+      // the campus buildings (the temple sits off campus to the south), not the whole town around them
+      const polys = d.eraId ? buildingsForEra(d.eraId).filter(b => b.registryId && b.registryId !== 'temple' && b.state !== 'site').map(b => b.poly) : allFootprints();
       for (const poly of polys) for (const [x, z] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
       if (!isFinite(x0)) return { x0: B.minX, x1: B.maxX, z0: B.minZ, z1: B.maxZ };
-      const near = 25; x0 = Math.min(x0, d.px - near); x1 = Math.max(x1, d.px + near); z0 = Math.min(z0, d.pz - near); z1 = Math.max(z1, d.pz + near);
-      const m = Math.max(x1 - x0, z1 - z0) * 0.12;                                             // "a little bigger"
+      const near = 25; x0 = Math.min(x0, me.x - near); x1 = Math.max(x1, me.x + near); z0 = Math.min(z0, me.z - near); z1 = Math.max(z1, me.z + near);
+      const m = Math.max(x1 - x0, z1 - z0) * 0.03;
       return { x0: Math.max(B.minX, x0 - m), x1: Math.min(B.maxX, x1 + m), z0: Math.max(B.minZ, z0 - m), z1: Math.min(B.maxZ, z1 + m) };
     };
-    const el = document.createElement('div'); el.className = 'screen map';
-    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)} · <small>north is up · yellow = objectives · green = entrances · red = you · © OpenStreetMap contributors</small> <button data-focus class="map-zoom">Whole map</button> <button data-focus class="map-close">Close</button></div>`;
-    const c = document.createElement('canvas'); el.appendChild(c);
-    let whole = false;
-    const draw = () => {
-      const v = whole ? { x0: B.minX, x1: B.maxX, z0: B.minZ, z1: B.maxZ } : campusView();
-      const sx = (v.x0 - B.minX) * s, sy = (v.z0 - B.minZ) * s, sw = (v.x1 - v.x0) * s, sh = (v.z1 - v.z0) * s;
-      // render the view at the size it's shown (fit inside the viewport, both dimensions), so a zoomed-in view stays sharp and large
-      const R = Math.min((window.innerWidth - 32) / sw, (window.innerHeight - 80) / sh);
-      c.width = Math.round(sw * R); c.height = Math.round(sh * R);
-      c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
-      const g = c.getContext('2d')!; g.imageSmoothingEnabled = false; g.clearRect(0, 0, c.width, c.height); g.drawImage(map, sx, sy, sw, sh, 0, 0, c.width, c.height);
-      const P = (x: number, z: number) => [(x - v.x0) * s * R, (z - v.z0) * s * R];
-      const u = 1;                                                                               // icons and labels in screen pixels
-      g.font = `bold ${Math.round(12 * u)}px sans-serif`; g.textAlign = 'left';
-      for (const e of d.doors) { const [x, y] = P(e.x, e.z); drawDoorIcon(g, x, y, 8 * u); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3 * u; g.strokeText('Entrance', x + 10 * u, y + 4 * u); g.fillText('Entrance', x + 10 * u, y + 4 * u); }
-      for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke(); }
-      if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2 * u; g.beginPath(); g.arc(x, y, 8 * u, 0, 7); g.fill(); g.stroke(); }
-      const [x, y] = P(d.px, d.pz); g.fillStyle = '#fff'; g.strokeStyle = '#c00'; g.lineWidth = 3 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke();
-      (el.querySelector('.map-zoom') as HTMLButtonElement).textContent = whole ? 'Campus view' : 'Whole map';
+    const c = document.createElement('canvas'); c.className = 'map-canvas';
+    const view = { cx: 0, cz: 0, mpp: 1 };                         // centre (metres) and metres per screen pixel
+    const fit = (r: { x0: number; x1: number; z0: number; z1: number }) => { const { w, h } = size(); view.cx = (r.x0 + r.x1) / 2; view.cz = (r.z0 + r.z1) / 2; view.mpp = Math.max((r.x1 - r.x0) / w, (r.z1 - r.z0) / h); };
+    const wholeMpp = () => { const { w, h } = size(); return Math.max((B.maxX - B.minX) / w, (B.maxZ - B.minZ) / h); };
+    const clamp = () => {
+      view.mpp = Math.max(0.08, Math.min(wholeMpp(), view.mpp));
+      const { w, h } = size(), hw = w * view.mpp / 2, hh = h * view.mpp / 2;
+      view.cx = hw * 2 >= B.maxX - B.minX ? (B.minX + B.maxX) / 2 : Math.max(B.minX + hw, Math.min(B.maxX - hw, view.cx));
+      view.cz = hh * 2 >= B.maxZ - B.minZ ? (B.minZ + B.maxZ) / 2 : Math.max(B.minZ + hh, Math.min(B.maxZ - hh, view.cz));
     };
-    draw();
+    const draw = () => {
+      const { w, h } = size(); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
+      const g = c.getContext('2d')!; g.imageSmoothingEnabled = view.mpp * s < 1; g.fillStyle = '#2a2620'; g.fillRect(0, 0, c.width, c.height);
+      const vx0 = view.cx - c.width * view.mpp / 2, vz0 = view.cz - c.height * view.mpp / 2;
+      const P = (x: number, z: number) => [(x - vx0) / view.mpp, (z - vz0) / view.mpp];
+      // the part of the map image inside the view (clipped to the image)
+      const ix0 = Math.max(B.minX, vx0), iz0 = Math.max(B.minZ, vz0), ix1 = Math.min(B.maxX, vx0 + c.width * view.mpp), iz1 = Math.min(B.maxZ, vz0 + c.height * view.mpp);
+      if (ix1 > ix0 && iz1 > iz0) { const [dx, dy] = P(ix0, iz0); g.drawImage(map, (ix0 - B.minX) * s, (iz0 - B.minZ) * s, (ix1 - ix0) * s, (iz1 - iz0) * s, dx, dy, (ix1 - ix0) / view.mpp, (iz1 - iz0) / view.mpp); }
+      g.font = 'bold 12px sans-serif'; g.textAlign = 'left';
+      const showDoorText = view.mpp < 0.45;   // 'Entrance' labels only when zoomed in
+      for (const e of d.doors) { const [x, y] = P(e.x, e.z); drawDoorIcon(g, x, y, 7); if (showDoorText) { g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText('Entrance', x + 10, y + 4); g.fillText('Entrance', x + 10, y + 4); } }
+      for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+      if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 8, 0, 7); g.fill(); g.stroke(); }
+      const [x, y] = P(me.x, me.z); g.fillStyle = '#fff'; g.strokeStyle = '#c00'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke();
+    };
+    let whole = false;
+    const campus = () => { whole = false; fit(campusRect()); clamp(); draw(); };
+    const zoomBy = (f: number, at?: { x: number; y: number }) => {
+      const ax = at ? view.cx + (at.x - c.width / 2) * view.mpp : view.cx, az = at ? view.cz + (at.y - c.height / 2) * view.mpp : view.cz;
+      const before = view.mpp; view.mpp *= f; clamp(); const k = view.mpp / before;
+      view.cx = ax + (view.cx - ax) * k; view.cz = az + (view.cz - az) * k; clamp(); draw();
+    };
+    const pan = (dxPx: number, dyPx: number) => { view.cx += dxPx * view.mpp; view.cz += dyPx * view.mpp; clamp(); draw(); };
+    const toggleWhole = () => { if (whole) campus(); else { whole = true; view.mpp = wholeMpp(); clamp(); draw(); } return whole; };
+    c.addEventListener('wheel', e => { e.preventDefault(); const r = c.getBoundingClientRect(); zoomBy(e.deltaY > 0 ? 1.15 : 1 / 1.15, { x: e.clientX - r.left, y: e.clientY - r.top }); }, { passive: false });
+    let drag: { x: number; y: number } | null = null;
+    c.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', e => { if (!drag) return; pan(drag.x - e.clientX, drag.y - e.clientY); drag = { x: e.clientX, y: e.clientY }; });
+    c.addEventListener('pointerup', () => { drag = null; });
+    // controller: right stick up/down zooms (and, if wanted, the left stick pans) — smooth, every frame
+    let last = performance.now();
+    const tick = (a: ActionState, panWithLeft: boolean) => {
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const zy = a.axes.lookY; if (Math.abs(zy) > 0.2) zoomBy(Math.pow(0.25, zy * dt));
+      if (panWithLeft && (Math.abs(a.axes.moveX) > 0.2 || Math.abs(a.axes.moveY) > 0.2)) pan(a.axes.moveX * 500 * dt, -a.axes.moveY * 500 * dt);
+    };
+    campus();
+    return { canvas: c, draw, campus, zoomBy, toggleWhole, tick, isWhole: () => whole };
+  }
+
+  /** Full-screen map (M / map button), available anywhere — indoors it shows the building you are in. */
+  bigMap(onClose: () => void) {
+    const d = this.lastHud; if (!d?.map) return;
+    const el = document.createElement('div'); el.className = 'screen map';
+    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)}${d.interior ? ` · inside: ${esc(d.interior.split(' — ')[0])}` : ''} · <small>north is up · yellow = objectives · green = entrances · red = you · © OpenStreetMap contributors</small>
+      <button data-focus class="map-in">＋</button><button data-focus class="map-out">－</button><button data-focus class="map-zoom">Whole map</button> <button data-focus class="map-close">Close</button></div>
+      <div class="map-tip">Wheel or right stick: zoom · drag or left stick: move</div>`;
+    const mw = this.mapWidget(() => ({ w: window.innerWidth - 32, h: window.innerHeight - 110 }));
+    el.insertBefore(mw.canvas, el.querySelector('.map-tip'));
+    const zb = el.querySelector('.map-zoom') as HTMLButtonElement;
     let sc: Screen;
-    const close = () => { this.pop(sc); onClose(); };
+    const close = () => { window.removeEventListener('resize', mw.draw); this.pop(sc); onClose(); };
     el.querySelector('.map-close')!.addEventListener('click', close);
-    el.querySelector('.map-zoom')!.addEventListener('click', () => { whole = !whole; draw(); });
+    el.querySelector('.map-in')!.addEventListener('click', () => mw.zoomBy(1 / 1.4));
+    el.querySelector('.map-out')!.addEventListener('click', () => mw.zoomBy(1.4));
+    zb.addEventListener('click', () => { zb.textContent = mw.toggleWhole() ? 'Campus view' : 'Whole map'; });
+    window.addEventListener('resize', mw.draw);
     sc = this.push(el, { onBack: close, onMap: close });
+    sc.tick = a => mw.tick(a, true); sc.noNav = true;
+  }
+
+  /** The menu with the map beside it (pause): options on the left, a zoomable map on the right. */
+  attachMap(sc: Screen) {
+    if (!this.lastHud?.map) return;
+    sc.el.classList.add('with-map');
+    const box = document.createElement('div'); box.className = 'menu-map';
+    box.innerHTML = `<div class="menu-map-head"><b>Campus map</b><span><button class="map-in" type="button">＋</button><button class="map-out" type="button">－</button><button class="map-zoom" type="button">Whole map</button></span></div>`;
+    const size = () => ({ w: Math.max(200, Math.min(window.innerWidth * 0.58, window.innerWidth - 560)), h: Math.max(200, window.innerHeight - 110) });
+    const mw = this.mapWidget(size);
+    box.appendChild(mw.canvas);
+    box.insertAdjacentHTML('beforeend', '<div class="map-tip">Wheel or right stick: zoom · drag: move · M: full-screen map</div>');
+    const zb = box.querySelector('.map-zoom') as HTMLButtonElement;
+    box.querySelector('.map-in')!.addEventListener('click', () => mw.zoomBy(1 / 1.4));
+    box.querySelector('.map-out')!.addEventListener('click', () => mw.zoomBy(1.4));
+    zb.addEventListener('click', () => { zb.textContent = mw.toggleWhole() ? 'Campus view' : 'Whole map'; });
+    sc.el.appendChild(box);
+    const onResize = () => mw.draw(); window.addEventListener('resize', onResize);
+    const prev = sc.cleanup; sc.cleanup = () => { window.removeEventListener('resize', onResize); prev?.(); };
+    sc.tick = a => mw.tick(a, false);
   }
 }
 

@@ -69,6 +69,8 @@ export function snapToPolygon(poly: Vec2[], p: Vec2): { point: Vec2; normal: Vec
 }
 
 /** Door model. `enterable` doors get a green frame, lamp and step so they read as usable entrances. */
+/** Buildings whose doors stay closed (sacred / utility). */
+export const CLOSED = new Set(['temple', 'heating-plant', 'pplt-shop']);
 export function makeDoor(enterable: boolean): THREE.Group {
   const g = new THREE.Group();
   const add = (w: number, h: number, d: number, c: string, x: number, y: number, z: number, emissive?: string) => {
@@ -163,6 +165,8 @@ export class World {
   private signs = new THREE.Group();
   get campusSignGroup() { return this.signs; }
   private obstacles: { x: number; z: number; r: number }[] = [];
+  /** Sign footprints: block only in eras where the sign exists (no invisible wall before it's built). */
+  private signObstacles: { x: number; z: number; r: number; eras: string[] | null }[] = [];
   private signSpots = new Map<string, Vec2>();
   /** Bench positions (seatable). yaw = direction the sitter faces. */
   benches: { x: number; z: number; yaw: number }[] = [];
@@ -186,7 +190,8 @@ export class World {
       const [x, z] = nudgeFree(...toGame(a.x, a.z), 3);
       this.signSpots.set(s.anchor, [x, z]);
       const w = (s as { width?: number }).width ?? 5, yaw = a.yaw ?? 0, ux = Math.cos(yaw), uz = -Math.sin(yaw);
-      for (let t = -w / 2 + 1.2; t <= w / 2 - 1.2 + 1e-6; t += 1.6) this.obstacles.push({ x: x + ux * t, z: z + uz * t, r: 1.4 });
+      const eras = (s as { eras?: string[] }).eras ?? null;
+      for (let t = -w / 2 + 1.2; t <= w / 2 - 1.2 + 1e-6; t += 1.6) this.signObstacles.push({ x: x + ux * t, z: z + uz * t, r: 1.4, eras });
     }
     if (GAME_CONFIG.world.trees) this.exterior.add(this.makeTrees());
     const hemi = this.hemi;
@@ -762,7 +767,7 @@ export class World {
       if (!inCampus && rnd() > 0.3) continue;
       if (everOccupied(x, z, 2) || !isLawn(x, z) || this.onPath(x, z)) continue;
       if (trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < 72)) continue;          // ~8.5 m apart
-      if (this.obstacles.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + 3) ** 2)) continue; // clear of benches, lamps, fountain, signs
+      if ([...this.obstacles, ...this.signObstacles].some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + 3) ** 2)) continue; // clear of benches, lamps, fountain, signs
       if (onVehicleRoad(x, z) || everOccupied(x, z, 4) || this.nearDoor(x, z, 5)) continue;
       if (CAMPUS.areas.some(a => (a.kind === 'sport' || a.kind === 'stadium' || a.kind === 'parking') && pointInPoly(x, z, a.poly))) continue;
       trees.push({ x, z });
@@ -883,7 +888,7 @@ export class World {
   }
   /** Era look: sun, sky dome, clouds, season (renderer handles env light, haze, exposure, bloom). */
   applyAtmosphere(era: EraId) {
-    const A = ATMOSPHERE[era];
+    const A = { ...ATMOSPHERE[era], season: SETTINGS.season };   // time of day per era, season chosen by the player
     this.sunOffset.set(...A.sun); this.sun.color.set(A.sunColor); this.sun.intensity = A.sunIntensity;
     this.hemi.color.set(A.hemiSky); this.hemi.groundColor.set(A.hemiGround); this.hemi.intensity = A.hemiIntensity;
     this.skyU.top.value.set(A.skyTop); this.skyU.mid.value.set(A.skyMid); this.skyU.horizon.value.set(A.horizon); this.skyU.sun.value.copy(this.sunOffset).normalize();
@@ -928,6 +933,7 @@ export class World {
     const buildings = buildingsForEra(era, id => this.gateBuilt(id));
     const grid = new CollisionGrid();
     grid.extra.push(...this.obstacles);
+    grid.extra.push(...this.signObstacles.filter(o => !o.eras || o.eras.includes(era)).map(({ x, z, r }) => ({ x, z, r })));
     const meshes = new Map<string, BuiltMesh>();
     const group = new THREE.Group(); group.name = `era-${era}`;
     const buildingSigns: BuildingSign[] = [];
@@ -1019,16 +1025,26 @@ export class World {
   /** Visible (decorative) entrances; returns the door spots. */
   private addEntrances(b: EraBuilding, group: THREE.Group) {
     const spots = this.entranceSpotsFor(b.poly, b.landmark);
-    for (const sp of spots) { const door = makeDoor(false); door.position.set(sp.x, terrainHeight(sp.x, sp.z), sp.z); door.rotation.y = Math.atan2(sp.nx, sp.nz); group.add(door); }
+    const enterable = !!b.registryId && !CLOSED.has(b.registryId);   // every campus door opens, except these
+    for (const sp of spots) { const door = makeDoor(enterable); door.position.set(sp.x, terrainHeight(sp.x, sp.z), sp.z); door.rotation.y = Math.atan2(sp.nx, sp.nz); group.add(door); }
     return spots;
   }
 
   /** Every entrance (decorative + enterable) in any era — a clear zone is kept in front of each. */
   doorZones: { x: number; z: number }[] = [];
+  private doorInfo: { x: number; z: number; id: string; wx: number; wz: number; nx: number; nz: number }[] = [];
+  /** Every building entrance (all eras): wall point, outward normal and building id. */
+  buildingDoors() { return this.doorInfo.map(d => ({ x: d.wx, z: d.wz, nx: d.nx, nz: d.nz, id: d.id })); }
+  private doorCache: { era: string; pts: [number, number][] } | null = null;
+  /** Entrances of buildings standing in the current era (destinations for NPCs). */
+  activeDoors(): [number, number][] {
+    if (this.doorCache?.era !== this.era) this.doorCache = { era: this.era, pts: this.doorInfo.filter(d => this.buildingStanding(d.id) || this.gateBuilt(d.id)).map(d => [d.x, d.z] as [number, number]) };
+    return this.doorCache.pts;
+  }
   private computeDoorZones() {
     for (const b of BUILDINGS) {
       const poly = registryPoly(b.id); if (!poly) continue;
-      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 });
+      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) { this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 }); this.doorInfo.push({ x: sp.x + sp.nx * 1.2, z: sp.z + sp.nz * 1.2, id: b.id, wx: sp.x, wz: sp.z, nx: sp.nx, nz: sp.nz }); }
     }
     for (const i of Object.values(GAME_CONFIG.interiors)) { const d = this.doorPlacement(GAME_CONFIG.locations[i.exteriorDoor]); this.doorZones.push({ x: d.x + d.nx * 2, z: d.z + d.nz * 2 }); }
   }

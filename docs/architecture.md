@@ -108,3 +108,17 @@ Each device is an `InputSource`:
 - **Characters** (`src/player/Avatar.ts`): knees and elbows, walk/run bob and lean, idle breathing, blinking and glances, hairstyles, hats, coats, scarves, backpacks and shirt patterns. NPCs re-dress per era (`eraLook` in `src/world/Npcs.ts`), and the player wears a coat and scarf in winter.
 - **Vehicles** (`src/player/Vehicle.ts`): spinning wheels with hub caps, steering front wheels, body roll and pitch, brake lights.
 - **No duplicate geometry:** multi-part OSM buildings are drawn once, and a background building that overlaps another is skipped (`World.buildEra`). Overlapping copies caused flickering walls and windows.
+
+## Campus life, interiors and extras
+- **Navigation** (`src/world/navGraph.ts`): A* over the OSM path network (walkers, bikes, scooters) and street network (cars).
+- **NPCs** (`src/world/Npcs.ts`): 40 walkers pick building entrances (`World.activeDoors()`, buildings standing in the current era), walk there, go inside for a while and come back out; about a third walk in small groups.
+- **Traffic** (`src/world/Traffic.ts`): cars route to parking lots or across town, park, drive on; cyclists and scooter riders ride to buildings and go in.
+- **Interiors** (`src/interiors/campusInteriors.ts`): classroom buildings, the Campus Center auditorium, the Manwaring food court + presidents gallery (grows by era; names and years only, generic silhouettes) and the Hinckley offices. Registered into `GAME_CONFIG.interiors` on import; furniture/people are built on first entry.
+- **Ball games** (`src/world/ballGames.ts`): basketball (pick up, dribble, shoot with E, rim scoring) and soccer (dribble, kick with E, goals).
+- **Settings**: one season for the whole game (`SETTINGS.season`), brightness, volumes, voices, graphics, reduced motion. The new-game screen asks the player's name (`{player}` in dialogue) and season.
+- **Cheat codes** (pause menu): `jetpack`.
+
+## Voice-overs and sound effects (API keys in `.env`, never committed)
+- `npm run voices:export` → `docs/voice-lines.{json,csv,md}` from the current dialogue data.
+- `npm run voices:generate` (needs `ELEVENLABS_API_KEY`) → `public/voices/*.mp3` + `manifest.json`; voices per character in `tools/voices.json` (`-- --list` shows your account's voices). Only changed lines are re-recorded. Lines with `{player}` etc. stay on the browser voice.
+- `npm run sounds:fetch` (needs `FREESOUND_API_KEY`) → CC0 sounds in `public/sfx/*.mp3` + `freesound-credits.json` (engine loops, bike bell, car pass-by, winter wind, food-court chatter, auditorium murmur, ball sounds, jetpack). The game uses whatever exists and synthesizes the rest.

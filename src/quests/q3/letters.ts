@@ -32,13 +32,13 @@ export function createLetters(): QuestModule {
   const journal = (intro = false) => openJournal(ctx, {
     cards: C.cards, state, noteLabel: C.noteLabel, intro, hintsAllowed: { view: C.modes[ctx.difficulty()].viewHint },
     onHint: () => ctx.progress.set('hints', ctx.progress.get('hints', 0) + 1),
-    openMap: () => { /* the game's map is on M; journal closes first */ ctx.ui.toast('Press M (or Button 3 outside the journal) for the map. Letters are not marked — use the clues!'); },
+    openMap: () => { /* the game's map is on M; journal closes first */ ctx.ui.toast('Press M (or the map button) for the map. Letters are not marked — use the clues!'); },
   });
-  const registerJournalButton = () => { if (cardsGiven()) ctx.ui.hudButton('Journal (J)', () => void journal(), ctx.status() === 'active'); };
+  const registerJournalButton = () => { if (cardsGiven()) ctx.ui.hudButton('Journal (J)', () => void journal()); };
 
   const updateObjective = () => {
     const f = found().length, p = placed().length;
-    if (f < 4) ctx.ui.setObjective(`Find the hidden letters (${f}/4 found${p ? `, ${p} placed` : ''}) — open your Journal (J) for clues`, f > p ? ctx.config.signAnchor : null);
+    if (f < 4) ctx.ui.setObjective(`Find the hidden letters (${f}/4 found${p ? `, ${p} placed` : ''}) — using the clues in your Journal (J), find the building where each letter is hidden`, f > p ? ctx.config.signAnchor : null);
     else if (p < 4) ctx.ui.setObjective(`Place the letters on the sign by the roundabout (${p}/4)`, ctx.config.signAnchor);
     ctx.reportColorProgress(p / 4);
   };

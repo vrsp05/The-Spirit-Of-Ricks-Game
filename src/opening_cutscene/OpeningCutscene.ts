@@ -71,9 +71,6 @@ export class OpeningCutscene {
     if (input.pressed('back') || input.pressed('pause')) {
       input.consume('back'); input.consume('pause'); this.finish(); return;
     }
-    if (input.pressed('confirm')) {
-      input.consume('confirm'); input.consume('interact'); this.togglePause();
-    }
     if (!this.paused && !document.hidden) {
       if (!this.skipNextFrame) this.elapsed = Math.min(OPENING.duration, this.elapsed + dt);
       if (this.elapsed < OPENING.officeAt) this.game.npcs.update(dt, new THREE.Vector3(1e6, 0, 1e6), (x, z, r) => this.game.world.blocked(x, z, r));
@@ -89,11 +86,6 @@ export class OpeningCutscene {
     this.elapsed = clamp(seconds, 0, OPENING.duration - 0.01); this.render();
   }
 
-  private togglePause() {
-    this.paused = !this.paused;
-    const button = this.overlay?.querySelector<HTMLButtonElement>('[data-pause]');
-    if (button) { button.textContent = this.paused ? 'Resume' : 'Pause'; button.setAttribute('aria-pressed', String(this.paused)); }
-  }
 
   private buildOverlay() {
     const el = document.createElement('div'); el.className = 'opening-cutscene';
@@ -103,12 +95,10 @@ export class OpeningCutscene {
       <div class="oc-subtitles" role="status" aria-live="polite" aria-atomic="true"><div class="oc-caption"><span class="oc-speaker"></span><p class="oc-text"></p></div></div>
       <div class="oc-black"></div><div class="oc-title"><span>Ricks College · 1999</span><h1></h1></div>
       ${this.preview ? '<span class="oc-preview">Opening preview</span>' : ''}
-      <div class="oc-controls"><span class="oc-hint">Enter: pause · Esc: skip</span><button type="button" data-pause aria-pressed="false">Pause</button><button type="button" data-skip>Skip intro</button></div>
-      <div class="oc-progress" aria-hidden="true"><span></span></div>`;
+      <div class="oc-controls"><button type="button" data-skip>Skip ▸</button></div>`;
     el.querySelector('.oc-location strong')!.textContent = OPENING.location;
     el.querySelector('.oc-location span')!.textContent = OPENING.date;
     el.querySelector('.oc-title h1')!.textContent = OPENING.title;
-    el.querySelector('[data-pause]')!.addEventListener('click', () => this.togglePause());
     el.querySelector('[data-skip]')!.addEventListener('click', () => this.finish());
     // All keyboard/controller input goes through the shared action layer.
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); });
@@ -298,7 +288,6 @@ export class OpeningCutscene {
     (this.overlay.querySelector('.oc-black') as HTMLElement).style.opacity = String(black);
     (this.overlay.querySelector('.oc-title') as HTMLElement).style.opacity = String(ramp(t, OPENING.titleAt + .5, OPENING.titleAt + 1.1) * (1 - ramp(t, OPENING.entranceAt - 1.3, OPENING.entranceAt - .7)));
     (this.overlay.querySelector('.oc-location') as HTMLElement).style.opacity = String(ramp(t, 0.9, 1.7) * (1 - ramp(t, 4, 4.8)));
-    (this.overlay.querySelector('.oc-progress span') as HTMLElement).style.width = `${clamp(t / OPENING.duration, 0, 1) * 100}%`;
     const cue = OPENING.cues.findIndex(c => t >= c.start && t < c.end);
     if (cue !== this.lastCue) {
       this.lastCue = cue;
@@ -309,11 +298,13 @@ export class OpeningCutscene {
         this.overlay.querySelector<HTMLElement>('.oc-speaker')!.hidden = !line.speaker;
         this.overlay.querySelector('.oc-speaker')!.textContent = line.speaker + (line.context ? ` · ${line.context}` : '');
         this.overlay.querySelector('.oc-text')!.textContent = line.text;
+        if (!line.text.startsWith('[')) this.game.voice.speak(line.speaker || 'Narrator', line.text);   // ElevenLabs recording (browser voice fallback)
       }
     }
   }
 
   finish() {
+    this.game.voice.stop();
     if (!this.active || !this.saved) return;
     const g = this.game, saved = this.saved;
     this.active = false;

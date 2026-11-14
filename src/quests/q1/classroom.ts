@@ -53,10 +53,10 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       speech,
       h('div', { class: 'q1-eng' }, h('span', { text: 'Class engagement' }), h('div', { class: 'q1-eng-bar' }, fill)));
     const stage = h('div', { class: 'q1-stage' });
-    // ---- views: G  < Chalkboard >  T ----
+    // ---- views: F  < Chalkboard >  R  (right stick left/right, Joy-Con L/R) ----
     const viewName = h('span', { class: 'q1-vn' });
     const arrow = (sym: string, key: string, d: 1 | -1) => { const b = h('button', { class: 'q1-ar', 'aria-label': d > 0 ? 'Next view' : 'Previous view' }, h('small', { text: key }), h('b', { text: sym })); b.addEventListener('click', () => stepView(d)); return b; };
-    const switcher = h('div', { class: 'q1-vw', title: 'Camera view' }, arrow('<', 'G', -1), viewName, arrow('>', 'T', 1));
+    const switcher = h('div', { class: 'q1-vw', title: 'Camera view' }, arrow('<', 'F', -1), viewName, arrow('>', 'R', 1));
     const paintView = () => { if (room3d) viewName.textContent = room3d.viewLabel(room3d.current); };
     const stepView = (d: 1 | -1) => { if (!room3d) return; const vs = room3d.views(); room3d.view(vs[(vs.indexOf(room3d.current) + d + vs.length) % vs.length]); paintView(); };
     // ---- pop-ups: first-demo intro, "How this works" card ----
@@ -83,19 +83,19 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       english: [
         { text: 'This is Brother Price’s write-up of the dedication. Click any word that looks wrong.', target: reg('page') },
         { text: 'Pick the correction in the red bubble. Your progress shows here: fix every mistake to finish proofreading.', target: domRect('.q1-eng-hud') },
-        { text: 'Not sure of a fact? Press G / T to look at the Church News clipping on the wall.', target: domRect('.q1-vw') },
+        { text: 'Not sure of a fact? Press F / R (right stick ← →) to look at the Church News clipping on the wall.', target: domRect('.q1-vw') },
         { text: 'Hint, Brief and More are written on the screen.', target: reg('tools') },
       ],
       art: [
         { text: 'Paint right on the board, square by square. Click and drag to paint; right-click erases.', target: reg('canvas') },
-        { text: 'The picture to copy is projected on the side wall. Press G / T to look at it.', target: domRect('.q1-vw') },
+        { text: 'The picture to copy is projected on the side wall. Press F / R (right stick ← →) to look at it.', target: domRect('.q1-vw') },
         { text: 'Pick colours here, and Check painting when it looks close.', target: domRect('.art-side') },
         { text: 'Hint, Brief and More are written on the board.', target: reg('tools') },
       ],
       engineering: [
         { text: 'This is the projector’s circuit board, opened up on the bench. Click a tile to turn it (right-click turns it back).', target: reg('circuit') },
         { text: 'Get power from + through the lamp and back to −. The lamp and fan show here when they work.', target: domRect('.cx-side') },
-        { text: 'Press G / T to switch between the bench and the wall board with the goal.', target: domRect('.q1-vw') },
+        { text: 'Press F / R (right stick ← →) to switch between the bench and the wall board with the goal.', target: domRect('.q1-vw') },
         { text: 'Hint, Brief and More are written on the circuit board.', target: reg('tools') },
       ],
     };
@@ -197,7 +197,10 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
         if (coachCtl) { if (a === 'confirm') coachCtl.next(); else if (a === 'back') coachCtl.end(); return true; }   // controller drives the tutorial
         if (card && (a === 'confirm' || a === 'back')) { closeCard(); return true; }
         if (more.classList.contains('open') && a === 'back') { toggleMore(false); return true; }
-        if (room3d && (a === 'rup' || a === 'rdown')) { stepView(a === 'rup' ? 1 : -1); return true; }
+        // the view changes with left/right (right stick ← →, R/F keys, Joy-Con L/R); the minigame's own
+        // right-stick-sideways action (colour, rotate, …) moves to right stick up
+        if (room3d && (a === 'alt' || a === 'alt2')) { stepView(a === 'alt' ? 1 : -1); return true; }
+        if (room3d && a === 'rup') return fn('alt');
         return fn(a);
       }),
       finish: (r: ChallengeResult) => {
@@ -276,7 +279,7 @@ function injectStyles() {
 .screen.fullscreen.q1-inroom.q1-closeup .panel{max-height:60dvh;background:rgba(20,15,11,.80)!important}
 .q1-closeup .cx-board{max-height:38dvh!important;width:auto!important;max-width:100%}
 .q1-closeup .cx-wrap{align-items:flex-start}
-.q1-closeup .art-canvas{max-height:40dvh!important;aspect-ratio:20/24;width:auto!important}
+.q1-closeup .art-canvas{max-height:40dvh!important;aspect-ratio:1/1;width:auto!important}
 .q1-closeup .art-refbox{display:none}
 .q1-inroom .ch-intro,.q1-inroom .legend-box{display:none}
 .q1-inroom .ch-head{padding:3px 8px}.q1-inroom .ch-title{font-size:16px!important}
@@ -336,6 +339,22 @@ body:has(.q1-inroom) .hud-top,body:has(.q1-inroom) .hud-mini,body:has(.q1-inroom
 .q1-measure{position:absolute!important;left:0;right:0;top:0;visibility:hidden;pointer-events:none;height:0;overflow:hidden}
 .q1-measure .rp-press{height:90px}
 .q1-inroom .rp-choice{position:static;margin:4px 0}.q1-inroom .rp-toast{position:static}
+/* bottom lectern panel: big enough to read from the couch */
+.q1-mini{gap:20px!important}
+.q1-mini .q1-speech{font:19px/1.35 Georgia,serif!important;max-width:58%;padding:8px 14px!important}
+.q1-mini .q1-eng,.q1-eng{font:700 16px monospace!important;gap:8px}
+.q1-mini .q1-eng-bar,.q1-eng-bar{width:180px;height:18px}
+.q1-vn{font:20px Georgia,serif!important;min-width:180px}
+.q1-ar b{font:500 30px system-ui,sans-serif!important}
+.q1-ar small{font:14px monospace!important;padding:1px 6px}
+.q1-mini .ch-footer button,.q1-mini .q1-viewbtn{font-size:15px!important;padding:5px 10px!important}
+.q1-inroom .q1-bin-fb,.q1-inroom .q1-eng-hud,.q1-inroom .cx-side,.q1-inroom .art-side{font-size:20px!important;line-height:1.4}
+.q1-inroom .q1-bin-score{font-size:16px!important}
+.q1-inroom .ch-hint{font-size:18px!important;padding:5px 12px!important}
+.q1-inroom .q1-choices button{font-size:22px!important;padding:8px 18px!important;min-width:64px}
+.q1-inroom .q1-follow h3{font-size:20px!important}.q1-inroom .q1-follow-opts button{font-size:17px!important}
+.q1-inroom .ch-result h2{font-size:22px!important}.q1-inroom .ch-result{font-size:17px}
+.screen.fullscreen.q1-inroom:not(.q1-closeup) .panel{max-height:44dvh}
 /* Art: dark chalkboard so white stone shows up */
 .q1-demo .art-canvas .cell{background-color:#34463d}
 .q1-demo .art-canvas{background:#1d2a24}

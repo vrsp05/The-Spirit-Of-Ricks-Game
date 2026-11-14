@@ -5,6 +5,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GAME_CONFIG } from '../config/game.config';
 import type { Atmosphere } from '../config/atmosphere';
+import { SETTINGS } from '../core/settings';
 
 /** colorAmount: 0 = full sepia (opening), 1 = full colour. Symbolic, not a time change. */
 const SepiaShader = {
@@ -101,12 +102,15 @@ export class Renderer {
     this.envTex?.dispose(); this.envTex = tex;
     return tex;
   }
+  private baseExposure = 0.72;
+  /** Brightness setting (exposure multiplier). */
+  setBrightness(b: number) { this.sepia.uniforms.exposure.value = this.baseExposure * b; }
   /** Era time-of-day: environment light, haze, exposure. (World sets sun, sky dome, night lights, season.) */
   setAtmosphere(a: Atmosphere) {
     this.scene.environment = this.skyEnvironment(a);
     this.scene.environmentIntensity = a.envIntensity;
     this.fog.color.set(a.fog); this.fog.density = a.fogDensity;
-    this.sepia.uniforms.exposure.value = a.exposure;
+    this.baseExposure = a.exposure; this.setBrightness(SETTINGS.brightness);
   }
   get canvas() { return this.renderer.domElement; }
   useScene(scene: THREE.Scene | null) { this.scenePass.scene = scene ?? this.scene; }

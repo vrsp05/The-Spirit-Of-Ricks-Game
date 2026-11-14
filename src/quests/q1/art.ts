@@ -132,9 +132,9 @@ export const artChallenge: ChallengeBody = (root, api) => {
   const undo = () => { const u = undoStack.pop(); if (u) { u.forEach((r, y) => { canvas[y] = r; }); paintUI(); } };
   const tools = h('div', { class: 'art-tools tools-zone' }, btn('✔ Check painting', () => check(), 'primary'), mirrorBtn, bucketBtn, btn('Undo fill/clear', () => undo()), btn('Clear', () => { snap(); canvas.forEach(r => r.fill(null)); paintUI(); }));
   root.append(h('div', { class: 'art-wrap' }, h('div', {}, grid),
-    h('div', { class: 'art-side' }, refBox, mode.liveMeter ? meter : null, h('div', { class: 'ref-title', text: 'Colours (right stick / R·F)' }), palette, tools)));
+    h('div', { class: 'art-side' }, refBox, mode.liveMeter ? meter : null, h('div', { class: 'ref-title', text: classroom()?.room ? 'Colours (right stick ↑ ↓ / T·G)' : 'Colours (right stick / R·F)' }), palette, tools)));
   palette.querySelectorAll('[data-focus]').forEach(b => b.removeAttribute('data-focus')); // colours: right stick (mouse can click)
-  api.setControls(classroom()?.room ? [['L', 'move brush'], ['R', 'colour'], ['RU', '↑ view · ↓ fill bucket'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'mirror / check / tools']] : [['L', 'move brush'], ['R', 'colour'], ['RU', '↑ mirror · ↓ fill bucket'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'check / tools']]);
+  api.setControls(classroom()?.room ? [['L', 'move brush'], ['R', '◀ ▶ view'], ['RU', '↑ ↓ colour'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'mirror / check / tools']] : [['L', 'move brush'], ['R', 'colour'], ['RU', '↑ mirror · ↓ fill bucket'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'check / tools']]);
 
   const cls = classroom();
   const room = cls?.room ?? null;
@@ -222,7 +222,9 @@ export const artChallenge: ChallengeBody = (root, api) => {
   api.onAction(a => {
     if (a === 'alt') { colorIdx = (colorIdx + 1) % ART.palette.length; paintUI(); return true; }
     if (a === 'alt2') { colorIdx = (colorIdx + ART.palette.length - 1) % ART.palette.length; paintUI(); return true; }
-    if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
+    // in the classroom the right stick only does two things: ← → change the view (handled by the classroom),
+    // ↑ ↓ change the colour (↑ arrives here as 'alt'); mirror and fill bucket stay on their buttons
+    if (a === 'rdown' && room) { colorIdx = (colorIdx + ART.palette.length - 1) % ART.palette.length; paintUI(); return true; }
     if (a === 'rup') { mirror = !mirror; paintUI(); return true; }
     if (a === 'rdown') { fill(color().id); return true; }
     if (a === 'left') cx = Math.max(0, cx - 1); else if (a === 'right') cx = Math.min(W - 1, cx + 1);

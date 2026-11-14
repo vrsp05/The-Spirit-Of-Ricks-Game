@@ -7,6 +7,10 @@ export interface Settings {
   musicVolume: number; sfxVolume: number; ambienceVolume: number; voiceVolume: number;
   /** Characters read their lines aloud (browser speech synthesis). */
   voices: boolean;
+  /** One season for the whole game (trees, snow, weather, clothing), chosen by the player. */
+  season: 'spring' | 'summer' | 'autumn' | 'winter';
+  /** Exposure multiplier, 0.6–1.4. */
+  brightness: number;
 }
 
 function systemReducedMotion() {
@@ -14,7 +18,7 @@ function systemReducedMotion() {
 }
 
 function load(): Settings {
-  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true };
+  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true, season: 'autumn', brightness: 1 };
   try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(d, JSON.parse(raw)); } catch { /* ignore */ }
   return d;
 }

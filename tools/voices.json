@@ -1,0 +1,28 @@
+{
+  "note": "ElevenLabs voice per character (premade voice IDs; run `npm run voices:generate -- --list` to see the voices on your account and swap any ID). model: eleven_multilingual_v2.",
+  "model": "eleven_multilingual_v2",
+  "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.25,
+    "use_speaker_boost": true
+  },
+  "voices": {
+    "Bednar": "pqHfZKP75CvOlQylNhV4",
+    "Narrator": "nPczCjzI2devNBz1zQrb",
+    "Candidate math": "XrExE9yKIg1WjnnlVkGX",
+    "Candidate english": "onwK4e9ZLuTAKqWW03F9",
+    "Candidate art": "pFZP5JQG7iQjIQuC4Bku",
+    "Candidate engineering": "TX3LPaxmHKxFdv7VOQHJ",
+    "Chair math": "CwhRBWXzGAHq8TQ4Fs17",
+    "Chair english": "FGY2WhTYpPnrIDTdsKH5",
+    "Chair art": "iP95p4xoKVk53GoZ742B",
+    "Chair engineering": "cgSgspJ2msm6clMCkdW9",
+    "Student A": "bIHbv24MWmeRgasZH58o",
+    "Student B": "EXAVITQu4vr4xnSDxMaL",
+    "Student C": "IKne3meq5aSn9XLyUdCD",
+    "Student D": "XB0fDUnXU5powFXDhCwa",
+    "Hinckley": "2EiwWnXFnvU5JabPnv8n"
+  },
+  "fallback": "nPczCjzI2devNBz1zQrb"
+}

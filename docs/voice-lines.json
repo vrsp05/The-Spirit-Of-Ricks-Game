@@ -1,0 +1,858 @@
+[
+ {
+  "id": "story-greeting-1",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "First talk with Bednar",
+  "text": "Ah, {player}, there you are. Come in, please.",
+  "live": true
+ },
+ {
+  "id": "story-greeting-2",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "First talk with Bednar",
+  "text": "This college is about to grow in ways most people can’t imagine yet, and I’m going to need your help.",
+  "live": false
+ },
+ {
+  "id": "story-done-1",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "After all quests",
+  "text": "{player}, look at what we’ve done together. Teachers hired, buildings raised, and a new name on the sign.",
+  "live": true
+ },
+ {
+  "id": "story-done-2",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "After all quests",
+  "text": "Go and see the campus as it is today. I think you’ll be proud of what it became.",
+  "live": false
+ },
+ {
+  "id": "q1-assign-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 (Bednar)",
+  "text": "Thank you for coming. Our college is growing, and our students will need more great teachers.",
+  "live": false
+ },
+ {
+  "id": "q1-assign-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 (Bednar)",
+  "text": "Four faculty candidates are waiting in Personnel Services, just down the hall: math, English, art and engineering.",
+  "live": false
+ },
+ {
+  "id": "q1-assign-3",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 (Bednar)",
+  "text": "Walk each one over to their department for a teaching demonstration, then come back for the next. Please take the art candidate before the engineering candidate; that's how the departments scheduled them. When all four are done, report to me.",
+  "live": false
+ },
+ {
+  "id": "q1-report-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 (Bednar)",
+  "text": "Math, English, art and engineering, all hired. And I hear the art studio's projector works again.",
+  "live": false
+ },
+ {
+  "id": "q1-report-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 (Bednar)",
+  "text": "These teachers will bless many students. Well done.",
+  "live": false
+ },
+ {
+  "id": "q3-assign-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3",
+  "text": "{player}, it’s good to see you. The years have flown by, haven’t they? Look how much this campus has grown.",
+  "live": true
+ },
+ {
+  "id": "q3-assign-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3",
+  "text": "I have one more job for you. Four letters are hidden around campus, right in plain sight. These cards will help you find them.",
+  "live": false
+ },
+ {
+  "id": "q3-assign-3",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3",
+  "text": "Once you have them, bring them to the sign by the roundabout. Let’s finish it together.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "Our campus is growing. I have two blueprints that need careful hands.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "One is the John Taylor Building. Its site is fenced off and waiting for the right plan.",
+  "live": false
+ },
+ {
+  "id": "q2-assign-3",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "The other is a great gathering place west of the Manwaring Center. Solve both blueprints, then report back.",
+  "live": false
+ },
+ {
+  "id": "q2-report-1",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "The Taylor Building and the Campus Center both stand now. Thank you.",
+  "live": false
+ },
+ {
+  "id": "q2-report-2",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2",
+  "text": "Let's see what the years bring to this campus.",
+  "live": false
+ },
+ {
+  "id": "q2-montage-taylor-1",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The blueprint lines rise from the site…",
+  "live": false
+ },
+ {
+  "id": "q2-montage-taylor-2",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The John Taylor Building now stands. (Symbolic build — the real building first opened in 1997.)",
+  "live": false
+ },
+ {
+  "id": "q2-montage-icenter-1",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "A great gathering place rises from the blueprint…",
+  "live": false
+ },
+ {
+  "id": "q2-montage-icenter-2",
+  "voice": "Narrator",
+  "speaker": "Construction",
+  "when": "Quest 2",
+  "text": "The Campus Center now stands. (Symbolic build — the real BYU–Idaho Center was dedicated in 2010.)",
+  "live": false
+ },
+ {
+  "id": "opening-1",
+  "voice": "Hinckley",
+  "speaker": "President Gordon B. Hinckley",
+  "when": "Opening movie",
+  "text": "David, Ricks College is going to become a four-year institution.",
+  "live": false
+ },
+ {
+  "id": "opening-2",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "President, what would you have me do?",
+  "live": false
+ },
+ {
+  "id": "opening-3",
+  "voice": "Hinckley",
+  "speaker": "President Gordon B. Hinckley",
+  "when": "Opening movie",
+  "text": "Make it happen.",
+  "live": false
+ },
+ {
+  "id": "opening-5",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "Come in.",
+  "live": false
+ },
+ {
+  "id": "opening-6",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "Opening movie",
+  "text": "We have a great deal of work ahead of us. Let’s begin.",
+  "live": false
+ },
+ {
+  "id": "ending-1",
+  "voice": "Bednar",
+  "speaker": "Elder David A. Bednar",
+  "when": "Ending movie",
+  "text": "The Spirit of Ricks lives on.",
+  "live": false
+ },
+ {
+  "id": "ending-2",
+  "voice": "Bednar",
+  "speaker": "Elder David A. Bednar",
+  "when": "Ending movie",
+  "text": "Together, we made it happen.",
+  "live": false
+ },
+ {
+  "id": "q1-ready",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 report prompt",
+  "text": "All four are hired? Wonderful — tell me about them.",
+  "live": false
+ },
+ {
+  "id": "q3-reminder",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3 reminder",
+  "text": "Keep those cards handy, {player}. Check your journal whenever you need a clue, and bring each letter to the sign by the roundabout.",
+  "live": true
+ },
+ {
+  "id": "q1-greetings-math-1",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1 greetings",
+  "text": "Hi! I'm due in the Romney Building to teach the computer science students. They're stuck on binary — I have an idea from Alma 11.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-math-1",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1 walk",
+  "text": "I tried this lesson on my little brother. He's eight. He got it in five minutes.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-math-2",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1 walk",
+  "text": "Fun fact: a limnah is exactly a shum, a seon and a senine. That's my whole hook.",
+  "live": false
+ },
+ {
+  "id": "q1-waitingOutside-math-1",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1 waitingOutside",
+  "text": "Over here! Ready when you are.",
+  "live": false
+ },
+ {
+  "id": "q1-room-math-chair",
+  "voice": "Chair math",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Class, this is our math candidate. Our computer science students keep tripping on binary. Sister Ames, could you explain it so it finally sticks?",
+  "live": false
+ },
+ {
+  "id": "q1-room-math-verdict",
+  "voice": "Chair math",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "That's the clearest binary lesson I've seen. I'll recommend you to President Bednar.",
+  "live": false
+ },
+ {
+  "id": "q1-room-math-thanks",
+  "voice": "Chair math",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Thank you! I think it finally clicked for them.",
+  "live": false
+ },
+ {
+  "id": "q1-greetings-english-1",
+  "voice": "Candidate english",
+  "speaker": "Brother Nielsen",
+  "when": "Quest 1 greetings",
+  "text": "Hello. My demonstration is in the Smith Building — a student's write-up needs a careful red pen.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-english-1",
+  "voice": "Candidate english",
+  "speaker": "Brother Nielsen",
+  "when": "Quest 1 walk",
+  "text": "Brother Price wrote the summary himself. I hope he doesn't mind a little red ink.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-english-2",
+  "voice": "Candidate english",
+  "speaker": "Brother Nielsen",
+  "when": "Quest 1 walk",
+  "text": "Rule one of editing: check the facts against a source. Rule two: be kind about it.",
+  "live": false
+ },
+ {
+  "id": "q1-waitingOutside-english-1",
+  "voice": "Candidate english",
+  "speaker": "Brother Nielsen",
+  "when": "Quest 1 waitingOutside",
+  "text": "There you are! Shall we head in?",
+  "live": false
+ },
+ {
+  "id": "q1-room-english-chair",
+  "voice": "Chair english",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. Brother Nielsen, would you show the class how to proofread a paper like this and get it ready to hand in?",
+  "live": false
+ },
+ {
+  "id": "q1-room-english-verdict",
+  "voice": "Chair english",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Careful, kind and accurate. I'll recommend you to President Bednar.",
+  "live": false
+ },
+ {
+  "id": "q1-room-english-thanks",
+  "voice": "Chair english",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Thank you — and thanks, Brother Price, for being a good sport.",
+  "live": false
+ },
+ {
+  "id": "q1-greetings-art-1",
+  "voice": "Candidate art",
+  "speaker": "Sister Okada",
+  "when": "Quest 1 greetings",
+  "text": "Hi there! My demo is up in the old Spori's art studio. I'll be teaching the grid method.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-art-1",
+  "voice": "Candidate art",
+  "speaker": "Sister Okada",
+  "when": "Quest 1 walk",
+  "text": "The Spori's art studio has a wonderful old overhead projector. I'm counting on it today.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-art-2",
+  "voice": "Candidate art",
+  "speaker": "Sister Okada",
+  "when": "Quest 1 walk",
+  "text": "The grid method is simple: one square at a time, and don't panic.",
+  "live": false
+ },
+ {
+  "id": "q1-waitingOutside-art-1",
+  "voice": "Candidate art",
+  "speaker": "Sister Okada",
+  "when": "Quest 1 waitingOutside",
+  "text": "Hi! The studio's on the third floor.",
+  "live": false
+ },
+ {
+  "id": "q1-room-art-chair",
+  "voice": "Chair art",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Class, meet our art candidate. Our students hold a pencil out at arm's length to measure proportions, and their drawings still come out lopsided. Sister Okada, can you show them a better way? If that old projector cooperates.",
+  "live": false
+ },
+ {
+  "id": "q1-room-art-verdict",
+  "voice": "Chair art",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Even with the projector dying, you kept the class drawing. I'll recommend you to President Bednar.",
+  "live": false
+ },
+ {
+  "id": "q1-room-art-thanks",
+  "voice": "Chair art",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Thank you! I'm sorry about your projector.",
+  "live": false
+ },
+ {
+  "id": "q1-greetings-engineering-1",
+  "voice": "Candidate engineering",
+  "speaker": "Brother Ruiz",
+  "when": "Quest 1 greetings",
+  "text": "Ready when you are. I'm demonstrating in the Austin Building's electronics lab.",
+  "live": false
+ },
+ {
+  "id": "q1-waiting-engineering-1",
+  "voice": "Candidate engineering",
+  "speaker": "Brother Ruiz",
+  "when": "Quest 1 waiting",
+  "text": "I'm scheduled after the art candidate. Come get me once the art demo is done.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-engineering-1",
+  "voice": "Candidate engineering",
+  "speaker": "Brother Ruiz",
+  "when": "Quest 1 walk",
+  "text": "I brought a whole lesson on circuits. Let's see if I get to use it.",
+  "live": false
+ },
+ {
+  "id": "q1-walk-engineering-2",
+  "voice": "Candidate engineering",
+  "speaker": "Brother Ruiz",
+  "when": "Quest 1 walk",
+  "text": "A short circuit is just electricity taking the lazy way home. That's my favourite thing to explain.",
+  "live": false
+ },
+ {
+  "id": "q1-waitingOutside-engineering-1",
+  "voice": "Candidate engineering",
+  "speaker": "Brother Ruiz",
+  "when": "Quest 1 waitingOutside",
+  "text": "Did the art demo finish? Let's go fix that projector.",
+  "live": false
+ },
+ {
+  "id": "q1-room-engineering-chair",
+  "voice": "Chair engineering",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Class, this is our engineering candidate. Change of plans: a student just carried in the art studio's overhead projector. It shorted out in the middle of their demo this morning. Brother Ruiz, instead of the lesson you planned, would you fix it in front of the class and explain what went wrong?",
+  "live": false
+ },
+ {
+  "id": "q1-room-engineering-verdict",
+  "voice": "Chair engineering",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Fixed it live, and they understood why. I'll recommend you to President Bednar.",
+  "live": false
+ },
+ {
+  "id": "q1-room-engineering-thanks",
+  "voice": "Chair engineering",
+  "speaker": "Department chair",
+  "when": "Quest 1 classroom",
+  "text": "Thank you! Let's get this projector back to the art studio.",
+  "live": false
+ },
+ {
+  "id": "q1-notYet",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1",
+  "text": "I'm not ready yet.",
+  "live": false
+ },
+ {
+  "id": "q1-othersWait",
+  "voice": "Candidate math",
+  "speaker": "Sister Ames",
+  "when": "Quest 1",
+  "text": "Walk me over, and then come back here for the next candidate.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-01",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I’ve got a chemistry test in the Romney Building in ten minutes. Pray for me.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-02",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "The Manwaring Center has the best snacks on campus. Don’t tell anyone.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-03",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Go Vikings! Are you coming to the game at the stadium?",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-04",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Rexburg winters are no joke. Bring a real coat, not a fashion coat.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-05",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I’m headed to the library to study. It’s the quietest place on campus.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-06",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Everyone keeps joking that the computers will break when it turns 2000.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-07",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "The new Kimball Building looks amazing. I heard the president’s office is in there.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-08",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Watch out for the golf carts. They come around corners fast.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-09",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I keep finding coins on the sidewalks. Free money!",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-10",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Intramurals on the upper fields tonight. You in?",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-11",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Have you seen the old Spori Building? It’s been here forever.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-12",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "My roommate auditioned at the Snow Building. She was so nervous.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-13",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I took a photo by the pond near the Manwaring Center. So pretty in the fall.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-14",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "There’s a devotional this week. Want to sit together?",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-15",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I’m from out of state. Idaho is way flatter than I expected… except this hill.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-16",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "The Hart gym is packed every night. Good luck finding a court.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-17",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "Professors here actually learn your name. That’s the best part.",
+  "live": false
+ },
+ {
+  "id": "student-ricks1999-18",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (ricks1999)",
+  "text": "I signed up for a ballroom class. Two left feet, but I’m trying.",
+  "live": false
+ },
+ {
+  "id": "student-transition-01",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "Did you see? The old Spori Building is gone. They’re planning something new.",
+  "live": false
+ },
+ {
+  "id": "student-transition-02",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "There are construction fences everywhere. Something big is coming.",
+  "live": false
+ },
+ {
+  "id": "student-transition-03",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "I heard there’s a brand-new building going up near the Taylor Building.",
+  "live": false
+ },
+ {
+  "id": "student-transition-04",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "Things feel different on campus this year. Exciting different.",
+  "live": false
+ },
+ {
+  "id": "student-transition-05",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "The Hart gym is still packed every night.",
+  "live": false
+ },
+ {
+  "id": "student-transition-06",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "I can’t wait to see what they build next.",
+  "live": false
+ },
+ {
+  "id": "student-transition-07",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "Free hot chocolate at the Manwaring Center today!",
+  "live": false
+ },
+ {
+  "id": "student-transition-08",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "My professor says the campus is growing faster than ever.",
+  "live": false
+ },
+ {
+  "id": "student-transition-12",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (transition)",
+  "text": "The pond by the Manwaring Center freezes in winter. Don’t walk on it!",
+  "live": false
+ },
+ {
+  "id": "student-byui-01",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "Have you been inside the big new Center? It holds thousands of people.",
+  "live": false
+ },
+ {
+  "id": "student-byui-02",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "The temple on the hill looks beautiful at night.",
+  "live": false
+ },
+ {
+  "id": "student-byui-03",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "I heard someone hid letters all over campus. Weird, right?",
+  "live": false
+ },
+ {
+  "id": "student-byui-04",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "The sign by the roundabout looks unfinished. I wonder why.",
+  "live": false
+ },
+ {
+  "id": "student-byui-07",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "The library is my second home during finals.",
+  "live": false
+ },
+ {
+  "id": "student-byui-09",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "The Snow Building has a concert every weekend.",
+  "live": false
+ },
+ {
+  "id": "student-byui-10",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "I love walking past the Hart Building when the teams are training.",
+  "live": false
+ },
+ {
+  "id": "student-byui-11",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "Campus keeps getting bigger every year.",
+  "live": false
+ },
+ {
+  "id": "student-byui-12",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (byui)",
+  "text": "Did you know the pond by the Manwaring Center has lily pads?",
+  "live": false
+ },
+ {
+  "id": "student-present-01",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "Welcome to BYU–Idaho!",
+  "live": false
+ },
+ {
+  "id": "student-present-02",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "Big devotional in the I-Center this week.",
+  "live": false
+ },
+ {
+  "id": "student-present-03",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "The STC is where all the science happens.",
+  "live": false
+ },
+ {
+  "id": "student-present-04",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "Can you believe this all used to be Ricks College?",
+  "live": false
+ },
+ {
+  "id": "student-present-05",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "Heading to the upper fields for intramurals!",
+  "live": false
+ },
+ {
+  "id": "student-present-06",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "I heard there’s a hackathon celebration in the STC today!",
+  "live": false
+ },
+ {
+  "id": "student-present-07",
+  "voice": "Student A",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "The temple grounds are so peaceful.",
+  "live": false
+ },
+ {
+  "id": "student-present-08",
+  "voice": "Student B",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "The I-Center track is great when it’s snowing outside.",
+  "live": false
+ },
+ {
+  "id": "student-present-09",
+  "voice": "Student C",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "Coins on the sidewalk again? This campus is lucky.",
+  "live": false
+ },
+ {
+  "id": "student-present-10",
+  "voice": "Student D",
+  "speaker": "Student",
+  "when": "Random student (present)",
+  "text": "I love the new sign by the roundabout.",
+  "live": false
+ }
+]

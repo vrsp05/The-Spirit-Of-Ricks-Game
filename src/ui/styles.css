@@ -183,6 +183,8 @@ button.primary { background: #2f5f8f !important; color: #fff; border-color: #1f3
 .bp-tray { display: flex; flex-direction: column; gap: 8px; }
 .bp-piece { position: relative; background: #fff; border: 2px solid #5b7fa8; border-radius: 8px; padding: 6px; cursor: grab; display: flex; justify-content: center; min-height: 54px; align-items: center; }
 .bp-piece .mini { display: grid; gap: 2px; } .bp-piece .mini i { width: 12px; height: 12px; display: block; border-radius: 2px; }
+.bp-piece.bp-sel { outline: 4px solid var(--focus); outline-offset: 3px; transform: scale(1.06); }
+.blueprint .bp-piece.focused:not(.bp-sel) { outline: none; }   /* only the stick selection is highlighted */
 .bp-piece.held { border-color: #ffcf4a; box-shadow: 0 0 0 3px #ffcf4a; } .bp-piece.is-placed { opacity: .55; } .bp-piece.faded { opacity: .2; } .bp-piece.hinted { box-shadow: 0 0 0 4px #ffe680; }
 .placed-tag { position: absolute; right: 4px; bottom: 2px; font: 600 10px system-ui; color: #2e7d4f; }
 .bp-msg { min-height: 1.3em; font-weight: 600; color: #1f4e79; margin-top: 6px; } .bp-progress { font: 600 13px system-ui; color: #1f4e79; }
@@ -210,6 +212,7 @@ button.primary { background: #2f5f8f !important; color: #fff; border-color: #1f3
 .card .emblem { font: 700 46px Georgia, serif; color: #6b1f2a; text-align: center; line-height: 1; border-bottom: 2px solid #1f3a5f; padding-bottom: 4px; }
 .card .emblem.small { font-size: 26px; }
 .card-art svg { display: block; margin: 0 auto; width: 90px; height: 56px; fill: none; stroke: #1f3a5f; stroke-width: 2; }
+.journal-goal { font: 700 20px Georgia, serif; color: #ffe39a; margin: 4px 0 2px; }
 .card .dest { font: 700 13px system-ui; color: #1f3a5f; text-align: center; }
 .card blockquote { margin: 4px 0; font-style: italic; } .card blockquote p { margin: 0; } .card cite { display: block; font-size: 12px; color: #6b1f2a; font-style: normal; margin-top: 2px; }
 .card .no-scripture { font-size: 12px; color: #7a6a5a; font-style: italic; }
@@ -512,3 +515,25 @@ html, body { overscroll-behavior: none; }
 .audio-settings input[type=range] { width: 100%; accent-color: #2f5f8f; }
 .audio-settings input[type=range].focused { outline: none; }
 .audio-settings b { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* name + season screen, settings */
+.name-input { width: 100%; font: 600 22px system-ui; padding: 10px 12px; border: 2px solid #5b4636; border-radius: 6px; background: #fffaf0; margin: 6px 0 10px; }
+.name-input.focused { outline: 4px solid var(--focus); }
+.season-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.season-row button { font: inherit; padding: 8px; border: 2px solid #5b4636; border-radius: 6px; background: #fffaf0; cursor: pointer; }
+.season-row button.chosen { background: #2f5f8f; color: #fff; }
+.season-row button.focused { outline: 4px solid var(--focus); }
+.settings-head { font: 800 12px system-ui; text-transform: uppercase; letter-spacing: .06em; color: #8d3b2f; margin-top: 6px; }
+.settings-screen .panel { width: min(560px, calc((100vw - 32px) / var(--z))); }
+
+/* pause menu with the campus map on the right */
+.screen.menu.with-map { gap: 18px; padding: 16px; align-items: stretch; }
+.screen.menu.with-map > .panel { width: min(440px, 40vw); flex: none; align-self: center; }
+.menu-map { display: flex; flex-direction: column; gap: 6px; background: rgba(20,15,10,.85); border: 3px solid #5b4636; border-radius: 10px; padding: 10px; color: #f3e7cf; min-width: 0; }
+.menu-map-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
+.menu-map-head button, .map-head .map-in, .map-head .map-out { font: inherit; font-size: 16px; padding: 3px 10px; margin-left: 6px; cursor: pointer; }
+.map-canvas { display: block; border-radius: 6px; cursor: grab; touch-action: none; }
+.map-canvas:active { cursor: grabbing; }
+.map-tip { font-size: 13px; color: #d8c9ad; text-align: center; }
+.screen.map { flex-direction: column; gap: 6px; }
+@media (max-width: 900px) { .screen.menu.with-map .menu-map { display: none; } .screen.menu.with-map > .panel { width: min(520px, calc(100vw - 32px)); } }

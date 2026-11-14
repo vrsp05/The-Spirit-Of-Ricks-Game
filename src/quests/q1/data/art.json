@@ -1,5 +1,5 @@
 {
-  "note": "A fictional future temple CONCEPT (the candidate's \"vision of a temple on the hill\") inspired by the Rexburg Temple's general silhouette. The real temple was dedicated in 2008; it does not exist in the 1999 campus. Set \"subject\" to swap references later (e.g. the Rexburg Tabernacle).",
+  "note": "A fictional future temple CONCEPT (the candidate's \"vision of a temple on the hill\") inspired by the Rexburg Temple's general silhouette. The real temple was dedicated in 2008; it does not exist in the 1999 campus. Set \"subject\" to swap references later (e.g. the Rexburg Tabernacle). Canvas and reference are 8x8 so the painting stays manageable.",
   "palette": [
     {
       "id": "w",
@@ -46,8 +46,8 @@
     "ssssssssssss"
   ],
   "canvas": {
-    "width": 14,
-    "height": 13
+    "width": 8,
+    "height": 8
   },
   "modes": {
     "easy": {
@@ -92,16 +92,14 @@
   ],
   "references": {
     "temple": [
-      "....g....",
-      "....w....",
-      "...www...",
-      "...wbw...",
-      ".wwwwwww.",
-      ".wbwbwbw.",
-      ".wwwwwww.",
-      ".wbwdwbw.",
-      ".wwwdwww.",
-      "sssssssss"
+      "...gg...",
+      "...ww...",
+      "..wwww..",
+      "..wbbw..",
+      "wwwwwwww",
+      "wbwddwbw",
+      "wwwddwww",
+      "ssssssss"
     ],
     "tabernacle": [
       "s.s......s.s",

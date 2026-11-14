@@ -14,11 +14,18 @@ export interface Space {
   interior: boolean;
 }
 
+const ROOF = 24;   // metres: above this the jetpack clears every campus roof
 export class PlayerController {
   readonly avatar = new Avatar({ shirt: '#f2efe6', pants: '#3a4252', skin: '#e2b893', hair: '#4a3324', tie: '#3b5b8c' });
   readonly position = new THREE.Vector3();
   yaw = 0;              // facing, radians (0 = +z/south)
   speed = 0;
+  /** Cheat code "jetpack": hold jump to fly. */
+  jetpack = false;
+  private thrust = false;
+  get thrusting() { return this.thrust; }
+  /** High enough to clear the campus roofs: building collision is ignored up here. */
+  private aboveRoofs() { return this.jetpack && this.position.y - this.space.groundY(this.position.x, this.position.z) > ROOF - 1.5; }
   vy = 0;
   grounded = true;
   space!: Space;
@@ -54,16 +61,22 @@ export class PlayerController {
     } else if (this.speed > 0.05) {
       this.move(Math.sin(this.yaw) * this.speed * dt, Math.cos(this.yaw) * this.speed * dt, P.radius);
     }
-    // jump + gravity
-    const gy = this.space.groundY(this.position.x, this.position.z);
+    // jump + gravity (+ jetpack: hold jump to fly, glide down when you let go)
+    let gy = this.space.groundY(this.position.x, this.position.z);
+    // above a building's footprint you can't drop below roof level (no landing inside walls)
+    if (this.jetpack && this.space.blocked(this.position.x, this.position.z, 0.3) && this.position.y > gy + 2) gy += ROOF;
+    this.thrust = this.jetpack && enabled && input.isDown('jump');
     if (enabled && this.grounded && input.pressed('jump')) { this.vy = P.jumpSpeed; this.grounded = false; }
+    if (this.thrust) { this.grounded = false; this.vy = Math.min(7, this.vy + 22 * dt); }
     if (!this.grounded) {
-      this.vy -= P.gravity * dt; this.position.y += this.vy * dt;
+      this.vy -= P.gravity * (this.jetpack ? 0.35 : 1) * dt; if (this.jetpack) this.vy = Math.max(this.vy, -4);
+      this.position.y = Math.min(this.position.y + this.vy * dt, gy + 90);
       if (this.position.y <= gy) { this.position.y = gy; this.vy = 0; this.grounded = true; }
     } else {
       this.position.y += (gy - this.position.y) * Math.min(1, dt * 20);
     }
     this.avatar.animate(dt, this.grounded ? this.speed : 0);
+    this.avatar.jetFlame(this.thrust ? 1 : !this.grounded && this.jetpack ? 0.35 : 0);
     this.sync();
   }
 
@@ -90,15 +103,17 @@ export class PlayerController {
     this.avatar.root.rotation.y = this.yaw;
     this.avatar.root.visible = !cart.hideRider;
     if (cart.pose === 'bike') this.avatar.pedal(cart.speed);
+    else if (cart.pose === 'stand') this.avatar.scoot(cart.speed);
   }
 
   private move(dx: number, dz: number, r: number) {
+    const free = this.noclip || this.aboveRoofs();
     const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dz)) / 0.3) || 1;
     for (let s = 0; s < steps; s++) {
       const nx = this.position.x + dx / steps;
-      if (this.noclip || !this.space.blocked(nx, this.position.z, r)) this.position.x = nx;
+      if (free || !this.space.blocked(nx, this.position.z, r)) this.position.x = nx;
       const nz = this.position.z + dz / steps;
-      if (this.noclip || !this.space.blocked(this.position.x, nz, r)) this.position.z = nz;
+      if (free || !this.space.blocked(this.position.x, nz, r)) this.position.z = nz;
     }
   }
   private sync() { this.avatar.root.position.copy(this.position); this.avatar.root.rotation.y = this.yaw; }

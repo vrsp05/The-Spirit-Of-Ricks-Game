@@ -1,11 +1,14 @@
 // Game orchestrator: wires world, player, input, UI, quests, interiors, save and finale.
 import * as THREE from 'three';
+import './interiors/campusInteriors';   // registers campus building interiors + their doors (before the world is built)
 import { ATMOSPHERE } from './config/atmosphere';
 import { MusicPlayer } from './fx/music';
 import { Ambience } from './fx/ambience';
 import { VoiceActor } from './fx/voice';
-import { EngineSound, loadSamples, playStep } from './fx/audio';
+import { EngineSound, loadSamples, playStep, SampleLoop } from './fx/audio';
 import { Traffic } from './world/Traffic';
+import { CLOSED, textCanvas } from './world/World';
+import { BallGames } from './world/ballGames';
 import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
 import { InputManager } from './input/actions';
 import { KeyboardMouseSource } from './input/keyboardMouse';
@@ -66,7 +69,12 @@ export class Game {
   readonly ambience = new Ambience();
   readonly voice = new VoiceActor();
   private engine = new EngineSound();
+  private jetLoop = new SampleLoop('jetpack');
   traffic!: Traffic;
+  balls!: BallGames;
+  playerName = '';
+  /** Re-apply the chosen season everywhere (set up in the constructor). */
+  applySeason: () => void = () => {};
   private stepDist = 0;
   difficulty: DifficultyId = GAME_CONFIG.difficulty.default as DifficultyId;
   colorStage = 0;
@@ -141,6 +149,7 @@ export class Game {
         location: id => this.location(id),
         position: id => pos3(this.resolve(id)),
         playerPosition: () => ({ x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, space: this.spaceId }),
+        placePlayer: (x, z, yaw) => this.player.place(this.space, x, z, yaw ?? this.player.yaw),
         questGiverPosition: () => pos3(this.resolve(GAME_CONFIG.questGiver.anchor)),
         terrainHeight: (x, z) => terrainHeight(x, z),
         addObject: (obj, at) => { const p = this.resolve(at); obj.position.set(p.x, this.groundAt(p.x, p.z, p.space), p.z); this.renderer.scene.add(obj); return () => obj.removeFromParent(); },
@@ -155,7 +164,7 @@ export class Game {
         sound: n => playSound(n),
         reducedMotion: () => SETTINGS.reducedMotion,
         voxel: voxelBox,
-        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); this.registerSpeaker(o.label, a); return a.root; }, // no floating info card; the objective marker shows who to talk to
+        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); this.registerSpeaker(o.label, a); this.questAvatars.push({ a, x: NaN, z: NaN }); return a.root; }, // no floating info card; the objective marker shows who to talk to
         label: (t, s) => makeLabel(t, s),
       },
       addInteractable: d => this.interactions.add(d),
@@ -175,24 +184,26 @@ export class Game {
     // era time-of-day: environment light, haze, exposure; NPC wardrobes
     const atmos = (era: EraId) => {
       const A = ATMOSPHERE[era]; this.renderer.setAtmosphere(A);
-      this.npcs?.setEra(era);
-      this.traffic?.setEra(era);
+      this.npcs?.setEra(era, SETTINGS.season);
+      this.traffic?.setEra(era, SETTINGS.season);
       // the player dresses for the weather too (coat + scarf in winter)
-      const base = this.player.avatar.look, winter = A.season === 'winter';
+      const base = this.player.avatar.look, winter = SETTINGS.season === 'winter';
       if (!!base.coat !== winter) this.player.avatar.rebuild({ ...base, coat: winter ? '#2b3a4f' : undefined, scarf: winter ? '#8d3b2f' : undefined });
     };
-    this.world.onEraChanged.push(atmos); atmos(this.world.era);
+    this.world.onEraChanged.push(atmos); atmos(this.world.era); this.applySeason = () => { this.world.applyAtmosphere(this.world.era); atmos(this.world.era); };
     this.world.gateBuilt = id => this.gateBuilt(id);
     const sp = this.resolve('spawn');
     this.player.place(this.exteriorSpace, sp.x, sp.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     this.setupCoreInteractables();
+    this.setupBuildingDoors();
     this.setupVehicles();
     this.setupBenches();
-    this.npcs = new NpcCrowd(this.renderer.scene);
-    this.npcs.setEra(this.world.era);
-    this.traffic = new Traffic(this.renderer.scene);
-    this.traffic.setEra(this.world.era);
+    this.npcs = new NpcCrowd(this.renderer.scene, GAME_CONFIG.npcs.count, () => this.world.activeDoors());
+    this.npcs.setEra(this.world.era, SETTINGS.season);
+    this.traffic = new Traffic(this.renderer.scene, () => this.world.activeDoors());
+    this.traffic.setEra(this.world.era, SETTINGS.season);
+    this.balls = new BallGames(this.renderer.scene);
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -273,22 +284,24 @@ export class Game {
     const bl = this.location(qg.anchor); bednar.root.rotation.y = bl.yaw ?? 0;
 
     for (const [id, def] of this.interiors.defs) {
-      const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string };
+      const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string; building?: string };
+      const open = () => !cfg.building || this.world.buildingStanding(cfg.building) || this.gateBuilt(cfg.building);
+      // Coordinates tagged with an interior space are room-local.
+      this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
+      if (cfg.building && this.world.buildingDoors().some(d => d.id === cfg.building)) continue;   // its real doors are the entrances (setupBuildingDoors)
       const anchor = this.location(def.exteriorDoor);
       const d = this.world.doorPlacement(anchor);
       const door = makeDoor(true);
-      const tag = makeLabel('ENTRANCE', def.label.split(' — ')[0]); tag.scale.multiplyScalar(1.7); tag.position.set(0, 5.6, 0.6); door.add(tag);
+      door.add(wallSign(['ENTRANCE', def.label.split(' — ')[0]]));   // flat sign on the wall above the door
       door.rotation.y = Math.atan2(d.nx, d.nz);
       this.entrances.push({ id, x: d.x, z: d.z, eras: cfg.eras, label: def.label.split(' — ')[0] });
       // The door visual sits on the wall; the interaction point is just outside.
       this.interactions.add({
         id: `core:door-${id}`, kind: 'door', at: { x: d.x + d.nx * 1.8, z: d.z + d.nz * 1.8 }, radius: 2.6,
-        eras: cfg.eras, prompt: `Enter: ${def.label}`,
+        eras: cfg.eras, prompt: `Enter: ${def.label}`, enabled: open,
         onInteract: () => this.enterInterior(id),
       });
       this.interactions.add({ id: `core:doorvis-${id}`, kind: 'generic', at: { x: d.x, z: d.z }, radius: 0, eras: cfg.eras, visual: door, prompt: '', onInteract: () => {} });
-      // Coordinates tagged with an interior space are room-local.
-      this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
     }
   }
 
@@ -330,6 +343,15 @@ export class Game {
       if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 5) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 100)) continue;
       add(new Vehicle(`bike-${bikes++}`, 'bike'), x, z, Math.atan2(bx - ax, bz - az));
     }
+    // electric scooters parked by the paths (rideable)
+    const SC = ['#2fbf71', '#1f2328', '#e8a33d', '#3d6fa8'];
+    let scooters = 0;
+    for (let tries = 0; tries < 3000 && scooters < 10; tries++) {
+      const r = paths[(rnd() * paths.length) | 0], [ax, az] = r.pts[0], [bx, bz] = r.pts[1], L = Math.hypot(bx - ax, bz - az); if (L < 4) continue;
+      const nx = -(bz - az) / L, nz = (bx - ax) / L, x = (ax + bx) / 2 + nx * (r.width / 2 + 0.6), z = (az + bz) / 2 + nz * (r.width / 2 + 0.6);
+      if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 4) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 64)) continue;
+      add(new Vehicle(`scooter-${scooters}`, 'scooter', 'boxy90s', SC[scooters++ % SC.length]), x, z, Math.atan2(bx - ax, bz - az));
+    }
   }
   /** Benches: E to sit; moving or pressing E again stands up. */
   private setupBenches() {
@@ -347,7 +369,7 @@ export class Game {
     this.player.seated = false; this.player.avatar.sit(false);
     this.player.place(this.exteriorSpace, p.x + Math.sin(y) * 1.1, p.z + Math.cos(y) * 1.1, y); this.unstick();
   }
-  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
+  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'scooter' ? 'Ride the electric scooter' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
   private addVehicleInteract(v: Vehicle) {
     this.interactions.add({
       id: `core:${v.id}`, kind: 'generic', at: { x: v.root.position.x, z: v.root.position.z }, radius: v.kind === 'car' ? 3.4 : 2.6,
@@ -361,13 +383,13 @@ export class Game {
     if (cart.pose === 'sit') this.player.avatar.sit(true);
     this.interactions.remove(`core:${id}`);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = cart.kind === 'car' ? 15 : 12;
-    playSound(cart.kind === 'bike' ? 'bell' : 'carDoor'); if (cart.kind !== 'bike') setTimeout(() => playSound('engineStart'), 250);
-    this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : 'W/S drive · A/D steer · E to get out');
+    playSound(cart.kind === 'bike' ? 'bell' : cart.kind === 'scooter' ? 'tick' : 'carDoor'); if (cart.kind === 'car' || cart.kind === 'cart') setTimeout(() => playSound('engineStart'), 250);
+    this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : cart.kind === 'scooter' ? 'W/S go/brake · A/D steer · E to step off' : 'W/S drive · A/D steer · E to get out');
   }
   exitCart() {
     const cart = this.player.vehicle; if (!cart) return;
     this.player.vehicle = null; cart.speed = 0; this.player.avatar.sit(false); this.player.avatar.root.visible = true;
-    if (cart.kind !== 'bike') playSound('carDoor');
+    if (cart.kind === 'car' || cart.kind === 'cart') playSound('carDoor');
     // step out to the side
     const side = cart.kind === 'car' ? 2.4 : 1.8;
     const sx = Math.cos(this.player.yaw) * side, sz = -Math.sin(this.player.yaw) * side;
@@ -375,6 +397,30 @@ export class Game {
     this.player.place(this.exteriorSpace, p.x + sx * dir, p.z + sz * dir, this.player.yaw);
     this.unstick();
     this.addVehicleInteract(cart);
+  }
+  /** Which interior a building's doors lead into. */
+  private interiorFor(buildingId: string): string | null {
+    if (buildingId === 'kimball') return 'kimball-office';
+    return this.interiors.defs.has(`bldg-${buildingId}`) ? `bldg-${buildingId}` : null;
+  }
+  /** Where you came in (so you leave by the same door). */
+  private entryDoor: { space: string; x: number; z: number; nx: number; nz: number } | null = null;
+  /** Every door on every campus building is an entrance into that building's interior. */
+  private setupBuildingDoors() {
+    const taken = [...this.interactions.items.values()].filter(it => it.kind === 'door' && it.space === 'exterior').map(it => ({ x: it.x, z: it.z }));
+    this.world.buildingDoors().forEach((d, i) => {
+      const room = this.interiorFor(d.id); if (!room || CLOSED.has(d.id)) return;
+      const ox = d.x + d.nx * 1.8, oz = d.z + d.nz * 1.8;
+      if (taken.some(t => Math.hypot(t.x - ox, t.z - oz) < 4)) return;                  // already an entrance here
+      const cfg = (GAME_CONFIG.interiors as Record<string, { label: string; eras: EraId[] | null }>)[room];
+      this.interactions.add({
+        id: `core:bdoor-${i}`, kind: 'door', at: { x: ox, z: oz }, radius: 2.4, eras: cfg?.eras ?? null,
+        enabled: () => this.world.buildingStanding(d.id) || this.gateBuilt(d.id),
+        prompt: `Enter: ${(this.interiors.defs.get(room)?.label ?? room).split(' — ')[0]}`,
+        onInteract: () => { this.entryDoor = { space: room, x: d.x, z: d.z, nx: d.nx, nz: d.nz }; void this.enterInterior(room); },
+      });
+      this.entrances.push({ id: `bdoor-${i}`, x: d.x, z: d.z, eras: cfg?.eras ?? null, label: d.id });
+    });
   }
   /** Era-specific vehicles (cars) only show in their era — unless you're driving one. */
   private syncVehicles() {
@@ -463,10 +509,57 @@ export class Game {
   private speakers = new Map<string, Avatar>();
   /** Characters whose mouths move when a line with their name is on screen. */
   registerSpeaker(name: string, a: Avatar) { this.speakers.set(name, a); }
+  /** Quest characters (e.g. a candidate following you) walk with their legs when a quest moves them. */
+  private questAvatars: { a: Avatar; x: number; z: number }[] = [];
+  private animateQuestAvatars(dt: number) {
+    const w = new THREE.Vector3();
+    for (const q of this.questAvatars) {
+      if (!q.a.root.parent || !q.a.root.visible) continue;
+      q.a.root.getWorldPosition(w);
+      const d = Math.hypot(w.x - q.x, w.z - q.z), speed = dt > 0 && d < 3 ? d / dt : 0;   // big jumps are teleports, not steps
+      q.x = w.x; q.z = w.z; q.a.animate(dt, Math.min(7, speed));
+    }
+  }
   private updateMouths(dt: number) {
     const sp = this.ui.currentSpeaker;
     for (const [name, a] of this.speakers) { a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }
   }
+  /**
+   * Face-to-face conversation: both characters turn toward each other and the camera frames
+   * them side-on (a two-shot), on whichever side has room (indoors too). Released afterwards.
+   */
+  /**
+   * Story conversations (Bednar, candidates — not students on the street) always start from the same spot:
+   * the player stands 1.7 m in front of the character, facing them, on the side with the most open space
+   * (picked once per character from the room geometry), so every scene gets the same camera shot.
+   */
+  private stageConversation(npc: THREE.Object3D) {
+    const o = npc.position, ud = npc.userData as { homeYaw?: number; stageYaw?: number };
+    ud.homeYaw ??= npc.rotation.y;
+    if (ud.stageYaw === undefined) {
+      const clear = (yaw: number) => { const fx = Math.sin(yaw), fz = Math.cos(yaw); for (let k = 0.8; k <= 4.2; k += 0.35) if (this.space.blocked(o.x + fx * k, o.z + fz * k, 0.3)) return false; return true; };
+      const tries = [0, 1, -1, 2, -2, 3, -3, 4].map(i => ud.homeYaw! + i * Math.PI / 4);
+      ud.stageYaw = tries.find(clear) ?? ud.homeYaw;
+    }
+    const yaw = ud.stageYaw!, fx = Math.sin(yaw), fz = Math.cos(yaw), d = 1.7;
+    this.player.place(this.space, o.x + fx * d, o.z + fz * d, yaw + Math.PI);
+    this.player.avatar.root.rotation.y = yaw + Math.PI; npc.rotation.y = yaw;
+    this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
+  }
+
+  private async faceToFace(other: THREE.Object3D, talk: () => Promise<void>) {
+    const p = this.player.position, o = other.position;
+    const dx = o.x - p.x, dz = o.z - p.z, d = Math.hypot(dx, dz) || 1;
+    this.player.yaw = Math.atan2(dx, dz); this.player.avatar.root.rotation.y = this.player.yaw;
+    other.rotation.y = Math.atan2(-dx, -dz);
+    const mx = (p.x + o.x) / 2, mz = (p.z + o.z) / 2, px = -dz / d, pz = dx / d;
+    const room = (sgn: number) => { let k = 0.5; while (k < 4.2 && !this.space.blocked(mx + px * sgn * k, mz + pz * sgn * k, 0.25)) k += 0.25; return k; };
+    const a = room(1), b = room(-1), sgn = a >= b ? 1 : -1, dist = Math.max(1.6, Math.min(3.4 + d * 0.3, (sgn > 0 ? a : b) - 0.3));
+    const y = this.space.groundY(mx, mz);
+    this.camFocus = { from: new THREE.Vector3(mx + px * sgn * dist, y + 1.75, mz + pz * sgn * dist), to: new THREE.Vector3(mx, y + 1.45, mz) };
+    try { await talk(); } finally { this.camFocus = null; this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position); }
+  }
+
   private npcTalking = false;
   private lineBag = new LineBag();
   private async talkToNpc(w: NpcCrowd['walkers'][number]) {
@@ -476,24 +569,25 @@ export class Game {
     const pool = GAME_CONFIG.npcs.lines[key] ?? GAME_CONFIG.npcs.lines.ricks1999;
     const line = this.lineBag.next(key, pool);
     w.heard++;
-    try { await this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }]); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
+    try { await this.faceToFace(w.avatar.root, () => this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }])); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
   }
 
   async talkToQuestGiver() {
     // Bednar turns toward the assistant
-    if (this.bednar) { const b = this.bednar.root.position, p = this.player.position; this.bednar.root.rotation.y = Math.atan2(p.x - b.x, p.z - b.z); }
+    if (this.bednar) this.stageConversation(this.bednar.root);   // same spot, same shot, every time
     const active = this.quests.active();
     if (active && this.quests.readyToReport(active)) { await this.quests.report(active); return; }
-    if (active) { await this.ui.dialogue(this.quests.reminder(active)); return; }
+    const talk = (lines: Parameters<UI['dialogue']>[0]) => (this.bednar ? this.faceToFace(this.bednar.root, () => this.ui.dialogue(lines)) : this.ui.dialogue(lines));
+    if (active) { await talk(this.quests.reminder(active)); return; }
     const next = this.quests.nextAvailable();
     if (next) {
-      if (next === 'professors' && !this.quests.data('professors').__greeted) { this.quests.data('professors').__greeted = true; await this.ui.dialogue(STORY.bednarGreeting()); }
+      if (next === 'professors' && !this.quests.data('professors').__greeted) { this.quests.data('professors').__greeted = true; await talk(STORY.bednarGreeting()); }
       await this.quests.assign(next);
       if (this.quests.status(next) === 'active') this.ui.toast(`New assignment: ${this.quests.modules.get(next)?.title}`);
       this.save();
       return;
     }
-    if (this.quests.allComplete()) await this.ui.dialogue(STORY.allQuestsDone());
+    if (this.quests.allComplete()) await talk(STORY.allQuestsDone());
   }
 
   playCutscene(spec: CutsceneSpec): Promise<void> {
@@ -570,7 +664,7 @@ export class Game {
     if (this.player.vehicle) this.exitCart();
     playSound('door');
     await this.ui.fade(() => {
-      this.spaceId = id; this.world.exterior.visible = false; this.interiors.show(id);
+      this.spaceId = id; this.world.exterior.visible = false; this.interiors.show(id, this.world.era);
       const p = this.interiors.entryPoint(id);
       this.player.place(this.interiors.space(id), p.x, p.z, Math.PI);
       this.cameraRig.reset(Math.PI); this.cameraRig.pitch = 0.9; this.cameraRig.distance = 9; this.cameraRig.snap(this.player.position);
@@ -582,7 +676,8 @@ export class Game {
     if (!instant) playSound('door');
     const go = () => {
       const def = this.interiors.defs.get(id)!;
-      const d = this.world.doorPlacement(this.location(def.exteriorDoor));
+      const e = this.entryDoor?.space === id ? this.entryDoor : null; this.entryDoor = null;
+      const d = e ?? this.world.doorPlacement(this.location(def.exteriorDoor));
       this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true;
       this.player.place(this.exteriorSpace, d.x + d.nx * 3, d.z + d.nz * 3, Math.atan2(d.nx, d.nz));
       this.unstick();
@@ -619,7 +714,7 @@ export class Game {
       quests: this.quests.state.quests, targets: this.quests.state.targets, rewards: this.quests.state.rewards,
       player: { space: this.spaceId, x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw },
       coins: [...this.collectedCoins],
-      introSeen: this.introSeen, finaleReached: this.finaleReached,
+      introSeen: this.introSeen, finaleReached: this.finaleReached, playerName: this.playerName,
     };
   }
   save() { if (!this.finale.previewing && (this.mode === 'playing' || this.mode === 'finale')) writeSave(this.snapshot()); }
@@ -637,11 +732,13 @@ export class Game {
     const s = this.resolve('spawn');
     this.player.place(this.exteriorSpace, s.x, s.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
-    this.beginPlay(true);
+    void this.ui.askName(this.playerName || 'Alex', SETTINGS.season).then(({ name, season }) => { this.setPlayerName(name); if (season !== SETTINGS.season) { SETTINGS.season = season; saveSettings(); this.applySeason(); } this.beginPlay(true); });
   }
+  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; }
   continueGame(d: SaveData) {
     this.finale.stop();
     this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = d.finaleReached;
+    this.setPlayerName(d.playerName ?? 'Alex');
     this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init({ quests: d.quests, targets: d.targets ?? {}, rewards: d.rewards ?? {} });
     this.world.refreshBuildings();
@@ -650,7 +747,7 @@ export class Game {
     this.applyColor(true);
     if (!d.player) { const sp = this.resolve('spawn'); d.player = { space: 'exterior', x: sp.x, z: sp.z, yaw: this.location('spawn').yaw ?? 0 }; }
     if (d.player.space !== 'exterior' && this.interiors.defs.has(d.player.space)) {
-      this.spaceId = d.player.space; this.world.exterior.visible = false; this.interiors.show(d.player.space);
+      this.spaceId = d.player.space; this.world.exterior.visible = false; this.interiors.show(d.player.space, d.era);
       this.player.place(this.interiors.space(d.player.space), d.player.x, d.player.z, d.player.yaw);
     } else {
       this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true;
@@ -751,17 +848,18 @@ export class Game {
   }
   showControls() {
     const rows = [
-      ['Move', 'W A S D / arrows', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)'], ['Jump', 'Space', 'Button 2'],
-      ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick'],
-      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset'],
-      ['Interact / confirm', 'E · Enter · Space', 'Button 1'], ['Back', 'Esc · Backspace', 'Button 2'],
-      ['Map / objective', 'M', 'Button 3'], ['Pause', 'Esc', 'Button 4'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1'],
+      ['Move', 'W A S D / arrows', 'Left stick', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)', 'Hold ZR / R'], ['Jump', 'Space', 'Button 2', 'B'],
+      ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick', 'A · left stick'],
+      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick'],
+      ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
+      ['Map / objective', 'M', 'Button 3', 'X'], ['Journal (Quest 3 cards)', 'J', 'Pause menu', 'Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
+      ['One Joy-Con (sideways)', '', '', 'Stick moves · SL / SR turn the camera'],
     ];
-    const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
+    const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th><th>Joy-Con</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
     const s = this.ui.menu('Controls', [{ label: 'Back', action: () => this.ui.pop(s) }], { html, onBack: () => this.ui.pop(s) });
   }
   showControllers() {
-    const html = `<div class="ctrl-status"></div><p class="sub">Two controllers can play at once; either one moves the same player. Transport (custom BLE vs. BLE HID gamepad) is not decided yet — see docs/controller-protocol.md.</p>`;
+    const html = `<div class="ctrl-status"></div><p class="sub">Two controllers can play at once; either one moves the same player. Transport (custom BLE vs. BLE HID gamepad) is not decided yet — see docs/controller-protocol.md.</p><p class="sub">Nintendo Switch Joy-Cons: pair them with this computer over Bluetooth (hold the small sync button on the rail), then press any button. Both together play like one controller; a single Joy-Con works held sideways. Chrome, Edge or Safari recommended.</p>`;
     const items = [
       ...this.ble.map((b, i) => ({ label: `Pair BLE controller ${i + 1} (custom protocol)`, action: () => { b.pair().catch(e => this.ui.toast(String(e.message ?? e))); } })),
       { label: 'Calibrate connected controllers (centre sticks first)', action: () => { this.allControllers().forEach(c => c.calibrate()); this.ui.toast('Calibrated.'); } },
@@ -787,10 +885,9 @@ export class Game {
       { label: `Difficulty: ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} — switch to ${other === 'easy' ? 'Easy' : 'Hard'}`, action: () => {
         this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
       } },
-      { label: `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, action: () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; saveSettings(); close(); this.showPause(); } },
-      { label: `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, action: () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; saveSettings(); this.renderer.setQuality(SETTINGS.graphics, this.world.sun); close(); this.showPause(); } },
-      { label: `Sound: ${SETTINGS.muted ? 'Muted' : 'On'}`, action: () => { SETTINGS.muted = !SETTINGS.muted; saveSettings(); close(); this.showPause(); } },
-      { label: 'Audio settings (volume, voices)…', action: () => this.showAudio() },
+      ...(this.player.jetpack ? [{ label: 'Take off the jetpack', action: () => { this.player.jetpack = false; this.player.avatar.setJetpack(false); this.ui.toast('Jetpack off.'); close(); } }] : []),
+      { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
+      { label: '⌨ Cheat codes', action: () => this.showCheats() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
@@ -810,41 +907,69 @@ export class Game {
       { label: 'Cancel', action: () => this.ui.pop(s) },
     ], { subtitle: 'Developer skip: the story advances, but no coins are awarded.', onBack: () => this.ui.pop(s) });
   }
-  /** Volumes for music / effects / ambience / voices + voices on/off. Left/right (or the mouse) adjusts. */
-  showAudio() {
-    void this.ui.custom('Audio settings', (root, panel) => {
-      const rows: [keyof typeof SETTINGS, string][] = [['musicVolume', 'Music'], ['sfxVolume', 'Sound effects'], ['ambienceVolume', 'Ambience (wind, birds)'], ['voiceVolume', 'Character voices']];
-      root.innerHTML = '';
+  /** Cheat codes. "jetpack" toggles a jetpack: hold jump to fly. */
+  showCheats() {
+    void this.ui.custom('Cheat codes', (root, panel) => {
+      root.innerHTML = `<input class="name-input cheat-input" data-focus maxlength="24" autocomplete="off" spellcheck="false" placeholder="Type a code"><p class="sub cheat-msg">Try a code, then press Enter.</p>`;
+      const input = root.querySelector('.cheat-input') as HTMLInputElement, msg = root.querySelector('.cheat-msg') as HTMLElement;
+      const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null)); root.append(back);
+      const run = () => {
+        const code = input.value.trim().toLowerCase();
+        if (code === 'jetpack') {
+          this.player.jetpack = !this.player.jetpack; this.player.avatar.setJetpack(this.player.jetpack);
+          msg.textContent = this.player.jetpack ? 'Jetpack on! Hold Space (or jump) to fly; let go to glide down.' : 'Jetpack off.';
+          playSound('success'); setTimeout(() => panel.close(null), 900);
+        } else { msg.textContent = code ? 'Nothing happened…' : 'Type a code first.'; playSound('error'); }
+        input.value = '';
+      };
+      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') run(); else if (e.key === 'Escape') panel.close(null); });
+      setTimeout(() => input.focus(), 50);
+    });
+  }
+
+  /** Settings: sound (volumes, mute, voices), brightness, season, graphics, reduced motion. Up/down to move, left/right to change. */
+  showSettings() {
+    void this.ui.custom('Settings', (root, panel) => {
       const list = document.createElement('div'); list.className = 'items audio-settings';
-      const sliders: HTMLInputElement[] = [];
-      for (const [key, label] of rows) {
+      const sliders: { el: HTMLInputElement; step: number }[] = [];
+      const head = (t: string) => { const h = document.createElement('div'); h.className = 'settings-head'; h.textContent = t; list.append(h); };
+      const slider = (label: string, get: () => number, set: (v: number) => void, min = 0, max = 100, step = 5, fmt = (v: number) => `${v}%`) => {
         const row = document.createElement('label'); row.className = 'audio-row';
         const name = document.createElement('span'); name.textContent = label;
         const val = document.createElement('b');
-        const r = document.createElement('input'); r.type = 'range'; r.min = '0'; r.max = '100'; r.step = '5'; r.setAttribute('data-focus', '');
-        r.value = String(Math.round((SETTINGS[key] as number) * 100)); val.textContent = `${r.value}%`;
-        r.addEventListener('input', () => { (SETTINGS as unknown as Record<string, number>)[key] = Number(r.value) / 100; val.textContent = `${r.value}%`; saveSettings(); if (key === 'sfxVolume') playSound('tick'); });
-        row.append(name, r, val); list.append(row); sliders.push(r);
-      }
-      const vbtn = document.createElement('button'); vbtn.setAttribute('data-focus', ''); vbtn.type = 'button';
-      const paint = () => { vbtn.textContent = `Voices: ${SETTINGS.voices ? 'On' : 'Off'}${this.voice.supported ? '' : ' (not supported in this browser)'}`; };
-      vbtn.addEventListener('click', () => { SETTINGS.voices = !SETTINGS.voices; saveSettings(); paint(); if (SETTINGS.voices) this.voice.speak('Narrator', 'Voices are on.'); else this.voice.stop(); });
-      const test = document.createElement('button'); test.setAttribute('data-focus', ''); test.type = 'button'; test.textContent = 'Test a voice';
-      test.addEventListener('click', () => this.voice.speak('President Bednar (game character)', 'Welcome. There is important work to do.'));
-      const back = document.createElement('button'); back.setAttribute('data-focus', ''); back.type = 'button'; back.textContent = 'Back';
-      back.addEventListener('click', () => panel.close(null));
-      paint(); list.append(vbtn, test, back);
-      const hint = document.createElement('p'); hint.className = 'sub'; hint.textContent = 'Up/down to choose · left/right to change · Sound: Muted in the pause menu silences everything.';
+        const r = document.createElement('input'); r.type = 'range'; r.min = String(min); r.max = String(max); r.step = String(step); r.setAttribute('data-focus', '');
+        r.value = String(get()); val.textContent = fmt(get());
+        r.addEventListener('input', () => { set(Number(r.value)); val.textContent = fmt(Number(r.value)); saveSettings(); });
+        row.append(name, r, val); list.append(row); sliders.push({ el: r, step });
+      };
+      const button = (label: () => string, onClick: () => void) => {
+        const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-focus', ''); b.textContent = label();
+        b.addEventListener('click', () => { onClick(); saveSettings(); b.textContent = label(); }); list.append(b); return b;
+      };
+      const V = SETTINGS as unknown as Record<string, number>;
+      head('Sound');
+      slider('Music', () => Math.round(SETTINGS.musicVolume * 100), v => { V.musicVolume = v / 100; });
+      slider('Sound effects', () => Math.round(SETTINGS.sfxVolume * 100), v => { V.sfxVolume = v / 100; playSound('tick'); });
+      slider('Ambience (wind, birds)', () => Math.round(SETTINGS.ambienceVolume * 100), v => { V.ambienceVolume = v / 100; });
+      slider('Character voices', () => Math.round(SETTINGS.voiceVolume * 100), v => { V.voiceVolume = v / 100; });
+      button(() => `Sound: ${SETTINGS.muted ? 'Muted' : 'On'}`, () => { SETTINGS.muted = !SETTINGS.muted; });
+      button(() => `Voices: ${SETTINGS.voices ? 'On' : 'Off'}${this.voice.supported ? '' : ' (not supported here)'}`, () => { SETTINGS.voices = !SETTINGS.voices; if (SETTINGS.voices) this.voice.speak('President Bednar', 'Voices are on.'); else this.voice.stop(); });
+      head('Look');
+      slider('Brightness', () => Math.round(SETTINGS.brightness * 100), v => { V.brightness = v / 100; this.renderer.setBrightness(SETTINGS.brightness); }, 60, 140, 5);
+      const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
+      button(() => `Season: ${SETTINGS.season[0].toUpperCase()}${SETTINGS.season.slice(1)} (whole game)`, () => { SETTINGS.season = SEASONS[(SEASONS.indexOf(SETTINGS.season) + 1) % 4]; this.applySeason(); });
+      button(() => `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
+      button(() => `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; });
+      const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null));
+      list.append(back);
+      const hint = document.createElement('p'); hint.className = 'sub'; hint.textContent = 'Up/down to choose · left/right to change sliders · confirm to toggle.';
       root.append(list, hint);
       panel.onAction(a => {
-        const focused = root.querySelector('.focused') as HTMLInputElement | null;
-        if ((a === 'left' || a === 'right') && focused && sliders.includes(focused)) {
-          focused.value = String(Math.max(0, Math.min(100, Number(focused.value) + (a === 'right' ? 5 : -5))));
-          focused.dispatchEvent(new Event('input')); return true;
-        }
+        const focused = root.querySelector('.focused') as HTMLInputElement | null, sl = sliders.find(x => x.el === focused);
+        if ((a === 'left' || a === 'right') && sl) { sl.el.value = String(Number(sl.el.value) + (a === 'right' ? sl.step : -sl.step)); sl.el.dispatchEvent(new Event('input')); return true; }
         return false;
       });
-    });
+    }, { className: 'settings-screen' });
   }
 
   quitToTitle(save: boolean) { if (save) this.save(); this.finale.stop(); this.showTitle(); }
@@ -947,6 +1072,13 @@ export class Game {
     for (const e of this.traffic.update(dt, p)) if (this.mode === 'playing' && !this.cutscenes.active) playSound(e.type);
   }
 
+  /** Minimap position: the player outdoors; indoors, the entrance of the building they're in. */
+  private mapPosition() {
+    const def = this.spaceId === 'exterior' ? null : this.interiors.defs.get(this.spaceId);
+    if (!def) return { mapX: this.player.position.x, mapZ: this.player.position.z };
+    const d = this.entryDoor?.space === this.spaceId ? this.entryDoor : this.world.doorPlacement(this.location(def.exteriorDoor)); return { mapX: d.x, mapZ: d.z };
+  }
+
   // ---------------- frame loop ----------------
   private frame() {
     const elapsed = this.clock.getDelta();
@@ -955,17 +1087,27 @@ export class Game {
     this.input.update(dt);
     const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
     this.music.update(dt, !cinematic, !!this.ui.currentSpeaker);   // ducked under dialogue
-    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: ATMOSPHERE[this.world.era].season, cinematic });
+    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.spaceId });
     const veh = this.player.vehicle;
-    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : 'car');
+    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
+    this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
     this.updateTraffic(dt);
+    if (this.spaceId !== 'exterior') this.interiors.update(dt);
+    if (this.balls) {
+      const out = this.spaceId === 'exterior';
+      this.balls.setVisible(out);
+      if (out && !this.pauseOpen) for (const e of this.balls.update(dt, { p: this.player.position, yaw: this.player.yaw, speed: this.player.speed, active: this.mode === 'playing' && !this.player.vehicle && !this.cutscenes.active })) {
+        if (e.type === 'score' || e.type === 'goal') { this.ui.toast(e.text!, 1800); playSound(e.type === 'goal' ? 'cheer' : 'success'); }
+        else if (e.type === 'bounce') playSound('bounce');
+      }
+    }
     // footsteps: one per ~0.8 m walked (shorter when running), surface from where you are
     const P = this.player;
     if (this.mode === 'playing' && !this.cutscenes.active && !P.vehicle && !P.seated && P.grounded && P.speed > 0.6) {
       this.stepDist += P.speed * dt;
       if (this.stepDist > (P.speed > 6 ? 1.3 : 0.8)) {
         this.stepDist = 0;
-        const x = P.position.x, z = P.position.z, winter = ATMOSPHERE[this.world.era].season === 'winter';
+        const x = P.position.x, z = P.position.z, winter = SETTINGS.season === 'winter';
         const hard = this.world.onPath(x, z) || onVehicleRoad(x, z);
         playStep(this.spaceId !== 'exterior' ? 'wood' : hard ? 'concrete' : winter ? 'snow' : 'grass', P.speed > 6 ? 0.45 : 0.3);
       }
@@ -1016,6 +1158,7 @@ export class Game {
       this.npcs.setVisible(this.spaceId === 'exterior');
       if (this.spaceId === 'exterior') this.npcs.update(dt, this.player.position, (x, z, r) => this.world.blocked(x, z, r) || Math.hypot(x - this.player.position.x, z - this.player.position.z) < r + 0.6);
       // inspectables: whatever is under the screen-centre reticle
+      const ballNear = !focus && !this.player.vehicle && this.spaceId === 'exterior' ? this.balls?.prompt(this.player.position) ?? null : null;
       const insp = !focus && !this.player.vehicle && !uiBlocking ? this.inspectAt(0, 0) : null;
       this.inspectFocus = insp;
       this.ui.setReticle([...this.inspectables.values()].some(i => !i.enabled || i.enabled()) && this.spaceId === 'exterior' && !uiBlocking, !!insp);
@@ -1026,13 +1169,13 @@ export class Game {
       if (canAct) {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
         else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
-        else if (focus && a.pressed('interact')) { a.consume('interact'); void this.interactions.trigger(); }
+        else if (focus && a.pressed('interact')) { a.consume('interact'); if (focus.kind === 'npc' && focus.visual) this.stageConversation(focus.visual); void this.interactions.trigger(); }
+        else if (ballNear && a.pressed('interact')) { a.consume('interact'); if (this.balls.action(this.player.position, this.player.yaw)) playSound(ballNear.startsWith('Kick') ? 'kick' : 'tick'); }
         else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
         else if (a.pressed('journal') && this.hudBtn) { a.consume('journal'); this.hudBtn.fn(); }
-        else if (a.pressed('map') && this.hudBtn?.viaMap) { a.consume('map'); this.hudBtn.fn(); }
-        else if (a.pressed('map') && this.spaceId === 'exterior') { a.consume('map'); this.ui.bigMap(() => {}); }
+        else if (a.pressed('map')) { a.consume('map'); this.ui.bigMap(() => {}); }   // the map always opens the map (the journal has its own button: J / Joy-Con Y)
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;
@@ -1040,8 +1183,8 @@ export class Game {
       this.ui.updateHud({
         objective: obj.text, era: ERAS[this.world.era].label,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
-        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
-        px: this.player.position.x, pz: this.player.position.z, pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
+        px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, eraId: this.world.era, target: this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],
         targetLabel: this.targetLabel(obj.target),
@@ -1053,6 +1196,7 @@ export class Game {
     this.effects.update(dt);
     // The opening and ending drive their own subtitle-synchronized mouths.
     if (this.mode !== 'cutscene' && this.mode !== 'finale') this.updateMouths(dt);
+    this.animateQuestAvatars(dt);
     this.syncVehicles();
     if (this.overhead) {
       const c = this.renderer.camera, o = this.overhead, h = o.span / 2 / Math.tan(THREE.MathUtils.degToRad(c.fov / 2));
@@ -1065,3 +1209,10 @@ export class Game {
 
 export { CAMPUS };
 export type { InteractableDef };
+
+/** A flat sign mounted on the wall above a door (door-local space; the door faces +z). */
+function wallSign(lines: string[]): THREE.Mesh {
+  const tex = new THREE.CanvasTexture(textCanvas(lines, { w: 512, h: 128, bg: '#2a3a4f', fg: '#f6f0e2', border: '#c9b48a' })); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+  m.position.set(0, 4.25, 0.08); return m;
+}

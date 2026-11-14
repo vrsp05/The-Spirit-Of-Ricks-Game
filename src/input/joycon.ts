@@ -4,10 +4,11 @@
 // - Chrome / Edge / Safari: "standard" mapping. Both Joy-Cons together appear as one "Joy-Con L+R"
 //   pad (held upright, two sticks); a single Joy-Con appears held sideways (one stick, SL/SR on top).
 // - Firefox: raw HID buttons (mapping ""), single Joy-Cons only; handled best-effort, held sideways.
-// Layout (Nintendo positions, so A is "confirm" like on the Switch):
-//   A = interact/confirm (①)  B = back + jump (②)  X / − = map (③)  Y / + = pause (④)
-//   ZR or R = sprint (hold)  L-stick click = sprint toggle  R-stick click / ZL = camera reset
-//   D-pad = menu navigation. One Joy-Con sideways: its stick moves, SL/SR turn the camera.
+// Layout (by the label on the button, tested on real Joy-Cons):
+//   A = action / use (E: talk, doors, carts, balls; confirm in menus)   B = back + jump
+//   + or − = menu (pause; the tools bar in minigames)   X / Y = map (hint in minigames)
+//   left stick = move, right stick = camera, ZR/R = sprint (hold), D-pad = menu navigation.
+//   One Joy-Con sideways: its stick moves, SL/SR turn the camera.
 import type { ButtonName } from './actions';
 
 export type JoyConKind = 'pair' | 'left' | 'right';
@@ -27,7 +28,7 @@ export function joyConKind(gp: { id: string }): JoyConKind | null {
 }
 
 const ACT: Record<'A' | 'B' | 'X' | 'Y' | 'plus' | 'minus' | 'run' | 'reset' | 'l3', ButtonName[]> = {
-  A: ['interact'], B: ['back', 'jump'], X: ['map'], Y: ['pause'], plus: ['pause'], minus: ['map'],
+  A: ['interact'], B: ['back', 'jump'], X: ['map'], Y: ['map'], plus: ['pause'], minus: ['pause'],
   run: ['run'], reset: ['cameraReset'], l3: ['runToggle'],
 };
 
@@ -38,8 +39,8 @@ export function readJoyCon(gp: PadLike, kind: JoyConKind): JoyConFrame {
   const add = (k: keyof typeof ACT) => ACT[k].forEach(x => out.buttons.add(x));
 
   if (gp.mapping === 'standard') {
-    // standard positions: 0 bottom(B) 1 right(A) 2 left(Y) 3 top(X) 4 L 5 R 6 ZL 7 ZR 8 − 9 + 10 L3 11 R3 12-15 d-pad
-    if (b(1)) add('A'); if (b(0)) add('B'); if (b(3)) add('X'); if (b(2)) add('Y');
+    // Joy-Cons come through by label: 0 = A, 1 = B, 2/3 = X/Y, 4 L 5 R 6 ZL 7 ZR 8 − 9 + 10 L3 11 R3 12-15 d-pad
+    if (b(0)) add('A'); if (b(1)) add('B'); if (b(2)) add('X'); if (b(3)) add('Y');
     if (b(9)) add('plus'); if (b(8)) add('minus'); if (b(10)) add('l3');
     if (b(12)) out.buttons.add('navUp'); if (b(13)) out.buttons.add('navDown'); if (b(14)) out.buttons.add('navLeft'); if (b(15)) out.buttons.add('navRight');
     if (kind === 'pair') {
@@ -56,8 +57,8 @@ export function readJoyCon(gp: PadLike, kind: JoyConKind): JoyConFrame {
   // Raw HID (Firefox). Button bits of the Joy-Con's simple report:
   //   L: 0 ←  1 ↓  2 ↑  3 →  4 SL  5 SR  8 −  10 stick  14 L  15 ZL
   //   R: 0 A  1 X  2 B  3 Y  4 SL  5 SR  9 +  11 stick  14 R  15 ZR
-  // Held sideways, the four face buttons map to these positions (bottom / right / top / left):
-  const [bottom, right, top, left] = kind === 'right' ? [0, 1, 3, 2] /* A X Y B */ : [0, 2, 3, 1] /* ← ↑ → ↓ */;
+  // Joy-Con (R) uses its labels; Joy-Con (L) held sideways uses positions (bottom / right / top / left):
+  const [bottom, right, top, left] = kind === 'right' ? [2, 0, 1, 3] /* by label: A = action, B = back */ : [0, 2, 3, 1] /* ← ↑ → ↓ */;
   if (b(right)) add('A'); if (b(bottom)) add('B'); if (b(top)) add('X'); if (b(left)) add('Y');
   if (b(9)) add('plus'); if (b(8)) add('minus'); if (b(10) || b(11)) add('l3');
   if (b(14) || b(15)) add('run');

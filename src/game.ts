@@ -817,11 +817,11 @@ export class Game {
   }
   showControls() {
     const rows = [
-      ['Move', 'W A S D / arrows', 'Left stick', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)', 'Hold ZR / R · stick click (toggle)'], ['Jump', 'Space', 'Button 2', 'B'],
+      ['Move', 'W A S D / arrows', 'Left stick', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)', 'Hold ZR / R'], ['Jump', 'Space', 'Button 2', 'B'],
       ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick', 'A · left stick'],
-      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick · R-stick click / ZL reset'],
+      ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick'],
       ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
-      ['Map / objective', 'M', 'Button 3', 'X or −'], ['Pause', 'Esc', 'Button 4', 'Y or +'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
+      ['Map / objective', 'M', 'Button 3', 'X or Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
       ['One Joy-Con (sideways)', '', '', 'Stick moves · SL / SR turn the camera'],
     ];
     const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th><th>Joy-Con</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;

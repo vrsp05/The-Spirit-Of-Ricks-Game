@@ -28,6 +28,15 @@ Rebuild everything with `npm run data:fetch-osm && npm run data:fetch-elevation 
 
 Not used yet: BYU–Idaho history page (1999 aerial), the ArcGIS "Through the Years" story map, official floor plans. These are the next references for 1999 footprints and the STC floor plan.
 
+## Quest content verification (2026-11-13)
+| Content | Checked against |
+|---|---|
+| Alma 11 coin values (senine/senum 1, seon/amnor 2, shum/ezrom 4, limnah/onti 7, shiblon ½, shiblum ¼, leah ⅛, antion 1½; judge's pay; six onties) | Alma 11:3–19, 22 — churchofjesuschrist.org/study/scriptures/bofm/alma/11 (also covered by unit tests) |
+| D&C 88:118, D&C 38:27, D&C 25:12 excerpts on the clue cards | churchofjesuschrist.org scripture pages |
+| Announcement facts (June 21, 2000; delivered by President Gordon B. Hinckley; two-year → four-year; Brigham Young University–Idaho; phased in over time) | byui.edu/speeches/announcement-ricks-college-to-become-byu-idaho |
+
+All Bednar-character lines, candidate lines, card notes and the English paraphrase are **authored fiction**, labelled in game.
+
 ## Era rules (src/world/eras.ts, src/world/buildingRegistry.ts)
 
 - `ricks1999` = fall 1999: after the Kimball dedication, before the announcement.
@@ -38,10 +47,11 @@ Not used yet: BYU–Idaho history page (1999 aerial), the ArcGIS "Through the Ye
 
 ## Known approximations and gaps
 
-- **Taylor Building (artistic choice):** hidden in all eras until quest 2 builds it, even though it was dedicated in 1997 (HOB p.87).
-- **BYU–Idaho Center (artistic choice):** appears when quest 2 builds it, earlier than its 2010 dedication.
+- **Taylor Building and BYU–Idaho Center (team decision, overrides the quest prompt):** both are construction sites until Quest 2 solves their blueprints, then appear in every era. In reality Taylor opened in 1997 (HOB p.87) and the I-Center was dedicated in 2010. The montage text states the real dates.
+- **Bednar in 2011:** his continued role as quest guide is fictional framing, not a claim about his historical position.
+- **2011 era label:** shows "Rexburg, Idaho", not the institution name, until the letters are placed (team decision).
 - **Fixed 2026-11-13:** OSM multipolygon buildings (58, including the Benson Building) and the campus boundary were missing from the first build because of an Overpass output mode. They are present now.
-- **Props:** benches, lamps, the fountain and street signs are decorative placements, not surveyed.
+- **Props:** benches (sittable), lamps, the pond, street signs, crosswalks, parked cars and bicycles are decorative placements, not surveyed. Car styles per era are generic, not specific real models.
 - **Era labels (artistic choice):** the middle eras are labelled "Ricks College" with no years. In reality the name changed in 2001, but the team chose that nothing says BYU–Idaho until the story's end.
 - **Taylor steeple and I-Center dome/portico:** stylized recognisable details, not measured models.
 - **Viking Stadium:** grandstand massing (stepped rows, press box, roof, visitor bleachers) is stylized. Its position comes from OSM `leisure=stadium` and the football pitch.

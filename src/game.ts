@@ -1,6 +1,6 @@
 // Game orchestrator: wires world, player, input, UI, quests, interiors, save and finale.
 import * as THREE from 'three';
-import { GAME_CONFIG, type Anchor } from './config/game.config';
+import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
 import { InputManager } from './input/actions';
 import { KeyboardMouseSource } from './input/keyboardMouse';
 import { GamepadHub, WebBluetoothController } from './input/transports';
@@ -17,12 +17,21 @@ import { Renderer } from './render/Renderer';
 import { clearSave, loadSave, writeSave, type SaveData } from './save/save';
 import { STORY } from './story/story';
 import { esc, UI } from './ui/ui';
-import { CAMPUS, everOccupied, nudgeFree, PATH_KINDS, pointInPoly, terrainHeight, toGame } from './world/campusData';
-import { GolfCart } from './player/GolfCart';
+import { CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, PATH_KINDS, pointInPoly, terrainHeight, toGame } from './world/campusData';
+import { Vehicle, type CarStyle } from './player/Vehicle';
 import { ERAS, type EraId } from './world/eras';
 import { makeDoor, World } from './world/World';
-import { NpcCrowd } from './world/Npcs';
+import { LineBag, NpcCrowd } from './world/Npcs';
 import { Finale } from './finale/finale';
+import { CutsceneRunner, type CutsceneSpec } from './cutscene/Cutscene';
+import { Effects } from './fx/fireworks';
+import { playSound } from './fx/audio';
+import { SETTINGS, saveSettings } from './core/settings';
+import type { Inspectable } from './quests/contract';
+import { computeReward, type RewardReceipt } from './quests/rewards';
+import { meshBuilding } from './world/voxelMesher';
+import { BUILDINGS } from './world/buildingRegistry';
+import { registryPoly } from './world/campusData';
 
 type Mode = 'title' | 'playing' | 'finale';
 type At = string | { x: number; z: number; space?: string };
@@ -42,7 +51,7 @@ export class Game {
   readonly quests: QuestManager;
   readonly finale: Finale;
   mode: Mode = 'title';
-  difficulty = GAME_CONFIG.difficulty.default;
+  difficulty: DifficultyId = GAME_CONFIG.difficulty.default as DifficultyId;
   colorStage = 0;
   introSeen = false;
   finaleReached = false;
@@ -55,7 +64,7 @@ export class Game {
   devHooks: ((dt: number) => void)[] = [];
   /** Dev: top-down camera for accuracy comparison screenshots (north up). */
   overhead: { x: number; z: number; span: number } | null = null;
-  readonly carts: { cart: GolfCart; id: string }[] = [];
+  readonly carts: { cart: Vehicle; id: string }[] = [];   // all drivable vehicles (carts, cars, bikes)
   npcs!: NpcCrowd;
   /** Enterable doors (shown on the minimap / map). */
   readonly entrances: { id: string; x: number; z: number; eras: EraId[] | null; label: string }[] = [];
@@ -63,6 +72,16 @@ export class Game {
   collectedCoins = new Set<string>();
   private markers: THREE.Object3D[] = [];
   private markerT = 0;
+  cutscenes!: CutsceneRunner;
+  bednar: Avatar | null = null;
+  effects!: Effects;
+  private inspectables = new Map<string, Inspectable>();
+  inspectFocus: Inspectable | null = null;
+  private camFocus: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;
+  private hudBtn: { label: string; fn: () => void; viaMap: boolean } | null = null;
+  private pauseOpen = false;
+  private connectedControllers = new Set<string>();
+  readonly devMode = new URLSearchParams(location.search).has('dev');
 
   constructor(container: HTMLElement, uiRoot: HTMLElement) {
     this.renderer = new Renderer(container);
@@ -85,23 +104,49 @@ export class Game {
       (obj, x, z, space) => { obj.position.set(x, this.groundAt(x, z, space), z); this.renderer.scene.add(obj); },
       obj => obj.removeFromParent(),
     );
+    this.effects = new Effects(this.renderer.scene);
+    this.cutscenes = new CutsceneRunner({
+      camera: this.renderer.camera,
+      subtitle: (line, hint) => this.ui.subtitle(line, hint),
+      reducedMotion: () => SETTINGS.reducedMotion,
+    });
+    const pos3 = (p: { x: number; z: number; space: string }) => ({ ...p, y: this.groundAt(p.x, p.z, p.space) });
     this.quests = new QuestManager({
-      ui: { dialogue: l => this.ui.dialogue(l), panel: s => this.ui.panel(s), custom: (t, r, o) => this.ui.custom(t, r, o), toast: t => this.ui.toast(t) },
+      ui: {
+        dialogue: l => this.ui.dialogue(l), panel: s => this.ui.panel(s), custom: (t, r, o) => this.ui.custom(t, r, o), toast: t => this.ui.toast(t),
+        setBanner: t => this.ui.setBanner(t),
+        hudButton: (label, fn, viaMap = false) => { this.hudBtn = label && fn ? { label, fn, viaMap } : null; this.ui.setHudButton(label, fn); },
+      },
       world: {
         era: () => this.world.era,
         location: id => this.location(id),
+        position: id => pos3(this.resolve(id)),
+        playerPosition: () => ({ x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, space: this.spaceId }),
+        questGiverPosition: () => pos3(this.resolve(GAME_CONFIG.questGiver.anchor)),
         terrainHeight: (x, z) => terrainHeight(x, z),
         addObject: (obj, at) => { const p = this.resolve(at); obj.position.set(p.x, this.groundAt(p.x, p.z, p.space), p.z); this.renderer.scene.add(obj); return () => obj.removeFromParent(); },
+        blueprintGhost: id => this.blueprintGhost(id),
+        focusCamera: (from, to) => { this.camFocus = { from: new THREE.Vector3(from.x, from.y, from.z), to: new THREE.Vector3(to.x, to.y, to.z) }; },
+        releaseCamera: () => { this.camFocus = null; },
+        addInspectable: d => { this.inspectables.set(d.id, d); },
+        removeInspectable: id => { this.inspectables.delete(id); },
+        gatherCrowd: (x, z, sec) => this.npcs.gather(x, z, sec),
+        fireworks: (x, y, z, sec) => this.effects.fireworks(x, y, z, sec, SETTINGS.reducedMotion),
+        colorWave: (x, z) => { this.effects.colorWave(x, terrainHeight(x, z), z); this.renderer.setColor(1); },
+        sound: n => playSound(n),
+        reducedMotion: () => SETTINGS.reducedMotion,
         voxel: voxelBox,
-        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); a.setLabel(o.label, o.sub); return a.root; },
+        npc: o => { const a = new Avatar({ shirt: o.shirt ?? '#6b5b95', pants: o.pants ?? '#333', hair: o.hair ?? '#3b2a20', skin: o.skin ?? '#d9a982' }); this.registerSpeaker(o.label, a); return a.root; }, // no floating info card; the objective marker shows who to talk to
         label: (t, s) => makeLabel(t, s),
       },
       addInteractable: d => this.interactions.add(d),
       removeInteractable: id => this.interactions.remove(id),
       difficulty: () => this.difficulty,
-      onCompleted: id => this.onQuestCompleted(id),
+      cutscene: spec => this.playCutscene(spec),
+      onCompleted: (id, receipt) => this.onQuestCompleted(id, receipt),
       onFailed: () => this.save(),
       onTargetsChanged: () => { this.world.refreshBuildings(); if (this.spaceId === 'exterior') this.unstick(); },
+      onColorProgress: () => this.applyColor(),
       persist: () => this.save(),
     });
     for (const m of createQuestModules()) this.quests.register(m);
@@ -112,10 +157,14 @@ export class Game {
     this.player.place(this.exteriorSpace, sp.x, sp.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     this.setupCoreInteractables();
-    this.setupCarts();
+    this.setupVehicles();
+    this.setupBenches();
     this.npcs = new NpcCrowd(this.renderer.scene);
+    for (const w of this.npcs.walkers) this.registerSpeaker(w.name, w.avatar);
+    this.registerSpeaker('You', this.player.avatar);
     this.setupCoins();
     this.setupMarkers();
+    this.setupClickInspect();
     this.clearTrees();
     this.showTitle();
     this.renderer.renderer.setAnimationLoop(() => this.frame());
@@ -144,7 +193,13 @@ export class Game {
     const a = this.location(id), space = a.space ?? 'exterior';
     let out: { x: number; z: number; space: string };
     if (space !== 'exterior') out = { ...this.interiors.toWorld(space, a.x, a.z), space };
-    else if (a.building) { const d = this.world.doorPlacement(a); const o = a.offset ?? 2.5; out = { x: d.x + d.nx * o, z: d.z + d.nz * o, space }; }
+    else if (a.building) {
+      const d = this.world.doorPlacement(a); const o = a.offset ?? 2.5;
+      let x = d.x + d.nx * o, z = d.z + d.nz * o;
+      // non-door anchors (NPCs, sites, letters) must not stand in front of an entrance: slide along the wall
+      if (!/^door/.test(id)) for (let k = 1; k <= 6 && this.world.nearDoor(x, z, 3.2); k++) { const t = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 3; x = d.x + d.nx * o - d.nz * t; z = d.z + d.nz * o + d.nx * t; }
+      out = { x, z, space };
+    }
     else {
       // compaction may have grown a building over this spot: nudge clear (signs use the same rule)
       const isSign = GAME_CONFIG.signs.some(s => s.anchor === id);
@@ -158,9 +213,8 @@ export class Game {
   private groundAt(x: number, z: number, space: string) { return space === 'exterior' ? this.world.groundY(x, z) : 0; }
   /** Quest-gated buildings appear once their construction target is built (or the quest is done). */
   gateBuilt(buildingId: string): boolean {
-    const t = (GAME_CONFIG.quests.construction.targets as { id: string; buildingId: string | null }[]).find(t => t.buildingId === buildingId);
-    if (!t) return true;
-    return this.quests.state.targets[`construction:${t.id}`] === 'built' || this.quests.status('construction') === 'completed';
+    if (!GAME_CONFIG.world.gatedBuildings.includes(buildingId)) return true;
+    return this.quests.state.targets[`construction:${buildingId}`] === 'solved' || this.quests.status('construction') === 'completed';
   }
   get space(): Space { return this.spaceId === 'exterior' ? this.exteriorSpace : this.interiors.space(this.spaceId); }
 
@@ -168,7 +222,8 @@ export class Game {
   private setupCoreInteractables() {
     const qg = GAME_CONFIG.questGiver;
     const bednar = new Avatar({ shirt: '#ffffff', jacket: '#2b2f3a', pants: '#2b2f3a', tie: '#7a2b2b', hair: '#6d655c', skin: '#e0b896' });
-    bednar.setLabel(qg.displayName, qg.subtitle);
+    this.bednar = bednar;
+    this.registerSpeaker('Bednar', bednar);
     const allEras = Object.keys(ERAS) as EraId[];
     this.interactions.add({
       id: 'core:quest-giver', kind: 'npc', at: qg.anchor, radius: 3.8, visual: bednar.root,
@@ -193,7 +248,7 @@ export class Game {
         eras: cfg.eras, prompt: `Enter: ${def.label}`,
         onInteract: () => this.enterInterior(id),
       });
-      this.interactions.add({ id: `core:doorvis-${id}`, kind: 'generic', at: { x: d.x + d.nx * 0.75, z: d.z + d.nz * 0.75 }, radius: 0, eras: cfg.eras, visual: door, prompt: '', onInteract: () => {} });
+      this.interactions.add({ id: `core:doorvis-${id}`, kind: 'generic', at: { x: d.x, z: d.z }, radius: 0, eras: cfg.eras, visual: door, prompt: '', onInteract: () => {} });
       // Coordinates tagged with an interior space are room-local.
       this.interactions.add({ id: `core:exit-${id}`, kind: 'door', at: { x: 0, z: def.depth / 2 - 0.6, space: id }, radius: 2.4, prompt: 'Exit to campus', onInteract: () => this.exitInterior() });
     }
@@ -209,39 +264,90 @@ export class Game {
   }
 
   // ---------------- golf carts ----------------
-  private setupCarts() {
-    for (const id of Object.keys(GAME_CONFIG.locations).filter(k => k.startsWith('cart-'))) {
-      const cart = new GolfCart(id), p = this.resolve(id);
-      cart.root.position.set(p.x, this.world.groundY(p.x, p.z), p.z); cart.root.rotation.y = this.location(id).yaw ?? 0;
-      this.renderer.scene.add(cart.root);
-      this.carts.push({ cart, id });
-      this.interactions.add({
-        id: `core:${id}`, kind: 'generic', at: { x: p.x, z: p.z }, radius: 2.8,
-        enabled: () => !this.player.vehicle, prompt: 'Drive the golf cart',
-        onInteract: () => this.enterCart(cart, id),
-      });
+  private setupVehicles() {
+    const add = (v: Vehicle, x: number, z: number, yaw: number) => {
+      v.root.position.set(x, this.world.groundY(x, z), z); v.root.rotation.y = yaw;
+      this.renderer.scene.add(v.root); this.carts.push({ cart: v, id: v.id }); this.addVehicleInteract(v);
+    };
+    // golf carts at their anchors
+    for (const id of Object.keys(GAME_CONFIG.locations).filter(k => k.startsWith('cart-'))) { let p = this.resolve(id); if (this.world.nearDoor(p.x, p.z, 4)) { const [nx, nz] = nudgeFree(p.x + 5, p.z, 2); p = { ...p, x: nx, z: nz }; } add(new Vehicle(id, 'cart'), p.x, p.z, this.location(id).yaw ?? 0); }
+    // parked cars in the lots; the models change as time passes
+    let seed = 913; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const lots = CAMPUS.areas.filter(a => a.kind === 'parking' && CAMPUS.campus.some(c => pointInPoly(a.poly[0][0], a.poly[0][1], c)));
+    const spots: { x: number; z: number; yaw: number }[] = [];
+    for (let tries = 0; tries < 3000 && spots.length < 16 && lots.length; tries++) {
+      const lot = lots[(rnd() * lots.length) | 0];
+      const xs = lot.poly.map(p => p[0]), zs = lot.poly.map(p => p[1]);
+      const x = Math.min(...xs) + rnd() * (Math.max(...xs) - Math.min(...xs)), z = Math.min(...zs) + rnd() * (Math.max(...zs) - Math.min(...zs));
+      if (!pointInPoly(x, z, lot.poly) || everOccupied(x, z, 2) || spots.some(s => (s.x - x) ** 2 + (s.z - z) ** 2 < 36)) continue;
+      const o = obb(lot.poly); spots.push({ x, z, yaw: Math.PI / 2 - o.angle + (rnd() < 0.5 ? 0 : Math.PI) });
+    }
+    const palette = ['#b03a2e', '#2e5e8e', '#e8e4da', '#3a3f45', '#7a8c5a', '#c9a227', '#6b3f7a', '#9aa3a8'];
+    const groups: { eras: EraId[]; styles: CarStyle[] }[] = [
+      { eras: ['ricks1999', 'transition'], styles: ['boxy90s', 'pickup90s'] },
+      { eras: ['byui'], styles: ['rounded2010s', 'boxy90s', 'rounded2010s'] },
+      { eras: ['presentFinale'], styles: ['modern', 'rounded2010s', 'modern'] },
+    ];
+    spots.forEach((sp, i) => groups.forEach((gr, gi) => {
+      const v = new Vehicle(`car-${i}-${gi}`, 'car', gr.styles[(i + gi) % gr.styles.length], palette[(i * 3 + gi) % palette.length]);
+      v.eras = gr.eras; add(v, sp.x, sp.z, sp.yaw);
+    }));
+    // bicycles beside campus paths
+    const paths = CAMPUS.roads.filter(r => r.kind === 'footway' && r.pts.length > 1);
+    let bikes = 0;
+    for (let tries = 0; tries < 2000 && bikes < 8; tries++) {
+      const r = paths[(rnd() * paths.length) | 0], [ax, az] = r.pts[0], [bx, bz] = r.pts[1], L = Math.hypot(bx - ax, bz - az); if (L < 4) continue;
+      const nx = -(bz - az) / L, nz = (bx - ax) / L, x = (ax + bx) / 2 + nx * (r.width / 2 + 0.8), z = (az + bz) / 2 + nz * (r.width / 2 + 0.8);
+      if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 5) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 100)) continue;
+      add(new Vehicle(`bike-${bikes++}`, 'bike'), x, z, Math.atan2(bx - ax, bz - az));
     }
   }
-  private enterCart(cart: GolfCart, id: string) {
-    this.player.vehicle = cart; this.player.yaw = cart.root.rotation.y; this.player.avatar.sit(true);
+  /** Benches: E to sit; moving or pressing E again stands up. */
+  private setupBenches() {
+    this.world.benches.forEach((b, i) => this.interactions.add({
+      id: `core:bench-${i}`, kind: 'generic', at: { x: b.x, z: b.z }, radius: 1.8,
+      enabled: () => !this.player.vehicle && !this.player.seated, prompt: 'Sit on the bench',
+      onInteract: () => {
+        this.player.place(this.exteriorSpace, b.x, b.z, b.yaw); this.player.position.y = this.world.groundY(b.x, b.z);
+        this.player.seated = true; this.player.avatar.sit(true); this.player.avatar.root.rotation.y = b.yaw;
+      },
+    }));
+  }
+  private standUp() {
+    const p = this.player.position, y = this.player.yaw;
+    this.player.seated = false; this.player.avatar.sit(false);
+    this.player.place(this.exteriorSpace, p.x + Math.sin(y) * 1.1, p.z + Math.cos(y) * 1.1, y); this.unstick();
+  }
+  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
+  private addVehicleInteract(v: Vehicle) {
+    this.interactions.add({
+      id: `core:${v.id}`, kind: 'generic', at: { x: v.root.position.x, z: v.root.position.z }, radius: v.kind === 'car' ? 3.4 : 2.6,
+      eras: v.eras as EraId[] | null, enabled: () => !this.player.vehicle && !this.player.seated, prompt: this.vehicleLabel(v),
+      onInteract: () => this.enterCart(v, v.id),
+    });
+  }
+  private enterCart(cart: Vehicle, id: string) {
+    this.player.vehicle = cart; this.player.yaw = cart.root.rotation.y;
     this.player.position.copy(cart.root.position);
+    if (cart.pose === 'sit') this.player.avatar.sit(true);
     this.interactions.remove(`core:${id}`);
-    this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = 14;
-    this.ui.toast('W/S drive · A/D steer · E to get out');
+    this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = cart.kind === 'car' ? 15 : 12;
+    this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : 'W/S drive · A/D steer · E to get out');
   }
   exitCart() {
     const cart = this.player.vehicle; if (!cart) return;
-    const entry = this.carts.find(c => c.cart === cart)!;
-    this.player.vehicle = null; cart.speed = 0; this.player.avatar.sit(false);
+    this.player.vehicle = null; cart.speed = 0; this.player.avatar.sit(false); this.player.avatar.root.visible = true;
     // step out to the side
-    const sx = Math.cos(this.player.yaw) * 1.8, sz = -Math.sin(this.player.yaw) * 1.8;
-    const p = this.player.position, side = !this.exteriorSpace.blocked(p.x + sx, p.z + sz, 0.45) ? 1 : -1;
-    this.player.place(this.exteriorSpace, p.x + sx * side, p.z + sz * side, this.player.yaw);
+    const side = cart.kind === 'car' ? 2.4 : 1.8;
+    const sx = Math.cos(this.player.yaw) * side, sz = -Math.sin(this.player.yaw) * side;
+    const p = this.player.position, dir = !this.exteriorSpace.blocked(p.x - sx, p.z - sz, 0.45) ? -1 : 1;
+    this.player.place(this.exteriorSpace, p.x + sx * dir, p.z + sz * dir, this.player.yaw);
     this.unstick();
-    this.interactions.add({
-      id: `core:${entry.id}`, kind: 'generic', at: { x: cart.root.position.x, z: cart.root.position.z }, radius: 2.8,
-      enabled: () => !this.player.vehicle, prompt: 'Drive the golf cart', onInteract: () => this.enterCart(cart, entry.id),
-    });
+    this.addVehicleInteract(cart);
+  }
+  /** Era-specific vehicles (cars) only show in their era — unless you're driving one. */
+  private syncVehicles() {
+    for (const { cart } of this.carts) cart.root.visible = this.spaceId === 'exterior' && (!cart.eras || cart.eras.includes(this.world.era) || this.player.vehicle === cart);
   }
 
   /** Keep trees off NPCs, doors, carts, coins, signs and quest objects. */
@@ -251,7 +357,7 @@ export class Game {
     for (const c of this.carts) pts.push({ x: c.cart.root.position.x, z: c.cart.root.position.z, r: 2.5 });
     for (const c of this.coins) pts.push({ x: c.x, z: c.z, r: 1 });
     for (const w of this.npcs?.walkers ?? []) for (const p of w.route) pts.push({ x: p[0], z: p[1], r: 0.5 });
-    for (const s of GAME_CONFIG.signs) { const p = this.resolve(s.anchor); pts.push({ x: p.x, z: p.z, r: 4 }); }
+    for (const s of GAME_CONFIG.signs) { const p = this.resolve(s.anchor); pts.push({ x: p.x, z: p.z, r: Math.max(4, ((s as { width?: number }).width ?? 0) / 2 + 1.5) }); }
     this.world.clearTreesAround(pts);
   }
 
@@ -259,7 +365,7 @@ export class Game {
   private setupCoins() {
     let s = 4242; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const paths = CAMPUS.roads.filter(r => PATH_KINDS.has(r.kind) && r.pts.length > 1);
-    const geo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 10), mat = new THREE.MeshLambertMaterial({ color: '#ffcc33', emissive: '#6b4a00' });
+    const geo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 10), mat = new THREE.MeshStandardMaterial({ color: '#ffcc33', emissive: '#6b4a00' });
     for (let tries = 0; tries < 4000 && this.coins.length < GAME_CONFIG.coins.count; tries++) {
       const r = paths[(rnd() * paths.length) | 0], i = (rnd() * (r.pts.length - 1)) | 0, t = rnd();
       const x = r.pts[i][0] + (r.pts[i + 1][0] - r.pts[i][0]) * t, z = r.pts[i][1] + (r.pts[i + 1][1] - r.pts[i][1]) * t;
@@ -323,42 +429,81 @@ export class Game {
     return a.label?.replace(/^DEV:\s*/, '').replace(/\s*\(.*\)$/, '') ?? null;
   }
 
+  private speakers = new Map<string, Avatar>();
+  /** Characters whose mouths move when a line with their name is on screen. */
+  registerSpeaker(name: string, a: Avatar) { this.speakers.set(name, a); }
+  private updateMouths(dt: number) {
+    const sp = this.ui.currentSpeaker;
+    for (const [name, a] of this.speakers) { a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }
+  }
   private npcTalking = false;
+  private lineBag = new LineBag();
   private async talkToNpc(w: NpcCrowd['walkers'][number]) {
     if (this.npcTalking) return;
     this.npcTalking = true; this.busy = true; w.talking = 6;
-    const lines = GAME_CONFIG.npcs.lines[ERAS[this.world.era].institution === 'byui' ? 'present' : 'ricks'];
-    const line = lines[(Math.random() * lines.length) | 0];
-    try { await this.ui.dialogue([{ speaker: GAME_CONFIG.npcs.title, text: line }]); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
+    const key = this.world.era === 'presentFinale' ? 'present' : this.world.era;
+    const pool = GAME_CONFIG.npcs.lines[key] ?? GAME_CONFIG.npcs.lines.ricks1999;
+    const line = this.lineBag.next(key, pool);
+    w.heard++;
+    try { await this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }]); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
   }
 
   async talkToQuestGiver() {
+    // Bednar turns toward the assistant
+    if (this.bednar) { const b = this.bednar.root.position, p = this.player.position; this.bednar.root.rotation.y = Math.atan2(p.x - b.x, p.z - b.z); }
     const active = this.quests.active();
+    if (active && this.quests.readyToReport(active)) { await this.quests.report(active); return; }
     if (active) { await this.ui.dialogue(this.quests.reminder(active)); return; }
     const next = this.quests.nextAvailable();
     if (next) {
-      if (next === 'professors') await this.ui.dialogue(STORY.bednarGreeting());
-      await this.ui.dialogue(this.quests.briefing(next));
-      this.quests.start(next);
-      this.ui.toast(`New assignment: ${this.quests.modules.get(next)?.title}`);
+      if (next === 'professors' && !this.quests.data('professors').__greeted) { this.quests.data('professors').__greeted = true; await this.ui.dialogue(STORY.bednarGreeting()); }
+      await this.quests.assign(next);
+      if (this.quests.status(next) === 'active') this.ui.toast(`New assignment: ${this.quests.modules.get(next)?.title}`);
+      this.save();
       return;
     }
     if (this.quests.allComplete()) await this.ui.dialogue(STORY.allQuestsDone());
   }
 
+  playCutscene(spec: CutsceneSpec): Promise<void> {
+    this.save();                                   // save before an important transition
+    const done = spec.onDone;
+    return this.cutscenes.play({ ...spec, onDone: () => { done?.(); this.save(); } }); // …and after
+  }
+
+  /** Colour is owned by the world: completed quests set the stage; the active quest's reported progress fills part of the gap. */
+  computeColor(): number {
+    const st = GAME_CONFIG.colorStages, n = this.quests.completedCount();
+    if (n >= QUEST_ORDER.length) return 1;
+    const base = st[n] ?? 1, nextStage = st[n + 1] ?? 1;
+    const active = this.quests.active();
+    const f = active ? this.quests.colorProgress(active) : 0;
+    return base + (nextStage - base) * f * GAME_CONFIG.colorPartialMax;
+  }
+  applyColor(instant = false) { this.colorStage = this.quests.completedCount(); this.renderer.setColor(this.computeColor(), instant); }
+
+  /** Translucent blueprint-blue copy of a building footprint. */
+  blueprintGhost(buildingId: string): THREE.Object3D | null {
+    const poly = registryPoly(buildingId), entry = BUILDINGS.find(b => b.id === buildingId); if (!poly || !entry) return null;
+    const m = meshBuilding(poly, entry.style, { detailed: true });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(m.positions, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(m.normals, 3));
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: '#5ab0ff', transparent: true, opacity: 0.32, depthWrite: false }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), new THREE.LineBasicMaterial({ color: '#cfe8ff', transparent: true, opacity: 0.7 }));
+    const grp = new THREE.Group(); grp.add(mesh, edges); grp.userData.absolute = true;
+    return grp;
+  }
+
   // ---------------- story progression ----------------
-  private async onQuestCompleted(id: QuestId) {
+  private async onQuestCompleted(id: QuestId, receipt: RewardReceipt | null) {
     this.busy = true;
     try {
-      this.colorStage = this.quests.completedCount();
-      this.renderer.setColor(GAME_CONFIG.colorStages[this.colorStage] ?? 1);
-      this.ui.toast(this.colorStage >= QUEST_ORDER.length ? STORY.fullColorToast : STORY.colorToast, 4500);
+      this.applyColor();
+      if (receipt) { playSound('success'); await this.ui.rewardScene(`Quest complete: ${this.quests.modules.get(id)?.title ?? id}`, receipt); }
       this.save();
-      await new Promise(r => setTimeout(r, 1800));
       const nextEra = GAME_CONFIG.story.eraAfterQuest[id];
       if (nextEra && nextEra !== this.world.era) await this.timeTransition(nextEra);
-      if (this.quests.allComplete()) {
-        await this.ui.dialogue(STORY.allQuestsDone());
+      if (this.quests.allComplete() && this.world.era !== GAME_CONFIG.story.finaleEra) {
         await this.timeTransition(GAME_CONFIG.story.finaleEra, STORY.presentDaySubtitle);
       }
       this.save();
@@ -367,7 +512,6 @@ export class Game {
 
   async timeTransition(era: EraId, subtitle?: string) {
     if (this.player.vehicle) this.exitCart();
-    if (this.spaceId !== 'exterior') await this.exitInterior(true);
     await this.ui.card(ERAS[era].cardTitle, subtitle ?? ERAS[era].label, 2600);
     this.setEra(era);
   }
@@ -418,7 +562,7 @@ export class Game {
       if (this.world.era !== GAME_CONFIG.story.finaleEra) return { text: 'Travelling to the present day…', target: null };
       return this.spaceId === 'stc-first-floor'
         ? { text: 'Walk into the celebration hall', target: { x: 0, z: -9, space: 'stc-first-floor' } }
-        : { text: 'Go to the Science and Technology Center', target: 'door-stc' };
+        : { text: 'Go to the Science and Technology Center', target: 'door.stc.main' };
     }
     const o = this.quests.objective();
     if (o) return { text: o.text, target: o.target };
@@ -440,8 +584,8 @@ export class Game {
   // ---------------- save ----------------
   snapshot(): SaveData {
     return {
-      version: 2, savedAt: '', difficulty: this.difficulty, era: this.world.era, colorStage: this.colorStage,
-      quests: this.quests.state.quests, targets: this.quests.state.targets,
+      version: 3, savedAt: '', difficulty: this.difficulty, era: this.world.era, colorStage: this.colorStage,
+      quests: this.quests.state.quests, targets: this.quests.state.targets, rewards: this.quests.state.rewards,
       player: { space: this.spaceId, x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw },
       coins: [...this.collectedCoins],
       introSeen: this.introSeen, finaleReached: this.finaleReached,
@@ -449,14 +593,14 @@ export class Game {
   }
   save() { if (this.mode !== 'title') writeSave(this.snapshot()); }
 
-  newGame(difficulty: string) {
+  newGame(difficulty: DifficultyId) {
     this.difficulty = difficulty; this.colorStage = 0; this.introSeen = false; this.finaleReached = false;
-    this.collectedCoins.clear(); if (this.player.vehicle) this.exitCart();
+    this.collectedCoins.clear(); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init(freshQuestState());
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(GAME_CONFIG.story.startEra);
-    this.renderer.setColor(GAME_CONFIG.colorStages[0], true);
+    this.applyColor(true);
     if (this.spaceId !== 'exterior') { this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true; }
     const s = this.resolve('spawn');
     this.player.place(this.exteriorSpace, s.x, s.z, this.location('spawn').yaw ?? 0);
@@ -465,12 +609,12 @@ export class Game {
   }
   continueGame(d: SaveData) {
     this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = false;
-    this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart();
-    this.quests.init({ quests: d.quests, targets: d.targets ?? {} });
+    this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
+    this.quests.init({ quests: d.quests, targets: d.targets ?? {}, rewards: d.rewards ?? {} });
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(d.era);
-    this.renderer.setColor(GAME_CONFIG.colorStages[d.colorStage] ?? 1, true);
+    this.applyColor(true);
     if (!d.player) { const sp = this.resolve('spawn'); d.player = { space: 'exterior', x: sp.x, z: sp.z, yaw: this.location('spawn').yaw ?? 0 }; }
     if (d.player.space !== 'exterior' && this.interiors.defs.has(d.player.space)) {
       this.spaceId = d.player.space; this.world.exterior.visible = false; this.interiors.show(d.player.space);
@@ -501,14 +645,46 @@ export class Game {
       { label: 'New game', action: () => this.chooseDifficulty() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
+      { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Reset saved game', disabled: !save, action: () => this.confirmReset() },
     ], { subtitle: GAME_CONFIG.disclaimer, className: 'title-screen', footer: `Map data © OpenStreetMap contributors (ODbL) · elevation USGS 3DEP · see docs/sources.md` });
     void s;
   }
+  /** Testing only: start at any quest with the earlier ones marked complete (no coins). */
+  private showQuestJump() {
+    let diff: DifficultyId = 'easy';
+    const go = (stage: 1 | 2 | 3 | 4) => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.jumpToQuest(stage, diff); };
+    const s = this.ui.menu('Testing: jump to a quest', [
+      { label: 'Difficulty: Easy (click to switch)', action: () => { diff = diff === 'easy' ? 'hard' : 'easy'; (s.el.querySelectorAll('button')[0] as HTMLButtonElement).textContent = `Difficulty: ${diff === 'easy' ? 'Easy' : 'Hard'} (click to switch)`; } },
+      { label: 'Quest 1 — Hire the professors (1999)', action: () => go(1) },
+      { label: 'Quest 2 — Build the campus (2001)', action: () => go(2) },
+      { label: 'Quest 3 — Find and place B Y U I (2011)', action: () => go(3) },
+      { label: 'Finale — STC celebration (present day)', action: () => go(4) },
+      { label: 'Back', action: () => this.ui.pop(s) },
+    ], { subtitle: 'For testing: earlier quests are marked complete and earn no coins.', onBack: () => this.ui.pop(s) });
+  }
+  jumpToQuest(stage: 1 | 2 | 3 | 4, diff: DifficultyId) {
+    if (stage === 1) { this.newGame(diff); return; }
+    const st = freshQuestState();
+    const done = (id: QuestId) => {
+      st.quests[id] = { status: 'completed', data: { __devSkipped: true } };
+      st.rewards[id] = computeReward({ questId: id, tuning: { base: 0, qualityMax: 0, speedMax: 0, hardBonus: 0 }, difficulty: diff, activeSeconds: 0, targetSeconds: 1, qualityScore: 0, skippedFraction: 1, devSkipped: true });
+    };
+    done('professors'); st.quests.construction.status = 'available';
+    let era: EraId = 'transition';
+    if (stage >= 3) { done('construction'); st.targets['construction:taylor'] = 'solved'; st.targets['construction:icenter'] = 'solved'; st.quests.letters.status = 'available'; era = 'byui'; }
+    if (stage >= 4) { done('letters'); st.quests.letters.data = { __devSkipped: true, cards: true, found: ['B', 'Y', 'U', 'I'], placed: ['B', 'Y', 'U', 'I'] }; era = 'presentFinale'; }
+    let player: SaveData['player'];
+    if (stage === 4) { const d = this.world.doorPlacement(this.location('door.stc.main')); player = { space: 'exterior', x: d.x + d.nx * 4, z: d.z + d.nz * 4, yaw: Math.atan2(-d.nx, -d.nz) }; }
+    else { const p = this.interiors.toWorld('kimball-office', 0, -4); player = { space: 'kimball-office', x: p.x, z: p.z, yaw: Math.PI }; }
+    this.continueGame({ version: 3, savedAt: '', difficulty: diff, era, colorStage: this.quests.completedCount(), quests: st.quests, targets: st.targets, rewards: st.rewards, player, coins: [], introSeen: true, finaleReached: false });
+    this.ui.toast(stage === 4 ? 'Testing: walk into the STC to trigger the finale.' : 'Testing: talk to President Bednar to start the quest.', 5000);
+  }
+
   private chooseDifficulty() {
     const s = this.ui.menu('Choose difficulty', GAME_CONFIG.difficulty.options.map(o => ({
-      label: o.label + (o.id === GAME_CONFIG.difficulty.default ? ' (default)' : ''), action: () => { this.ui.pop(s); this.newGame(o.id); },
-    })), { subtitle: 'Difficulty effects are not decided yet; quests can read this setting.', onBack: () => this.ui.pop(s) });
+      label: `${o.label} — ${o.hint}`, action: () => { this.ui.pop(s); this.newGame(o.id as DifficultyId); },
+    })), { subtitle: 'You can switch later from the pause menu; it applies to your next challenge attempt.', onBack: () => this.ui.pop(s) });
   }
   private confirmReset() {
     const s = this.ui.menu('Reset saved game?', [
@@ -545,28 +721,79 @@ export class Game {
   allControllers() { return [...this.gamepads.list(), ...this.ble.map(b => b.device), ...this.mocks.map(m => m.device)]; }
 
   showPause() {
-    this.quests.suspendAll();
-    const close = () => { this.ui.pop(s); this.quests.resumeAll(); };
-    const s = this.ui.menu('Paused', [
+    this.quests.suspendAll(); this.pauseOpen = true;
+    const close = () => { this.ui.pop(s); this.pauseOpen = false; this.quests.resumeAll(); };
+    const other = this.difficulty === 'easy' ? 'hard' : 'easy';
+    const items = [
       { label: 'Resume', action: close },
+      ...(this.hudBtn ? [{ label: this.hudBtn.label, action: () => { close(); this.hudBtn?.fn(); } }] : []),
+      { label: `Difficulty: ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} — switch to ${other === 'easy' ? 'Easy' : 'Hard'}`, action: () => {
+        this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
+      } },
+      { label: `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, action: () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; saveSettings(); close(); this.showPause(); } },
+      { label: `Sound: ${SETTINGS.muted ? 'Muted' : 'On'}`, action: () => { SETTINGS.muted = !SETTINGS.muted; saveSettings(); close(); this.showPause(); } },
+      { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Controllers', action: () => this.showControllers() },
-      { label: 'Skip current quest', disabled: this.quests.allComplete(), action: () => this.confirmSkip() },
+      ...(this.devMode ? [{ label: 'Skip current quest (dev — no reward)', disabled: this.quests.allComplete(), action: () => this.confirmSkip() }] : []),
       { label: 'Save game', action: () => { this.save(); this.ui.toast('Game saved in this browser.'); } },
-      { label: 'Save and quit to title', action: () => this.quitToTitle(true) },
+      { label: 'Save and quit to title', action: () => { this.pauseOpen = false; this.quitToTitle(true); } },
       { label: 'Reset saved game', action: () => this.confirmReset() },
-    ], { subtitle: `${ERAS[this.world.era].label} · difficulty: ${this.difficulty}`, onBack: close });
+    ];
+    const s = this.ui.menu('Paused', items, { subtitle: `${ERAS[this.world.era].label} · ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} · quest timers paused`, onBack: close });
     s.onPause = close;
   }
   private confirmSkip() {
     const id = this.quests.active() ?? this.quests.nextAvailable(); if (!id) return;
     const title = this.quests.modules.get(id)?.title ?? id;
     const s = this.ui.menu(`Skip "${title}"?`, [
-      { label: 'Yes, skip to the next quest', action: () => { this.ui.clear(); this.quests.resumeAll(); this.quests.forceComplete(id); } },
+      { label: 'Yes, skip (no reward)', action: () => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.quests.forceComplete(id); } },
       { label: 'Cancel', action: () => this.ui.pop(s) },
-    ], { subtitle: 'Counts the quest as completed (colour, era and buildings advance).', onBack: () => this.ui.pop(s) });
+    ], { subtitle: 'Developer skip: the story advances, but no coins are awarded.', onBack: () => this.ui.pop(s) });
   }
   quitToTitle(save: boolean) { if (save) this.save(); this.finale.stop(); this.showTitle(); }
+
+  // ---------------- inspectables (look-and-press discovery) ----------------
+  private raycaster = new THREE.Raycaster();
+  /** Inspectable under normalised screen coords (0,0 = centre), within its max distance of the player. */
+  inspectAt(nx: number, ny: number): Inspectable | null {
+    if (!this.inspectables.size || this.spaceId !== 'exterior') return null;
+    this.raycaster.setFromCamera(new THREE.Vector2(nx, ny), this.renderer.camera);
+    let best: Inspectable | null = null, bestD = Infinity;
+    for (const ins of this.inspectables.values()) {
+      if (ins.enabled && !ins.enabled()) continue;
+      const wp = new THREE.Vector3(); ins.object.getWorldPosition(wp);
+      if (wp.distanceTo(this.player.position) > (ins.maxDistance ?? 30)) continue;
+      const hit = this.raycaster.intersectObject(ins.object, true)[0];
+      if (hit && hit.distance < bestD) { bestD = hit.distance; best = ins; }
+    }
+    return best;
+  }
+  /** Mouse click on the 3D view inspects what is under the cursor. */
+  private setupClickInspect() {
+    let downAt: [number, number] | null = null;
+    this.renderer.canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+    this.renderer.canvas.addEventListener('pointerup', e => {
+      if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return; // a drag (camera orbit), not a click
+      if (this.mode !== 'playing' || this.ui.blocking || this.busy || this.cutscenes.active) return;
+      const r = this.renderer.canvas.getBoundingClientRect();
+      const hit = this.inspectAt(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      hit?.onInspect();
+    });
+  }
+
+  // ---------------- controller disconnect → pause + keyboard fallback ----------------
+  controllerLost = false;
+  private watchControllers() {
+    for (const c of this.allControllers()) {
+      const st = c.status();
+      if (st.connected) this.connectedControllers.add(st.id);
+      else if (this.connectedControllers.has(st.id)) {
+        this.connectedControllers.delete(st.id);
+        if (!this.pauseOpen) { this.ui.toast(`${st.label} disconnected — game paused. Keyboard still works.`, 5000); this.showPause(); }
+      }
+    }
+  }
 
   // ---------------- frame loop ----------------
   private frame() {
@@ -591,39 +818,66 @@ export class Game {
       this.markers.forEach(m => m.visible = false);
       this.npcs.setVisible(false);
       this.interactions.update(this.player.position.x, this.player.position.z, this.spaceId, this.world.era); // refresh marker visibility
+    } else if (this.cutscenes.active) {
+      // a story scene owns the camera; the world keeps animating, the player waits
+      const skip = a.pressed('back') || a.pressed('pause'); const next = a.pressed('confirm');
+      if (skip) { a.consume('back'); a.consume('pause'); } if (next) a.consume('confirm');
+      this.cutscenes.update(dt, next, skip);
+      this.player.update(dt, a, this.cameraRig.yaw, false);
+      if (this.spaceId === 'exterior') { this.npcs.setVisible(true); this.npcs.update(dt, this.player.position, (x, z, r) => this.world.blocked(x, z, r)); }
+      this.quests.update(dt); this.updateMarkers(dt); this.markers.forEach(m => m.visible = false);
+      this.world.updateSun(this.player.position);
+      this.ui.showHud(false);
     } else {
+      this.ui.showHud(true);
       const canAct = !uiBlocking && !this.busy && !this.interactions.busy;
       this.player.update(dt, a, this.cameraRig.yaw, canAct);
       this.cameraRig.follow = !!this.player.vehicle;
-      this.cameraRig.update(dt, uiBlocking ? null : a, this.player.position, this.space, this.player.yaw);
+      if (this.camFocus) { const c = this.renderer.camera; c.position.copy(this.camFocus.from); c.lookAt(this.camFocus.to); }
+      else this.cameraRig.update(dt, uiBlocking ? null : a, this.player.position, this.space, this.player.yaw);
       this.world.updateSun(this.player.position);
       this.quests.update(dt);
+      this.quests.tick(dt, !this.pauseOpen && !this.controllerLost);
       const focusRaw = this.interactions.update(this.player.position.x, this.player.position.z, this.spaceId, this.world.era);
       const focus = this.player.vehicle ? null : focusRaw;
       this.npcs.setVisible(this.spaceId === 'exterior');
       if (this.spaceId === 'exterior') this.npcs.update(dt, this.player.position, (x, z, r) => this.world.blocked(x, z, r) || Math.hypot(x - this.player.position.x, z - this.player.position.z) < r + 0.6);
-      const npc = !focus && !this.player.vehicle && this.spaceId === 'exterior' ? this.npcs.nearest(this.player.position.x, this.player.position.z, 2.4) : null;
+      // inspectables: whatever is under the screen-centre reticle
+      const insp = !focus && !this.player.vehicle && !uiBlocking ? this.inspectAt(0, 0) : null;
+      this.inspectFocus = insp;
+      this.ui.setReticle([...this.inspectables.values()].some(i => !i.enabled || i.enabled()) && this.spaceId === 'exterior' && !uiBlocking, !!insp);
+      const npc = !focus && !insp && !this.player.vehicle && this.spaceId === 'exterior' ? this.npcs.nearest(this.player.position.x, this.player.position.z, 2.4) : null;
       this.updateCoins(dt); this.updateMarkers(dt);
+      this.watchControllers();
       if (canAct) {
-        if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
+        if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
+        else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
         else if (focus && a.pressed('interact')) { a.consume('interact'); void this.interactions.trigger(); }
+        else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
+        else if (a.pressed('journal') && this.hudBtn) { a.consume('journal'); this.hudBtn.fn(); }
+        else if (a.pressed('map') && this.hudBtn?.viaMap) { a.consume('map'); this.hudBtn.fn(); }
         else if (a.pressed('map') && this.spaceId === 'exterior') { a.consume('map'); this.ui.bigMap(() => {}); }
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;
+      const coinTotal = this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin;
       this.ui.updateHud({
         objective: obj.text, era: ERAS[this.world.era].label,
-        prompt: canAct ? (this.player.vehicle ? 'Get out of the golf cart' : focus ? this.interactions.promptText(focus) : npc ? `Talk to ${GAME_CONFIG.npcs.title.toLowerCase()}` : null) : null,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, target: this.targetPoint(obj.target), interior: interiorLabel,
-        markers: this.markerPoints(), targetLabel: this.targetLabel(obj.target),
+        markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],
+        targetLabel: this.targetLabel(obj.target),
         doors: this.spaceId === 'exterior' ? this.entrances.filter(e => !e.eras || e.eras.includes(this.world.era)) : [],
-        coins: this.coins.length ? `● ${this.collectedCoins.size}/${this.coins.length} coins` : '', driving: !!this.player.vehicle,
+        coins: `● ${coinTotal} coins`, driving: !!this.player.vehicle,
       });
       this.autosaveT += dt; if (this.autosaveT > 20) { this.autosaveT = 0; this.save(); }
     }
+    this.effects.update(dt);
+    this.updateMouths(dt);
+    this.syncVehicles();
     if (this.overhead) {
       const c = this.renderer.camera, o = this.overhead, h = o.span / 2 / Math.tan(THREE.MathUtils.degToRad(c.fov / 2));
       c.position.set(o.x, h, o.z + 0.001); c.up.set(0, 0, -1); this.renderer.scene.fog = null; c.lookAt(o.x, 0, o.z); c.far = h + 500; c.updateProjectionMatrix();

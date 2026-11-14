@@ -23,7 +23,7 @@ export function installDevTools(game: Game) {
   const tp = section('Teleport');
   const sel = document.createElement('select');
   for (const [id, a] of Object.entries(GAME_CONFIG.locations)) { const o = document.createElement('option'); o.value = id; o.textContent = `${id}${a.space ? ' (' + a.space + ')' : ''}`; sel.appendChild(o); }
-  tp.append(sel, btn('Go', () => teleport(sel.value)), btn('STC door', () => teleport('door-stc')), btn('Copy position', () => {
+  tp.append(sel, btn('Go', () => teleport(sel.value)), btn('STC door', () => teleport('door.stc.main')), btn('Copy position', () => {
     const p = game.player.position;
     const [rx, rz] = game.spaceId === 'exterior' ? toReal(p.x, p.z) : [p.x - game.interiors.origin(game.spaceId).x, p.z - game.interiors.origin(game.spaceId).z];
     const s = `{ x: ${rx.toFixed(1)}, z: ${rz.toFixed(1)}${game.spaceId !== 'exterior' ? `, space: '${game.spaceId}'` : ''} }`;
@@ -48,6 +48,13 @@ export function installDevTools(game: Game) {
     btn('Replay ending', () => void game.finale.start()),
     btn('Overhead view (north up)', () => { game.overhead = game.overhead ? null : { x: game.player.position.x, z: game.player.position.z, span: 260 }; }),
   );
+  const sc = section('Cutscenes & effects (no rewards)');
+  const csSel = document.createElement('select');
+  const refreshCs = () => { csSel.replaceChildren(...[...game.cutscenes.history.keys()].map(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; return o; })); };
+  sc.append(csSel, btn('Refresh list', refreshCs), btn('Replay', () => { const s = game.cutscenes.history.get(csSel.value); if (s) void game.cutscenes.play({ ...s, replay: true }); }),
+    btn('Fireworks here', () => { const p = game.player.position; game.effects.fireworks(p.x, p.y + 20, p.z, 5); game.effects.colorWave(p.x, p.y, p.z); }));
+  const df = section('Difficulty');
+  df.append(btn('Easy', () => { game.difficulty = 'easy'; game.ui.toast('Difficulty: Easy'); }), btn('Hard', () => { game.difficulty = 'hard'; game.ui.toast('Difficulty: Hard'); }));
   const mc = section('Mock controllers');
   for (let i = 0; i < 2; i++) mc.appendChild(btn(`Toggle mock ${i + 1}`, () => toggleMock(i)));
 

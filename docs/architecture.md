@@ -55,10 +55,16 @@ Each device is an `InputSource`:
 
 `InputManager` merges them: the largest stick deflection wins and any device can press a button. Menu navigation repeats when a stick is held. The protocol is in `docs/controller-protocol.md`.
 
+## Story systems
+- **`cutscene/Cutscene.ts`:** reusable in-engine scenes made of camera moves, subtitles, prop animation and fades. They are skippable and replayable, and their `onDone` state change runs exactly once. The game saves before and after each scene.
+- **`quests/rewards.ts`:** pure reward maths and the active-time timer. `QuestManager` writes one immutable receipt per quest.
+- **`fx/fireworks.ts`, `fx/audio.ts`:** pooled fireworks, the colour-wave ring, and synthesized sounds.
+- **`core/settings.ts`:** reduced motion and mute, stored per viewer.
+
 ## Quests (`src/quests/`)
 - **`contract.ts`:** the only API quest modules use: `QuestModule` and `QuestContext`.
 - **`QuestManager.ts`:** status flow (`locked → available → active → completed`), per-quest saved progress, objectives, and target states. It hooks into the game for colour and era changes and building gates.
-- **`examples/*.dev.ts`:** clearly labelled development examples. Swap them in `quests/index.ts`.
+- **`q1/`, `q2/`, `q3/`:** the three quests. Their content is JSON in `data/`; `shared/` holds the challenge frame and scene helpers.
 - **Story flow** (in `game.ts`):
   1. Talk to Bednar in his office.
   2. Bednar assigns the next quest.

@@ -23,6 +23,8 @@ npm run dev        # http://localhost:5173
 | `npm run build` | Type-check and production build into `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | TypeScript only |
+| `npm test` | Unit tests (Alma 11 coins + fewest-coin DP, art scoring + fill, tile-circuit solver + scrambles, English keys, tiling solvability, rewards, quest idempotency, save migration) |
+| `npm run gen:tiling` | Regenerate the Quest 2 blueprint puzzles |
 | `npm run data:fetch-osm` / `data:fetch-elevation` / `data:build` | Rebuild the campus map data (see [Map data](#map-data)) |
 
 Add **`?dev=1`** to the URL for developer tools. Press <kbd>`</kbd> or <kbd>F1</kbd> to show or hide them.
@@ -52,10 +54,24 @@ Two custom ESP32 controllers can play at the same time; either one moves the sam
   - Buildings appear and disappear by researched dates.
   - Nothing says "BYU–Idaho" until all three quests are done.
 - **Colour:** each completed quest restores colour, from sepia to a warm 90s-photo grade.
-- **Quests:** each quest supports failed attempts and retries. All quest content is a clearly labelled **development example** until each owner delivers the real module.
-  1. **Recruit professors:** four NPCs, one inside a quest room.
-  2. **Construct buildings:** the Taylor Building and the I-Center are fenced sites with materials until you build them.
-  3. **Find the lost letters:** collect B, Y, U and I, then place them on the Ricks College sign.
+- **Difficulty:** Easy or Hard, chosen at the start and switchable from the pause menu (applies to your next attempt). Each quest has its own tuning for each mode.
+- **Quest 1, Hire the professors (fall 1999):** Bednar assigns it in his Kimball office. Four candidates wait at the Romney, Austin, Spori and Snow buildings, and each challenge has hints, retry and an optional skip:
+  - **Nephite Market** (math): customers queue at a barley stall; count out exact payments and change in Alma 11 coins before their patience runs out (fewest coins = perfect).
+  - **Paint a future temple concept** (art): pixel canvas with mirror and fill bucket; a passing painting is rebuilt as a spinning voxel model.
+  - **Light the Temple** (engineering): rotate wire tiles; a live circuit solver lights the bulbs (series dim, parallel bright, switches).
+  - **Red Pen Rush** (English): a printing press scrolls a labelled paraphrase of the June 21, 2000 announcement; stamp the mistakes at the red line and pick the fix.
+  - Every minigame ends with a 1–3 star rating; the Quest 2 blueprints use a tower-crane drop and a "Blueprint approved!" screen.
+  - When all four are hired, report back to Bednar.
+- **Quest 2, Build the campus (2001):**
+  - Blueprint tiling puzzles for the Taylor Building and the I-Center: fill the footprint with no gaps or overlaps, and ignore the decoy pieces.
+  - Both sites stay fenced until their blueprint is solved; each building then rises in a short montage.
+  - Report back to Bednar to finish.
+- **Quest 3, Find and place B Y U I (2011):**
+  - Bednar hands over four illustrated clue cards, which you can reread any time in the Journal (J).
+  - Letters are camouflaged in the architecture at the library, temple approach, Hart Building and Snow Building. Find them by looking and pressing Interact.
+  - Placing the 4th letter on the sign by the roundabout sets off the celebration: full colour, fireworks, a cheering crowd.
+- **Rewards:** each quest pays once: base 100, plus up to 50 for quality and 50 for speed, plus 25 on Hard. Quest timers pause during menus and cutscenes.
+- **Cutscenes:** short, skippable, subtitled in-engine scenes. Reduced-motion and mute settings are in the pause menu.
 - **Places:** enterable Kimball Building (President Bednar's office), a quest room, and the STC first floor (finale). Viking Stadium and the upper fields. Benches, lamps, a fountain and street signs.
 - **Getting around:** golf carts, collectible coins, walking students you can talk to, an objective pointer, minimap and full map markers, and green entrance icons.
 - **Menus and saves:** title, difficulty, pause, controls, controller status, local save/continue (versioned), and "skip quest".

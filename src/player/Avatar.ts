@@ -11,9 +11,12 @@ export class Avatar {
   private armL: THREE.Object3D; private armR: THREE.Object3D;
   private phase = 0;
   private label?: THREE.Sprite;
+  private mouth!: THREE.Mesh;
+  private talkT = 0;
+  talking = false;
 
   constructor(look: AvatarLook, scale = 1) {
-    const mat = (c: string) => new THREE.MeshLambertMaterial({ color: c });
+    const mat = (c: string) => new THREE.MeshStandardMaterial({ color: c });
     const box = (w: number, h: number, d: number, c: string) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.castShadow = true; return m; };
     const body = new THREE.Group(); body.scale.setScalar(scale); this.root.add(body);
     const limb = (w: number, h: number, c: string, x: number, y: number, footC?: string) => {
@@ -33,7 +36,8 @@ export class Avatar {
     const head = box(0.48, 0.48, 0.46, look.skin); head.position.y = 1.78; body.add(head);
     const hair = box(0.52, 0.16, 0.5, look.hair); hair.position.y = 2.06; body.add(hair);
     const back = box(0.52, 0.3, 0.1, look.hair); back.position.set(0, 1.9, -0.22); body.add(back);
-    for (const x of [-0.11, 0.11]) { const eye = box(0.07, 0.07, 0.02, '#1d1d1d'); eye.position.set(x, 1.8, 0.235); body.add(eye); }
+    for (const x of [-0.11, 0.11]) { const eye = box(0.07, 0.07, 0.02, '#1d1d1d'); eye.position.set(x, 1.84, 0.235); body.add(eye); }
+    this.mouth = box(0.16, 0.035, 0.02, '#5a2a24'); this.mouth.position.set(0, 1.66, 0.236); body.add(this.mouth);
   }
 
   setLabel(text: string, sub?: string, height = 3.0) {
@@ -49,6 +53,12 @@ export class Avatar {
     const a = Math.sin(this.phase) * Math.min(0.9, speed * 0.16 + (speed > 0.1 ? 0.25 : 0));
     this.legL.rotation.x = a; this.legR.rotation.x = -a; this.armL.rotation.x = -a * 0.8; this.armR.rotation.x = a * 0.8;
   }
+  /** Mouth opens and closes while this character's line is shown. */
+  updateMouth(dt: number) {
+    if (this.talking) { this.talkT += dt; const o = Math.abs(Math.sin(this.talkT * 13)) * (0.6 + 0.4 * Math.sin(this.talkT * 3.1)); this.mouth.scale.y = 1 + o * 3.2; }
+    else if (this.mouth.scale.y !== 1) { this.mouth.scale.y += (1 - this.mouth.scale.y) * Math.min(1, dt * 15); }
+  }
+
   /** Seated pose (driving): legs forward, arms reaching to the wheel. */
   sit(on: boolean) {
     this.seated = on;
@@ -56,6 +66,13 @@ export class Avatar {
     this.armL.rotation.x = this.armR.rotation.x = on ? -0.9 : 0;
   }
   seated = false;
+  private pedalT = 0;
+  /** Bicycle pose: legs pedal with speed, arms forward on the handlebar. */
+  pedal(speed: number) {
+    this.seated = true; this.pedalT += speed * 0.05;
+    this.legL.rotation.x = -0.9 + Math.sin(this.pedalT) * 0.5; this.legR.rotation.x = -0.9 - Math.sin(this.pedalT) * 0.5;
+    this.armL.rotation.x = this.armR.rotation.x = -1.1;
+  }
   wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; }
 }
 

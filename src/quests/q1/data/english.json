@@ -1,0 +1,127 @@
+{
+ "label": "GAME PARAPHRASE — fictional text written for this game, not a quotation. Facts checked against byui.edu/speeches/announcement-ricks-college-to-become-byu-idaho (2026-11-13).",
+ "facts": [
+  "The announcement was made on June 21, 2000.",
+  "President Gordon B. Hinckley delivered the announcement.",
+  "Ricks College is in Rexburg, Idaho.",
+  "The school would change from a two-year junior college to a four-year institution.",
+  "Its new name would be Brigham Young University–Idaho.",
+  "The change would be phased in over a period of time."
+ ],
+ "passages": {
+  "easy": {
+   "text": "On June 21, 1999, President Gordon B. Hinckley announced that Ricks College in Rexburg, Montana, would grow from a two-year junior college into a three-year institution. The change would be phased in over a period of time.",
+   "errors": [
+    {
+     "word": "1999,",
+     "correct": "2000,",
+     "options": [
+      "2000,",
+      "2001,",
+      "1998,"
+     ],
+     "why": "The announcement was made on June 21, 2000."
+    },
+    {
+     "word": "Montana,",
+     "correct": "Idaho,",
+     "options": [
+      "Idaho,",
+      "Utah,",
+      "Wyoming,"
+     ],
+     "why": "Rexburg is in Idaho."
+    },
+    {
+     "word": "three-year",
+     "correct": "four-year",
+     "options": [
+      "four-year",
+      "two-year",
+      "five-year"
+     ],
+     "why": "The school became a four-year institution."
+    }
+   ]
+  },
+  "hard": {
+   "text": "On June 21, 1999, President Gordon B. Hinckley announced that Ricks College in Rexburg, Montana, would grow from a two-year junior college into a three-year institution. The school would receives a new name: Brigham Young University–Utah. The change were phased in over a period of time.",
+   "errors": [
+    {
+     "word": "1999,",
+     "correct": "2000,",
+     "options": [
+      "2000,",
+      "2001,",
+      "1998,"
+     ],
+     "why": "The announcement was made on June 21, 2000."
+    },
+    {
+     "word": "Montana,",
+     "correct": "Idaho,",
+     "options": [
+      "Idaho,",
+      "Utah,",
+      "Wyoming,"
+     ],
+     "why": "Rexburg is in Idaho."
+    },
+    {
+     "word": "three-year",
+     "correct": "four-year",
+     "options": [
+      "four-year",
+      "two-year",
+      "five-year"
+     ],
+     "why": "The school became a four-year institution."
+    },
+    {
+     "word": "receives",
+     "correct": "receive",
+     "options": [
+      "receive",
+      "received",
+      "receiving"
+     ],
+     "why": "After \"would\", use the base form: would receive."
+    },
+    {
+     "word": "University–Utah.",
+     "correct": "University–Idaho.",
+     "options": [
+      "University–Idaho.",
+      "University–Rexburg.",
+      "University–West."
+     ],
+     "why": "The new name was Brigham Young University–Idaho."
+    },
+    {
+     "word": "were",
+     "correct": "would be",
+     "options": [
+      "would be",
+      "are",
+      "was being"
+     ],
+     "why": "The change would be phased in (future in the past)."
+    }
+   ]
+  }
+ },
+ "modes": {
+  "easy": {
+   "wrongAllowance": -1,
+   "hints": 3,
+   "hintStyle": "glow",
+   "speed": 55
+  },
+  "hard": {
+   "wrongAllowance": 2,
+   "hints": 1,
+   "hintStyle": "count",
+   "speed": 90
+  }
+ }
+}

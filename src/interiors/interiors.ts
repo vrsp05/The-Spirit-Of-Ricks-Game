@@ -87,9 +87,9 @@ export class InteriorManager {
     const fx = fc.getContext('2d')!;
     for (let j = 0; j < D; j++) for (let i = 0; i < W; i++) { fx.fillStyle = (i + j) % 2 ? d.floor : shade(d.floor, 0.92); fx.fillRect(i * 8, j * 8, 8, 8); }
     const ft = new THREE.CanvasTexture(fc); ft.magFilter = THREE.NearestFilter; ft.colorSpace = THREE.SRGBColorSpace;
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshLambertMaterial({ map: ft }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ft }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
-    const wallMat = new THREE.MeshLambertMaterial({ color: d.wall });
+    const wallMat = new THREE.MeshStandardMaterial({ color: d.wall });
     const addBox = (r: Rect, h: number, mat: THREE.Material) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(r.x1 - r.x0, h, r.z1 - r.z0), mat);
       m.position.set((r.x0 + r.x1) / 2, h / 2, (r.z0 + r.z1) / 2); m.castShadow = m.receiveShadow = true; g.add(m);
@@ -102,9 +102,9 @@ export class InteriorManager {
     addBox({ x0: -W / 2 - t, z0: D / 2, x1: -1.5, z1: D / 2 + t }, 1.2, wallMat);
     addBox({ x0: 1.5, z0: D / 2, x1: W / 2 + t, z1: D / 2 + t }, 1.2, wallMat);
     for (const r of d.walls) addBox(r, r.h ?? H, wallMat);
-    for (const p of d.props) addBox(p, p.h ?? 1, new THREE.MeshLambertMaterial({ color: p.color ?? '#7a6a5a' }));
+    for (const p of d.props) addBox(p, p.h ?? 1, new THREE.MeshStandardMaterial({ color: p.color ?? '#7a6a5a' }));
     // exit mat
-    const mat = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.4), new THREE.MeshLambertMaterial({ color: '#6b2f2a' }));
+    const mat = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.4), new THREE.MeshStandardMaterial({ color: '#6b2f2a' }));
     mat.rotation.x = -Math.PI / 2; mat.position.set(0, 0.02, D / 2 - 0.8); g.add(mat);
     for (const s of d.signs) {
       const tex = new THREE.CanvasTexture(textCanvas(s.text, { w: 512, h: 128, bg: '#2d3a46' })); tex.colorSpace = THREE.SRGBColorSpace;

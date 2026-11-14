@@ -1,14 +1,10 @@
-// Quest registration. Teammates: swap a dev example for your module here —
-// no other core file needs to change. Keep the stable ids.
+// Quest registration (stable ids: professors, construction, letters).
+// Each module only uses the contract in ./contract.ts; content lives in ./q*/data/*.json.
 import type { QuestModule } from './contract';
-import { createProfessorsDev } from './examples/professors.dev';
-import { createConstructionDev } from './examples/construction.dev';
-import { createLettersDev } from './examples/letters.dev';
+import { createProfessors } from './q1/professors';
+import { createConstruction } from './q2/construction';
+import { createLetters } from './q3/letters';
 
 export function createQuestModules(): QuestModule[] {
-  return [
-    createProfessorsDev(),    // TODO(Quest 1 owner): replace with real module
-    createConstructionDev(),  // TODO(Quest 2 owner): replace with real module
-    createLettersDev(),       // TODO(Quest 3 owner): replace with real module
-  ];
+  return [createProfessors(), createConstruction(), createLetters()];
 }

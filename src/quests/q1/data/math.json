@@ -1,0 +1,352 @@
+{
+ "source": "Alma 11:3–19, 22 (checked against churchofjesuschrist.org on 2026-11-13). Values are in senums / senines (a senum of silver equals a senine of gold, v.7).",
+ "reference": [
+  {
+   "gold": "senine",
+   "silver": "senum",
+   "value": 1,
+   "note": "one measure of barley (v.7)"
+  },
+  {
+   "gold": "seon",
+   "silver": "amnor",
+   "value": 2,
+   "note": "twice a senine / two senums (vv.8, 11)"
+  },
+  {
+   "gold": "shum",
+   "silver": "ezrom",
+   "value": 4,
+   "note": "twice a seon / four senums (vv.9, 12)"
+  },
+  {
+   "gold": "limnah",
+   "silver": "onti",
+   "value": 7,
+   "note": "the value of them all: 1 + 2 + 4 (vv.10, 13)"
+  },
+  {
+   "gold": "",
+   "silver": "shiblon",
+   "value": 0.5,
+   "note": "half of a senum (v.15)"
+  },
+  {
+   "gold": "",
+   "silver": "shiblum",
+   "value": 0.25,
+   "note": "half of a shiblon (v.16)"
+  },
+  {
+   "gold": "",
+   "silver": "leah",
+   "value": 0.125,
+   "note": "half of a shiblum (v.17)"
+  },
+  {
+   "gold": "antion",
+   "silver": "",
+   "value": 1.5,
+   "note": "equal to three shiblons (v.19)"
+  }
+ ],
+ "story": "Market day. One senine of gold (or one senum of silver) buys one measure of barley (Alma 11:7). Count out exact payments and change with the coins on your tray.",
+ "coins": [
+  {
+   "id": "senine",
+   "metal": "gold",
+   "value": 1
+  },
+  {
+   "id": "seon",
+   "metal": "gold",
+   "value": 2
+  },
+  {
+   "id": "shum",
+   "metal": "gold",
+   "value": 4
+  },
+  {
+   "id": "limnah",
+   "metal": "gold",
+   "value": 7
+  },
+  {
+   "id": "antion",
+   "metal": "gold",
+   "value": 1.5
+  },
+  {
+   "id": "senum",
+   "metal": "silver",
+   "value": 1
+  },
+  {
+   "id": "amnor",
+   "metal": "silver",
+   "value": 2
+  },
+  {
+   "id": "ezrom",
+   "metal": "silver",
+   "value": 4
+  },
+  {
+   "id": "onti",
+   "metal": "silver",
+   "value": 7
+  },
+  {
+   "id": "shiblon",
+   "metal": "silver",
+   "value": 0.5
+  },
+  {
+   "id": "shiblum",
+   "metal": "silver",
+   "value": 0.25
+  },
+  {
+   "id": "leah",
+   "metal": "silver",
+   "value": 0.125
+  }
+ ],
+ "orders": [
+  {
+   "id": "farmer3",
+   "tier": "basic",
+   "who": "Barley farmer",
+   "say": "Three measures of barley, please! Pay the farmer in gold.",
+   "target": 3,
+   "coins": [
+    "senine",
+    "seon",
+    "shum",
+    "limnah"
+   ]
+  },
+  {
+   "id": "weaver5",
+   "tier": "basic",
+   "who": "Weaver",
+   "say": "Five measures for my family. Gold coins, please.",
+   "target": 5,
+   "coins": [
+    "senine",
+    "seon",
+    "shum",
+    "limnah"
+   ]
+  },
+  {
+   "id": "potter6",
+   "tier": "basic",
+   "who": "Potter",
+   "say": "Six measures. I only take silver!",
+   "target": 6,
+   "coins": [
+    "senum",
+    "amnor",
+    "ezrom",
+    "onti"
+   ]
+  },
+  {
+   "id": "judge7",
+   "tier": "basic",
+   "who": "Judge's scribe",
+   "say": "Pay the judge for seven days of work, one senine of gold a day (Alma 11:3).",
+   "target": 7,
+   "coins": [
+    "senine",
+    "seon",
+    "shum",
+    "limnah"
+   ]
+  },
+  {
+   "id": "fisher9",
+   "tier": "basic",
+   "who": "Fisherman",
+   "say": "Nine measures, quickly — the boats are leaving! Silver only.",
+   "target": 9,
+   "coins": [
+    "senum",
+    "amnor",
+    "ezrom",
+    "onti"
+   ]
+  },
+  {
+   "id": "baker11",
+   "tier": "basic",
+   "who": "Baker",
+   "say": "Eleven measures for the bakery, in gold.",
+   "target": 11,
+   "coins": [
+    "senine",
+    "seon",
+    "shum",
+    "limnah"
+   ]
+  },
+  {
+   "id": "judge10",
+   "tier": "basic",
+   "who": "Judge's scribe",
+   "say": "Ten days of judging at one senum of silver a day.",
+   "target": 10,
+   "coins": [
+    "senum",
+    "amnor",
+    "ezrom",
+    "onti"
+   ]
+  },
+  {
+   "id": "shepherd8",
+   "tier": "basic",
+   "who": "Shepherd",
+   "say": "Eight measures for the flock. Gold, if you please.",
+   "target": 8,
+   "coins": [
+    "senine",
+    "seon",
+    "shum",
+    "limnah"
+   ]
+  },
+  {
+   "id": "change-onti",
+   "tier": "basic",
+   "who": "Merchant",
+   "say": "I paid you an onti for four measures. Give me my change in silver.",
+   "price": 4,
+   "paidWith": "onti",
+   "target": 3,
+   "coins": [
+    "senum",
+    "amnor",
+    "ezrom"
+   ]
+  },
+  {
+   "id": "half",
+   "tier": "advanced",
+   "who": "Child",
+   "say": "One and a half measures, please! Small silver coins only.",
+   "target": 1.5,
+   "coins": [
+    "senum",
+    "shiblon",
+    "shiblum",
+    "leah"
+   ]
+  },
+  {
+   "id": "antion",
+   "tier": "advanced",
+   "who": "Goldsmith",
+   "say": "Three and a half measures — gold coins only.",
+   "target": 3.5,
+   "coins": [
+    "senine",
+    "seon",
+    "antion"
+   ]
+  },
+  {
+   "id": "quarter",
+   "tier": "advanced",
+   "who": "Herb seller",
+   "say": "Two and a quarter measures of barley.",
+   "target": 2.25,
+   "coins": [
+    "senum",
+    "amnor",
+    "shiblon",
+    "shiblum"
+   ]
+  },
+  {
+   "id": "threequarter",
+   "tier": "advanced",
+   "who": "Scribe",
+   "say": "Three quarters of a measure for my lunch.",
+   "target": 0.75,
+   "coins": [
+    "shiblon",
+    "shiblum",
+    "leah"
+   ]
+  },
+  {
+   "id": "change-limnah",
+   "tier": "advanced",
+   "who": "Traveller",
+   "say": "I paid a limnah for five and a half measures. My change, in gold?",
+   "price": 5.5,
+   "paidWith": "limnah",
+   "target": 1.5,
+   "coins": [
+    "senine",
+    "seon",
+    "antion"
+   ]
+  },
+  {
+   "id": "leah",
+   "tier": "advanced",
+   "who": "Spice trader",
+   "say": "Four and one-eighth measures. Exactly, please.",
+   "target": 4.125,
+   "coins": [
+    "senum",
+    "amnor",
+    "ezrom",
+    "leah"
+   ]
+  },
+  {
+   "id": "change-ezrom",
+   "tier": "advanced",
+   "who": "Carpenter",
+   "say": "I paid an ezrom for two and three-quarter measures. Change, please!",
+   "price": 2.75,
+   "paidWith": "ezrom",
+   "target": 1.25,
+   "coins": [
+    "senum",
+    "shiblon",
+    "shiblum",
+    "leah"
+   ]
+  }
+ ],
+ "modes": {
+  "easy": {
+   "customers": 5,
+   "pass": 3,
+   "patience": 40,
+   "tiers": [
+    "basic"
+   ],
+   "hints": 3,
+   "showValues": true
+  },
+  "hard": {
+   "customers": 6,
+   "pass": 5,
+   "patience": 24,
+   "tiers": [
+    "basic",
+    "advanced"
+   ],
+   "minAdvanced": 3,
+   "hints": 1,
+   "showValues": false
+  }
+ }
+}

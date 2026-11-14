@@ -50,7 +50,20 @@ Each controller is an ESP32-WROOM with two joysticks (each with a click), four b
 | B3 | map / objective |
 | B4 | pause |
 
-Configure this in `GAME_CONFIG.input.controllerButtons`. **Merging:** for each axis the largest deflection wins; any controller can press a button.
+Configure this in `GAME_CONFIG.input.controllerButtons`.
+
+### Inside minigames (4 buttons + 2 sticks only)
+| Input | Keyboard | Minigame action |
+|---|---|---|
+| Left stick | WASD / arrows | move cursor / focus |
+| Right stick ← → | F / R | cycle (colour, piece, wire direction) |
+| Right stick ↑ ↓ | T / G | secondary (mirror, rotate, test) |
+| B1 | E / Enter | do it (paint, place, select, flip) |
+| B2 | Esc / Backspace | erase / cancel / leave |
+| B3 | H | hint |
+| B4 | Tab | tools bar (check, undo, reset, skip, leave) |
+
+Stick clicks are not needed in any minigame. Every minigame shows this legend at the bottom. **Merging:** for each axis the largest deflection wins; any controller can press a button.
 
 ## Testing without hardware
 Open `?dev=1` and use **Toggle mock 1/2** to show on-screen controllers. They encode real v1 reports and decode them through the same path as BLE. **Toggle input view** shows raw axes and buttons, connection state, packet age and drop counts.

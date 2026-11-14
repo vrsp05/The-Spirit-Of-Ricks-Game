@@ -1,0 +1,20 @@
+{
+  "note": "Authored game dialogue for fictional characters. The Bednar character's lines are NOT real quotes.",
+  "assign": [
+    { "speaker": "President Bednar (game character)", "text": "Thank you for coming. Our college is growing, and our students need more great teachers." },
+    { "speaker": "President Bednar (game character)", "text": "Four candidates are waiting at their department buildings: math at the Romney Building, engineering at the Austin Building, art at the Spori Building, and English at the Snow Building." },
+    { "speaker": "President Bednar (game character)", "text": "Meet each one, see what they can do, and hire them. Then come back and report to me." }
+  ],
+  "reminder": "Candidates still waiting: {list}. Their buildings are marked on your map.",
+  "readyReminder": "All four are hired? Wonderful — tell me about them.",
+  "report": [
+    { "speaker": "President Bednar (game character)", "text": "Let me see the list… math, engineering, art and English. All four hired." },
+    { "speaker": "President Bednar (game character)", "text": "These teachers will bless many students. Well done." }
+  ],
+  "greetings": {
+    "math": "Hello! I love the money system in Alma 11. Shall we convert a few coins?",
+    "engineering": "Hi there. I sketched a lighting plan for a future temple concept. Help me wire it?",
+    "art": "Welcome! I'm painting a concept for a future temple. Can you match my reference?",
+    "english": "Good to meet you. This announcement paraphrase has mistakes — care to edit it?"
+  }
+}

@@ -1,7 +1,9 @@
 // DOM UI: a stack of focus-navigable screens driven by the action layer, plus HUD.
 // Every screen works with keyboard, mouse and controllers (nav*/confirm/back).
 import type { ActionState } from '../input/actions';
-import type { CustomPanel, DialogueLine, PanelSpec } from '../quests/contract';
+import type { ButtonName } from '../input/actions';
+import type { CustomPanel, DialogueLine, PanelAction, PanelSpec } from '../quests/contract';
+import type { RewardReceipt } from '../quests/rewards';
 import { CAMPUS } from '../world/campusData';
 import './styles.css';
 
@@ -16,6 +18,8 @@ interface Screen {
   blocksWorld: boolean;
   focusIndex: number;
   cleanup?: () => void;
+  actionHandler?: (a: PanelAction) => boolean;
+  toolsMode?: boolean;
 }
 export interface MenuItem { label: string; action: () => void; disabled?: boolean; hint?: string }
 
@@ -39,6 +43,8 @@ export class UI {
   private overlay: HTMLElement;
   private pointer: HTMLElement; private arrow: HTMLElement; private ptext: HTMLElement; private coinsEl: HTMLElement; private helpEl: HTMLElement;
   lastHud: HudData | null = null;
+  /** Speaker of the line currently on screen (dialogue or cutscene subtitle), for mouth animation. */
+  currentSpeaker: string | null = null;
   /** 0 = sepia … 1 = colour; keeps 2D maps consistent with the symbolic colour grade. */
   setMapColor(amount: number) { this.root.style.setProperty('--map-sepia', String(1 - amount)); }
 
@@ -51,10 +57,14 @@ export class UI {
         <div class="hud-mini"><canvas width="180" height="180"></canvas><div class="hud-dist"></div>
           <div class="hud-c n">N</div><div class="hud-c e">E</div><div class="hud-c s">S</div><div class="hud-c w">W</div></div>
         <div class="hud-coins"></div>
+        <button class="hud-btn hidden" tabindex="-1"></button>
+        <div class="hud-banner hidden"></div>
+        <div class="hud-reticle hidden">+</div>
         <div class="hud-prompt hidden"></div>
         <div class="hud-toasts"></div>
         <div class="hud-help">WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause</div>
       </div>
+      <div class="subtitle hidden"><div class="sub-speaker"></div><div class="sub-text"></div><div class="sub-hint"></div></div>
       <div class="screens"></div>
       <div class="fade"></div>`;
     this.hud = root.querySelector('.hud')!;
@@ -67,6 +77,48 @@ export class UI {
     this.overlay = root.querySelector('.screens')!;
     this.pointer = root.querySelector('.hud-pointer')!; this.arrow = root.querySelector('.hud-arrow')!; this.ptext = root.querySelector('.hud-ptext')!;
     this.coinsEl = root.querySelector('.hud-coins')!; this.helpEl = root.querySelector('.hud-help')!;
+    this.banner = root.querySelector('.hud-banner')!; this.reticle = root.querySelector('.hud-reticle')!;
+    this.hudBtn = root.querySelector('.hud-btn')!; this.subEl = root.querySelector('.subtitle')!;
+    this.hudBtn.addEventListener('click', () => this.hudBtnAction?.());
+    // Scale the whole interface to the window so nothing ends up off-screen (laptops, zoomed browsers).
+    const fit = () => {
+      const z = Math.max(0.5, Math.min(1, window.innerWidth / 1280, window.innerHeight / 800));
+      document.documentElement.style.setProperty('--ui-zoom', z.toFixed(3));
+    };
+    window.addEventListener('resize', () => { fit(); keepOnScreen(); }); fit();
+    // Safety net that works in any browser: measure the corner HUD boxes and pull back any
+    // that stick out of the window (independent of how the browser handles CSS scaling).
+    const pinned = ['.hud-mini', '.hud-coins', '.hud-btn', '.hud-top', '.hud-help'];
+    const keepOnScreen = () => {
+      const vw = Math.min(window.innerWidth, document.documentElement.clientWidth || Infinity, window.visualViewport?.width ?? Infinity);
+      const vh = Math.min(window.innerHeight, document.documentElement.clientHeight || Infinity, window.visualViewport?.height ?? Infinity);
+      for (const sel of pinned) {
+        const el = root.querySelector<HTMLElement>(sel); if (!el || el.offsetParent === null) continue;
+        el.style.marginLeft = el.style.marginTop = el.style.marginRight = el.style.marginBottom = '';
+        const r = el.getBoundingClientRect(); if (!r.width) continue;
+        const k = r.width / (el.offsetWidth || r.width);                        // current scale factor
+        const right = getComputedStyle(el).right !== 'auto' && getComputedStyle(el).left === 'auto';
+        let dx = 0, dy = 0;
+        if (r.right > vw - 6) dx = vw - 6 - r.right; if (r.left + dx < 6) dx = 6 - r.left;
+        if (r.bottom > vh - 6) dy = vh - 6 - r.bottom; if (r.top + dy < 6) dy = 6 - r.top;
+        // margins move the unscaled box; right-anchored boxes move with margin-right
+        if (dx) { if (right) el.style.marginRight = `${-dx / k}px`; else el.style.marginLeft = `${dx / k}px`; }
+        if (dy) el.style.marginTop = `${dy / k}px`;
+      }
+    };
+    window.setInterval(keepOnScreen, 700); requestAnimationFrame(keepOnScreen);
+  }
+  private banner!: HTMLElement; private reticle!: HTMLElement; private hudBtn!: HTMLButtonElement; private subEl!: HTMLElement;
+  private hudBtnAction: (() => void) | null = null;
+  setBanner(text: string | null) { this.banner.classList.toggle('hidden', !text); if (text) this.banner.textContent = text; }
+  setReticle(visible: boolean, active = false) { this.reticle.classList.toggle('hidden', !visible); this.reticle.classList.toggle('active', active); }
+  setHudButton(label: string | null, action: (() => void) | null) { this.hudBtn.classList.toggle('hidden', !label); if (label) this.hudBtn.textContent = label; this.hudBtnAction = action; }
+  subtitle(line: { speaker: string; text: string } | null, hint: string) {
+    this.currentSpeaker = line?.speaker || null;
+    this.subEl.classList.toggle('hidden', !line && !hint);
+    (this.subEl.querySelector('.sub-speaker') as HTMLElement).textContent = line?.speaker ?? '';
+    (this.subEl.querySelector('.sub-text') as HTMLElement).textContent = line?.text ?? '';
+    (this.subEl.querySelector('.sub-hint') as HTMLElement).textContent = hint;
   }
 
   get blocking() { return this.stack.some(s => s.blocksWorld); }
@@ -90,7 +142,14 @@ export class UI {
     if (this.top) this.paintFocus(this.top);
   }
   clear() { while (this.stack.length) this.pop(); }
-  private focusables(s: Screen) { return [...s.el.querySelectorAll<HTMLElement>('[data-focus]')].filter(e => !(e as HTMLButtonElement).disabled && e.offsetParent !== null); }
+  private focusables(s: Screen) {
+    const all = [...s.el.querySelectorAll<HTMLElement>('[data-focus]')].filter(e => !(e as HTMLButtonElement).disabled && e.offsetParent !== null);
+    if (!s.actionHandler) return all;
+    // minigames: the tools bar (.tools-zone) is reached with ④; otherwise focus stays in the game area
+    const inTools = (e: HTMLElement) => !!e.closest('.tools-zone');
+    const zone = all.filter(e => inTools(e) === !!s.toolsMode);
+    return zone.length ? zone : all;
+  }
   private paintFocus(s: Screen) {
     const f = this.focusables(s); if (!f.length) return;
     s.focusIndex = Math.max(0, Math.min(f.length - 1, s.focusIndex));
@@ -101,6 +160,23 @@ export class UI {
   /** Route actions to the top screen. Returns true if the UI consumed input. */
   update(a: ActionState): boolean {
     const s = this.top; if (!s) return false;
+    if (s.actionHandler) {
+      // Minigames: 4 buttons + 2 sticks. ③ (map) = hint, ④ (pause / Tab) = tools bar, right stick = alt/alt2/rup/rdown.
+      const backNow = a.pressed('back');
+      const table: [PanelAction, ButtonName[]][] = [['up', ['navUp']], ['down', ['navDown']], ['left', ['navLeft']], ['right', ['navRight']],
+        ['confirm', ['confirm']], ['back', ['back']], ['alt', ['alt', 'rRight']], ['alt2', ['alt2', 'rLeft']], ['rup', ['rUp']], ['rdown', ['rDown']],
+        ['hint', ['hint', 'map']], ['tools', backNow ? ['tools'] : ['tools', 'pause']]];
+      for (const [pa, btns] of table) {
+        if (!btns.some(b => a.pressed(b))) continue;
+        let used = false;
+        if (pa === 'tools') { s.toolsMode = !s.toolsMode; s.focusIndex = 0; this.paintFocus(s); used = true; }
+        else if (s.toolsMode && pa === 'back') { s.toolsMode = false; s.focusIndex = 0; this.paintFocus(s); used = true; }
+        else if (!s.toolsMode || pa === 'hint') used = s.actionHandler(pa);
+        if (used) { btns.forEach(b => a.consume(b)); if (pa === 'confirm') a.consume('interact'); if (pa === 'back' || pa === 'tools') { a.consume('pause'); a.consume('back'); } }
+      }
+      if (!this.stack.includes(s)) return true; // handler closed the screen
+      s.el.classList.toggle('tools-mode', !!s.toolsMode);
+    }
     const f = this.focusables(s);
     const move = (d: number) => { if (f.length) { s.focusIndex = (s.focusIndex + d + f.length) % f.length; this.paintFocus(s); } };
     if (a.pressed('navUp') || a.pressed('navLeft')) move(-1);
@@ -136,10 +212,11 @@ export class UI {
       el.innerHTML = `<div class="dlg"><div class="dlg-speaker"></div><div class="dlg-text"></div><div class="dlg-next">Confirm ▸</div></div>`;
       const render = () => {
         const l = lines[i];
+        this.currentSpeaker = l.speaker;
         el.querySelector('.dlg-speaker')!.innerHTML = esc(l.speaker) + (l.placeholder ? ' <span class="badge">PLACEHOLDER DIALOGUE</span>' : '');
         el.querySelector('.dlg-text')!.textContent = l.text;
       };
-      const next = () => { i++; if (i >= lines.length) { this.pop(s); resolve(); } else render(); };
+      const next = () => { i++; if (i >= lines.length) { this.currentSpeaker = null; this.pop(s); resolve(); } else render(); };
       el.addEventListener('click', next);
       render();
       const s = this.push(el, { onConfirmEmpty: next, onBack: next });
@@ -160,14 +237,30 @@ export class UI {
     });
   }
 
-  custom(title: string, render: CustomPanel, opts: { placeholder?: boolean } = {}): Promise<string | null> {
+  custom(title: string, render: CustomPanel, opts: { placeholder?: boolean; wide?: boolean; className?: string } = {}): Promise<string | null> {
     return new Promise(resolve => {
-      const el = document.createElement('div'); el.className = 'screen menu';
-      el.innerHTML = `<div class="panel"><h2>${esc(title)} ${opts.placeholder ? '<span class="badge">DEV EXAMPLE</span>' : ''}</h2><div class="custom"></div></div>`;
-      let s: Screen;
-      const close = (r: string | null) => { this.pop(s); resolve(r); };
-      const cleanup = render(el.querySelector('.custom') as HTMLElement, { close, refocus: () => this.paintFocus(s) });
+      const el = document.createElement('div'); el.className = `screen menu ${opts.className ?? ''}`;
+      el.innerHTML = `<div class="panel ${opts.wide ? 'wide' : ''}">${title ? `<h2>${esc(title)} ${opts.placeholder ? '<span class="badge">DEV EXAMPLE</span>' : ''}</h2>` : ''}<div class="custom"></div></div>`;
+      let s: Screen | undefined; let handler: ((a: PanelAction) => boolean) | undefined; let closed = false;
+      const close = (r: string | null) => { if (closed) return; closed = true; if (s) this.pop(s); resolve(r); };
+      const cleanup = render(el.querySelector('.custom') as HTMLElement, { close, refocus: () => { if (s) { s.focusIndex = 0; this.paintFocus(s); } }, onAction: fn => { handler = fn; if (s) s.actionHandler = fn; } }); // content changed → focus its first control
+      if (closed) return;
       s = this.push(el, { onBack: () => close(null), cleanup: cleanup || undefined });
+      s.actionHandler = handler;
+    });
+  }
+
+  /** One-time reward breakdown (skippable). */
+  rewardScene(title: string, r: RewardReceipt): Promise<void> {
+    return new Promise(resolve => {
+      const row = (label: string, v: number, note = '') => `<tr><td>${esc(label)}${note ? ` <small>${esc(note)}</small>` : ''}</td><td class="num">+${v}</td></tr>`;
+      const mins = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+      const html = r.devSkipped ? '<p class="sub">Skipped with developer tools — no reward granted.</p>' : `<table class="reward">
+        ${row('Base', r.base)}${row('Quality', r.quality, `${Math.round(r.qualityScore * 100)}%`)}${row('Speed', r.speed, `${mins(r.activeSeconds)} vs target ${mins(r.targetSeconds)}`)}
+        ${r.difficulty === 'hard' ? row('Hard challenge bonus', r.hardBonus) : ''}
+        <tr class="total"><td>Total</td><td class="num">${r.total} coins</td></tr></table>
+        <p class="sub">${r.base} + ${r.quality} + ${r.speed}${r.difficulty === 'hard' ? ` + ${r.hardBonus}` : ''} = ${r.total}</p>`;
+      const s = this.menu(title, [{ label: 'Continue', action: () => { this.pop(s); resolve(); } }], { html, onBack: () => { this.pop(s); resolve(); }, className: 'reward-screen' });
     });
   }
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/game.config';
 import type { ActionState } from '../input/actions';
 import { Avatar } from './Avatar';
-import type { GolfCart } from './GolfCart';
+import { PARAMS, type Vehicle } from './Vehicle';
 
 /** Where the player currently is (exterior campus or an interior). */
 export interface Space {
@@ -23,7 +23,9 @@ export class PlayerController {
   grounded = true;
   space!: Space;
   noclip = false;
-  vehicle: GolfCart | null = null;
+  vehicle: Vehicle | null = null;
+  /** Sitting on a bench (any movement stands up). */
+  seated = false;
 
   constructor(scene: THREE.Scene) { scene.add(this.avatar.root); }
 
@@ -33,6 +35,7 @@ export class PlayerController {
 
   update(dt: number, input: ActionState, cameraYaw: number, enabled: boolean) {
     if (this.vehicle) { this.drive(dt, input, enabled); return; }
+    if (this.seated) { this.avatar.root.position.set(this.position.x, this.position.y - 0.25, this.position.z); this.avatar.root.rotation.y = this.yaw; return; }
     let mx = 0, my = 0;
     if (enabled) { mx = input.axes.moveX; my = input.axes.moveY; }
     const mag = Math.min(1, Math.hypot(mx, my));
@@ -66,7 +69,7 @@ export class PlayerController {
 
   /** Golf cart: W/S throttle & brake/reverse, A/D steer (relative to the cart). */
   private drive(dt: number, input: ActionState, enabled: boolean) {
-    const C = GAME_CONFIG.cart, cart = this.vehicle!;
+    const cart = this.vehicle!, C = PARAMS[cart.kind];
     const throttle = enabled ? input.axes.moveY : 0, steer = enabled ? input.axes.moveX : 0;
     const max = throttle >= 0 ? C.maxSpeed : -C.reverseSpeed;
     const tgt = Math.abs(throttle) > 0.05 ? max * Math.abs(throttle) : 0, step = C.accel * dt;
@@ -81,11 +84,12 @@ export class PlayerController {
     this.speed = Math.abs(cart.speed);
     cart.root.position.copy(this.position); cart.root.rotation.y = this.yaw;
     cart.animate(dt);
-    // seated on the bench: hips (0.8 above feet) on the seat top (1.22), shifted toward the left seat
-    const sx = Math.cos(this.yaw) * 0.35, sz = -Math.sin(this.yaw) * 0.35;
-    const bx = -Math.sin(this.yaw) * 0.05, bz = -Math.cos(this.yaw) * 0.05;
-    this.avatar.root.position.set(this.position.x + sx + bx, this.position.y + 0.42, this.position.z + sz + bz);
+    // rider in the vehicle's seat (vehicle-local x right, z forward)
+    const s = cart.seat, cx = Math.cos(this.yaw), sn = Math.sin(this.yaw);
+    this.avatar.root.position.set(this.position.x + cx * s.x + sn * s.z, this.position.y + s.y, this.position.z - sn * s.x + cx * s.z);
     this.avatar.root.rotation.y = this.yaw;
+    this.avatar.root.visible = !cart.hideRider;
+    if (cart.pose === 'bike') this.avatar.pedal(cart.speed);
   }
 
   private move(dx: number, dz: number, r: number) {
@@ -99,3 +103,4 @@ export class PlayerController {
   }
   private sync() { this.avatar.root.position.copy(this.position); this.avatar.root.rotation.y = this.yaw; }
 }
+

@@ -1,0 +1,42 @@
+{
+ "note": "Light a fictional FUTURE temple concept (a plan in 1999 — no temple exists yet). Rotate the wire tiles. Bulbs have resistance 1, the battery is 1 unit: current ≥ 0.75 = bright, ≥ 0.2 = dim, otherwise off. Rows list tiles in their SOLVED orientation; the game scrambles them.",
+ "legend": "Tiles: '.' empty; wire tiles list their open sides (N E S W), e.g. 'WE', 'ES', 'WES'; 'B+N' battery with + on that side and − opposite; 'U:NS:id' bulb; 'S:WE:id' switch. Battery, bulbs and switches are fixed.",
+ "levels": [
+  {
+   "id": "one-bulb", "title": "Light the lantern", "goal": "Make the lantern glow brightly.",
+   "rows": ["ES WE WE WS", "B+N NE WE U:NS:L", "NE WE WE WN"],
+   "labels": { "L": "Lantern" },
+   "expect": [{ "switches": {}, "bulbs": { "L": "bright" } }],
+   "hint": "Make a loop: from + (top of the battery) around to the lantern and back to −."
+  },
+  {
+   "id": "two-parallel", "title": "Two equal window lights", "goal": "Both window bulbs must be equally BRIGHT.",
+   "rows": ["ES WE WES WE WS", "B+N NS U:NS:A NE U:NS:B", "NE WE WEN WE WN"],
+   "labels": { "A": "Window A", "B": "Window B" },
+   "expect": [{ "switches": {}, "bulbs": { "A": "bright", "B": "bright" } }],
+   "hint": "Use the T-tiles so each bulb gets its own path to both ends of the battery (parallel)."
+  },
+  {
+   "id": "switch-one", "title": "A switch for the door light", "goal": "Window A always bright; the switch turns the Door light on and off.",
+   "rows": ["ES WE WES S:WE:SW WS", "B+N NE U:NS:A WE U:NS:D", "NE WE WEN WE WN"],
+   "labels": { "A": "Window A", "D": "Door light", "SW": "Switch" },
+   "expect": [
+    { "switches": { "SW": false }, "bulbs": { "A": "bright", "D": "off" } },
+    { "switches": { "SW": true }, "bulbs": { "A": "bright", "D": "bright" } }
+   ],
+   "hint": "The switch should sit only on the Door light's branch. Flip it (right stick ↑) to test both ways."
+  },
+  {
+   "id": "spire", "title": "Dim spire, bright window", "goal": "Both spire bulbs glow DIM; the window bulb is BRIGHT.",
+   "hardOnly": true,
+   "rows": ["NE WE . ES WS", "ES WE WES WN U:NS:S1", "B+N NS U:NS:W ES U:NS:S2", "NE WE WEN WE WN"],
+   "labels": { "W": "Window", "S1": "Spire top", "S2": "Spire base" },
+   "expect": [{ "switches": {}, "bulbs": { "W": "bright", "S1": "dim", "S2": "dim" } }],
+   "hint": "Two bulbs in one chain (series) share the battery and glow dim. Route the spire as one chain up and over."
+  }
+ ],
+ "modes": {
+  "easy": { "levels": ["one-bulb", "two-parallel", "switch-one"], "hints": 4, "hintStyle": "visual", "scramble": 0.6 },
+  "hard": { "levels": ["one-bulb", "two-parallel", "switch-one", "spire"], "hints": 2, "hintStyle": "text", "scramble": 1 }
+ }
+}

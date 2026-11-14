@@ -6,7 +6,7 @@ export type AxisName = 'moveX' | 'moveY' | 'lookX' | 'lookY';
 export type ButtonName =
   | 'interact' | 'confirm' | 'back' | 'map' | 'pause'
   | 'run' | 'runToggle' | 'cameraReset'
-  | 'navUp' | 'navDown' | 'navLeft' | 'navRight' | 'devToggle' | 'jump';
+  | 'navUp' | 'navDown' | 'navLeft' | 'navRight' | 'devToggle' | 'jump' | 'alt' | 'alt2' | 'hint' | 'journal' | 'tools' | 'rLeft' | 'rRight' | 'rUp' | 'rDown';
 
 export interface SourceFrame {
   axes: Partial<Record<AxisName, number>>;   // -1..1; moveY/lookY: +1 = forward/up
@@ -23,7 +23,7 @@ export interface InputSource {
   raw?(): { axes: number[]; buttons: boolean[] } | null; // for the input test view
 }
 
-const ALL_BUTTONS: ButtonName[] = ['interact', 'confirm', 'back', 'map', 'pause', 'run', 'runToggle', 'cameraReset', 'navUp', 'navDown', 'navLeft', 'navRight', 'devToggle', 'jump'];
+const ALL_BUTTONS: ButtonName[] = ['interact', 'confirm', 'back', 'map', 'pause', 'run', 'runToggle', 'cameraReset', 'navUp', 'navDown', 'navLeft', 'navRight', 'devToggle', 'jump', 'alt', 'alt2', 'hint', 'journal', 'tools', 'rLeft', 'rRight', 'rUp', 'rDown'];
 
 export class ActionState {
   axes: Record<AxisName, number> = { moveX: 0, moveY: 0, lookX: 0, lookY: 0 };
@@ -71,9 +71,12 @@ export class InputManager {
       merged.zoomDelta! += f.zoomDelta ?? 0;
     }
     // Stick-driven menu navigation with auto-repeat (keyboard sources emit nav* directly).
+    // right stick (controllers) → rLeft/rRight/rUp/rDown edges (lookX = -stick x)
     const stick: [ButtonName, boolean][] = [
       ['navUp', (merged.axes.moveY ?? 0) > 0.6], ['navDown', (merged.axes.moveY ?? 0) < -0.6],
       ['navLeft', (merged.axes.moveX ?? 0) < -0.6], ['navRight', (merged.axes.moveX ?? 0) > 0.6],
+      ['rRight', (merged.axes.lookX ?? 0) < -0.6], ['rLeft', (merged.axes.lookX ?? 0) > 0.6],
+      ['rUp', (merged.axes.lookY ?? 0) > 0.6], ['rDown', (merged.axes.lookY ?? 0) < -0.6],
     ];
     for (const [b, active] of stick) {
       if (merged.buttons.has(b)) continue;

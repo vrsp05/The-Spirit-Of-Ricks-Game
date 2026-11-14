@@ -7,20 +7,37 @@ import { GAME_CONFIG } from '../config/game.config';
 
 /** colorAmount: 0 = full sepia (opening), 1 = full colour. Symbolic, not a time change. */
 const SepiaShader = {
-  uniforms: { tDiffuse: { value: null }, colorAmount: { value: 0 }, saturation: { value: 1.2 }, warmth: { value: 0.06 }, contrast: { value: 1.05 }, grain: { value: 0.03 }, time: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, exposure: { value: 0.72 }, colorAmount: { value: 0 }, saturation: { value: 1.2 }, warmth: { value: 0.06 }, contrast: { value: 1.05 }, grain: { value: 0.03 }, time: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   // Colour side: a warm "90s photo" grade (saturation, warmth, contrast, light grain).
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float colorAmount, saturation, warmth, contrast, grain, time; varying vec2 vUv;
+  // HDR in → Khronos PBR Neutral tone mapping (keeps hues true, rolls off highlights) → grade.
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float exposure, colorAmount, saturation, warmth, contrast, grain, time; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + time) * 43758.5453); }
+    vec3 neutral(vec3 color){
+      const float startCompression = 0.76; const float desaturation = 0.15;
+      float x = min(color.r, min(color.g, color.b)); float offset = x < 0.08 ? x - 6.25 * x * x : 0.04; color -= offset;
+      float peak = max(color.r, max(color.g, color.b)); if (peak < startCompression) return color;
+      const float d = 1.0 - startCompression; float newPeak = 1.0 - d * d / (peak + d - startCompression); color *= newPeak / peak;
+      float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0); return mix(color, vec3(newPeak), g);
+    }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
-      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-      vec3 sepia = vec3(l * 1.07 + 0.02, l * 0.88 + 0.01, l * 0.66);
-      vec3 graded = mix(vec3(l), c.rgb, saturation);
+      c.rgb = neutral(max(c.rgb, 0.0) * exposure);
+      // grade in display (gamma) space so saturation/contrast don't crush darks, then back to linear
+      vec3 g = pow(max(c.rgb, 0.0), vec3(1.0 / 2.2));
+      float l = dot(g, vec3(0.299, 0.587, 0.114));
+      vec3 sepia = vec3(l * 1.07 + 0.02, l * 0.9 + 0.01, l * 0.7);
+      // vibrance: boost dull colours more than already-vivid ones, so greens/blues don't clip into flat patches
+      float chroma = max(g.r, max(g.g, g.b)) - min(g.r, min(g.g, g.b));
+      float sat = 1.0 + (saturation - 1.0) * (1.0 - smoothstep(0.05, 0.55, chroma));
+      vec3 graded = mix(vec3(l), g, sat);
+      graded = graded / max(vec3(1.0), vec3(max(graded.r, max(graded.g, graded.b))));   // keep hue when a channel overshoots
+      graded = clamp(graded, 0.0, 1.0);
       graded = (graded - 0.5) * contrast + 0.5;
       graded *= vec3(1.0 + warmth, 1.0 + warmth * 0.35, 1.0 - warmth);
       vec3 col = mix(sepia, graded, colorAmount);
       col += (hash(vUv * 731.0) - 0.5) * grain;
+      col = pow(clamp(col, 0.0, 1.0), vec3(2.2));
       vec2 d = vUv - 0.5; float vig = 1.0 - dot(d, d) * (0.9 - 0.55 * colorAmount);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0) * vig, c.a);
     }`,
@@ -30,7 +47,8 @@ export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(55, 1, 0.3, 2500);
-  readonly fog = new THREE.Fog('#cddde8', 320, 1600);
+  /** Aerial haze: distant buildings fade toward the horizon colour. */
+  readonly fog = new THREE.FogExp2('#c8d9e6', 0.0036);
   private composer: EffectComposer;
   private sepia: ShaderPass;
   private colorTarget = 0;
@@ -44,6 +62,8 @@ export class Renderer {
     container.appendChild(this.renderer.domElement);
     this.scene.background = new THREE.Color('#a9cbe8');
     this.scene.fog = this.fog;
+    this.scene.environment = this.skyEnvironment();          // image-based light for the physically based materials
+    this.scene.environmentIntensity = 0.55;
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.sepia = new ShaderPass(SepiaShader);
@@ -51,6 +71,23 @@ export class Renderer {
     this.composer.addPass(new OutputPass());
     window.addEventListener('resize', () => this.resize());
     this.resize();
+  }
+  /** Prefiltered environment map made from a small sky scene (sky gradient + sun glow + ground bounce). */
+  private skyEnvironment(): THREE.Texture {
+    const sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      uniforms: { sun: { value: new THREE.Vector3(50, 100, 35).normalize() } },
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform vec3 sun; varying vec3 vP; void main(){ vec3 d = normalize(vP); float h = d.y;
+        vec3 sky = mix(vec3(0.62, 0.76, 0.9), vec3(0.28, 0.48, 0.78), smoothstep(0.0, 0.7, h));
+        vec3 ground = vec3(0.36, 0.38, 0.3);
+        vec3 c = mix(ground, sky, smoothstep(-0.08, 0.05, h)) + vec3(1.0, 0.92, 0.78) * pow(max(dot(d, sun), 0.0), 64.0) * 6.0;
+        gl_FragColor = vec4(c, 1.0); }`,
+    })));
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    const tex = pm.fromScene(sc, 0.02).texture; pm.dispose();
+    return tex;
   }
   get canvas() { return this.renderer.domElement; }
   resize() {
@@ -62,8 +99,11 @@ export class Renderer {
   render(dt: number) {
     this.colorAmount += (this.colorTarget - this.colorAmount) * Math.min(1, dt * 0.8);
     if (Math.abs(this.colorTarget - this.colorAmount) < 0.002) this.colorAmount = this.colorTarget;
-    const u = this.sepia.uniforms, L = GAME_CONFIG.look;
-    u.colorAmount.value = this.colorAmount; u.saturation.value = L.saturation; u.warmth.value = L.warmth; u.contrast.value = L.contrast; u.grain.value = L.grain;
+    const u = this.sepia.uniforms, L = GAME_CONFIG.look, s0 = GAME_CONFIG.colorStages[0];
+    const t = Math.max(0, Math.min(1, (this.colorAmount - s0) / (1 - s0))), mix = (a: number, b: number) => a + (b - a) * t;
+    u.colorAmount.value = this.colorAmount;
+    u.saturation.value = mix(L.saturationStart, L.saturationEnd); u.warmth.value = mix(L.warmthStart, L.warmthEnd);
+    u.contrast.value = mix(L.contrastStart, L.contrastEnd); u.grain.value = mix(L.grainStart, L.grainEnd);
     u.time.value = (u.time.value + dt) % 100;
     this.composer.render(dt);
   }

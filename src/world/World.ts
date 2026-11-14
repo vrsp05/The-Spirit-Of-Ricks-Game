@@ -1,20 +1,22 @@
 // Builds the exterior campus from data and swaps buildings/signs per era.
 import * as THREE from 'three';
+import { addWorldDetail, brickSet, detailTexture, gravelSet, waterNormals, windowSet } from '../render/textures';
 import { GAME_CONFIG, type Anchor } from '../config/game.config';
 import { BUILDINGS, eraState } from './buildingRegistry';
 import {
-  allFootprints, buildingsForEra, CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, toReal, PATH_KINDS, pointInPoly, registryPoly,
+  allFootprints, buildingsForEra, CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, streetDirAt, toReal, PATH_KINDS, pointInPoly, registryPoly,
   terrainHeight, toGame, type EraBuilding, type Vec2,
 } from './campusData';
 import { CollisionGrid } from './collision';
 import { ERAS, type EraId } from './eras';
-import { meshBuilding, mergeToGeometry, VOXEL, type BuiltMesh } from './voxelMesher';
+import { meshBuilding, mergeToGeometry, rasterize, VOXEL, type BuiltMesh } from './voxelMesher';
 
 const PX_PER_M = 4;
 const B = CAMPUS.bounds;
 const GW = B.maxX - B.minX, GH = B.maxZ - B.minZ;
 
-const AREA_COLORS: Record<string, string> = { park: '#7da35c', sport: '#6a9a4c', parking: '#6e6e70', water: '#4f8fc0', wood: '#5b8a43', field: '#b3a868' };
+const ASPHALT = '#4b4c50';
+const AREA_COLORS: Record<string, string> = { park: '#7da35c', sport: '#6a9a4c', parking: ASPHALT, water: '#4f8fc0', wood: '#5b8a43', field: '#b3a868' };
 
 export function textCanvas(lines: string[], opts: { w?: number; h?: number; bg?: string; fg?: string; font?: string; border?: string } = {}): HTMLCanvasElement {
   const c = document.createElement('canvas'); c.width = opts.w ?? 512; c.height = opts.h ?? 192;
@@ -35,11 +37,11 @@ function makeSign(lines: string[], width = 4, height = 1.5, colors?: { bg?: stri
   const grp = new THREE.Group();
   const tex = new THREE.CanvasTexture(textCanvas(lines, { ...colors, border: '#c9b48a' }));
   tex.colorSpace = THREE.SRGBColorSpace;
-  const side = new THREE.MeshLambertMaterial({ color: '#5a4636' });
-  const face = new THREE.MeshLambertMaterial({ map: tex });
+  const side = new THREE.MeshStandardMaterial({ color: '#5a4636' });
+  const face = new THREE.MeshStandardMaterial({ map: tex });
   const board = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.25), [side, side, side, side, face, face]);
   board.position.y = 0.8 + height / 2; board.castShadow = true;
-  const base = new THREE.Mesh(new THREE.BoxGeometry(width + 0.4, 0.8, 0.6), new THREE.MeshLambertMaterial({ color: '#8f877c' }));
+  const base = new THREE.Mesh(new THREE.BoxGeometry(width + 0.4, 0.8, 0.6), new THREE.MeshStandardMaterial({ color: '#8f877c' }));
   base.position.y = 0.4;
   grp.add(board, base);
   return grp;
@@ -68,7 +70,7 @@ export function snapToPolygon(poly: Vec2[], p: Vec2): { point: Vec2; normal: Vec
 export function makeDoor(enterable: boolean): THREE.Group {
   const g = new THREE.Group();
   const add = (w: number, h: number, d: number, c: string, x: number, y: number, z: number, emissive?: string) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: c, emissive: emissive ?? '#000000' }));
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: c, emissive: emissive ?? '#000000' }));
     m.position.set(x, y, z); m.castShadow = true; g.add(m); return m;
   };
   add(2.6, 3.1, 0.3, '#6e4a2e', 0, 1.55, 0);                         // double door
@@ -83,8 +85,37 @@ export function makeDoor(enterable: boolean): THREE.Group {
   return g;
 }
 
+/** Point on the actual voxel wall face (rasterised footprint) along the outward normal. */
+const rasterCache = new Map<Vec2[], ReturnType<typeof rasterize>>();
+export function flushOnWall(poly: Vec2[], x: number, z: number, nx: number, nz: number): Vec2 {
+  let r = rasterCache.get(poly); if (!r) { r = rasterize(poly); rasterCache.set(poly, r); }
+  const solid = (px: number, pz: number) => {
+    const i = Math.floor(px / VOXEL) - r!.i0, j = Math.floor(pz / VOXEL) - r!.j0;
+    return i >= 0 && j >= 0 && i < r!.w && j < r!.h && r!.cells[j * r!.w + i] === 1;
+  };
+  // start outside and walk inward until the first solid voxel
+  for (let t = 3; t > -3; t -= 0.05) {
+    const px = x + nx * t, pz = z + nz * t;
+    if (solid(px, pz)) return [px + nx * 0.2, pz + nz * 0.2];
+  }
+  return [x + nx * 0.2, z + nz * 0.2];
+}
+
+/** Shared building materials: brick walls, framed glass, gravel roofs (physically based; textures × vertex colours incl. baked AO). */
+let BMATS: THREE.Material[] | null = null;
+function buildingMaterials(): THREE.Material[] {
+  if (BMATS) return BMATS;
+  const brick = brickSet(), gravel = gravelSet(), win = windowSet();
+  BMATS = [
+    new THREE.MeshStandardMaterial({ vertexColors: true, map: brick.map, normalMap: brick.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.88, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(2.1, 2.2, 2.4), map: win.map, normalMap: win.normalMap, roughness: 0.1, metalness: 0.2, envMapIntensity: 2.2 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, map: gravel.map, normalMap: gravel.normalMap, roughness: 0.95, metalness: 0 }),
+  ];
+  return BMATS;
+}
+
 function rng(seed: number) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
-const lambert = (c: string) => new THREE.MeshLambertMaterial({ color: c });
+const lambert = (c: string) => new THREE.MeshStandardMaterial({ color: c });
 
 interface EraCache { group: THREE.Group; grid: CollisionGrid; buildings: EraBuilding[]; meshes: Map<string, BuiltMesh>; map: HTMLCanvasElement }
 
@@ -97,6 +128,8 @@ export class World {
   private signs = new THREE.Group();
   private obstacles: { x: number; z: number; r: number }[] = [];
   private signSpots = new Map<string, Vec2>();
+  /** Bench positions (seatable). yaw = direction the sitter faces. */
+  benches: { x: number; z: number; yaw: number }[] = [];
   private pathMask!: Uint8Array; private maskW = 0; private maskH = 0;
   readonly sun: THREE.DirectionalLight;
   onEraChanged: ((era: EraId) => void)[] = [];
@@ -106,17 +139,20 @@ export class World {
   constructor(scene: THREE.Scene) {
     scene.add(this.root); this.root.add(this.exterior);
     this.groundCanvas = this.paintGround();
+    this.computeDoorZones();
     this.exterior.add(this.makeTerrain(), this.makeCurbs(), this.makeBoundary(), this.makeSports(), this.makeProps(), this.makeSky());
     this.exterior.add(this.signs);
     // campus signs never move between eras: fix their spots now so trees/props keep clear and they collide
     for (const s of GAME_CONFIG.signs) {
       const a = GAME_CONFIG.locations[s.anchor]; if (!a) continue;
       const [x, z] = nudgeFree(...toGame(a.x, a.z), 3);
-      this.signSpots.set(s.anchor, [x, z]); this.obstacles.push({ x, z, r: 2.8 });
+      this.signSpots.set(s.anchor, [x, z]);
+      const w = (s as { width?: number }).width ?? 5, yaw = a.yaw ?? 0, ux = Math.cos(yaw), uz = -Math.sin(yaw);
+      for (let t = -w / 2 + 1.2; t <= w / 2 - 1.2 + 1e-6; t += 1.6) this.obstacles.push({ x: x + ux * t, z: z + uz * t, r: 1.4 });
     }
     if (GAME_CONFIG.world.trees) this.exterior.add(this.makeTrees());
-    const hemi = new THREE.HemisphereLight('#dfefff', '#6b6150', 1.1);
-    this.sun = new THREE.DirectionalLight('#fff4de', 2.1);
+    const hemi = new THREE.HemisphereLight('#dfefff', '#6b6150', 0.6);
+    this.sun = new THREE.DirectionalLight('#fff1d6', 2.4);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 1; sc.far = 400;
@@ -136,22 +172,91 @@ export class World {
     for (let i = 0; i < 90000; i++) { g.fillStyle = rnd() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 4, 4); }
     for (const ring of CAMPUS.campus) { path(ring, true); g.fillStyle = 'rgba(120,170,90,0.25)'; g.fill(); }
     for (const k of ['field', 'wood', 'park', 'sport', 'water']) for (const a of CAMPUS.areas) if (a.kind === k) { path(a.poly, true); g.fillStyle = AREA_COLORS[k]; g.fill(); }
+    // lawn variation: soft light/dark green patches (later layers — pitches, lots, paths, streets — paint over them)
+    const rv = rng(19);
+    for (let i = 0; i < 2600; i++) {
+      const x = rv() * c.width, y = rv() * c.height, r = (2 + rv() * 7) * PX_PER_M, light = rv() > 0.45;
+      const grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, light ? 'rgba(190,210,100,0.28)' : 'rgba(35,75,30,0.26)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    for (let i = 0; i < 1400; i++) {                                   // a few clover / dry specks
+      g.fillStyle = rv() > 0.5 ? 'rgba(220,215,140,0.25)' : 'rgba(60,110,40,0.25)';
+      g.fillRect(rv() * c.width, rv() * c.height, 2 + rv() * 3, 2 + rv() * 3);
+    }
     this.paintPitches(g);
     // parking lots: asphalt, light curb outline and stall stripes so they read as parking
-    for (const a of CAMPUS.areas) if (a.kind === 'parking') {
-      path(a.poly, true); g.fillStyle = AREA_COLORS.parking; g.fill();
-      g.save(); path(a.poly, true); g.clip();
-      g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.2;
-      const xs = a.poly.map(p => P(p[0], p[1])); const minx = Math.min(...xs.map(p => p[0])), maxx = Math.max(...xs.map(p => p[0])), miny = Math.min(...xs.map(p => p[1])), maxy = Math.max(...xs.map(p => p[1]));
-      for (let x = minx; x < maxx; x += 2.6 * PX_PER_M) for (let y = miny; y < maxy; y += 6 * PX_PER_M) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 4 * PX_PER_M); g.stroke(); }
-      g.restore();
-      path(a.poly, true); g.strokeStyle = '#b8b2a8'; g.lineWidth = 3; g.stroke();
-    }
+    // parking lots: the same asphalt as the streets (one consistent surface, no stray markings)
+    for (const a of CAMPUS.areas) if (a.kind === 'parking') { path(a.poly, true); g.fillStyle = ASPHALT; g.fill(); }
     g.lineCap = 'round'; g.lineJoin = 'round';
-    const roads = CAMPUS.roads.filter(r => !PATH_KINDS.has(r.kind)).sort((a, b) => a.width - b.width);
-    // asphalt (the 3D curb is the only edge line) and a single centre line on two-way streets
-    for (const r of roads) { g.strokeStyle = r.kind === 'service' ? '#545558' : '#4b4c50'; g.lineWidth = r.width * PX_PER_M; path(r.pts); g.stroke(); }
-    for (const r of roads) if (r.width >= 6 && !r.oneway && r.kind !== 'service') { g.strokeStyle = 'rgba(240,205,80,0.85)'; g.lineWidth = 0.25 * PX_PER_M; g.setLineDash([3 * PX_PER_M, 3 * PX_PER_M]); path(r.pts); g.stroke(); g.setLineDash([]); }
+    // paths first; streets are painted over them, then crosswalks mark where paths cross
+    for (const r of CAMPUS.roads) if (PATH_KINDS.has(r.kind)) { g.strokeStyle = '#d9cfb8'; g.lineWidth = r.width * PX_PER_M; path(r.pts); g.stroke(); }
+    const seen = new Set<string>();
+    const roads = CAMPUS.roads.filter(r => {
+      if (PATH_KINDS.has(r.kind)) return false;
+      const k = r.pts.map(p => `${Math.round(p[0])},${Math.round(p[1])}`).join('|'); // OSM sometimes duplicates a way
+      const kr = [...r.pts].reverse().map(p => `${Math.round(p[0])},${Math.round(p[1])}`).join('|');
+      if (seen.has(k) || seen.has(kr)) return false; seen.add(k); return true;
+    }).sort((a, b) => a.width - b.width);
+    for (const r of roads) { g.strokeStyle = ASPHALT; g.lineWidth = r.width * PX_PER_M; path(r.pts); g.stroke(); }
+    // ---- surface textures (masked layers): asphalt grain/patches/cracks, concrete grain + joints
+    const tile = (draw: (t: CanvasRenderingContext2D) => void) => { const t = document.createElement('canvas'); t.width = t.height = 256; draw(t.getContext('2d')!); return g.createPattern(t, 'repeat')!; };
+    const rs = rng(77);
+    const asphaltTex = tile(t => {
+      for (let i = 0; i < 2600; i++) { t.fillStyle = rs() > 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)'; t.fillRect(rs() * 256, rs() * 256, 1, 1); }
+      for (let i = 0; i < 4; i++) { t.fillStyle = 'rgba(0,0,0,0.045)'; t.fillRect(rs() * 220, rs() * 220, 20 + rs() * 40, 14 + rs() * 30); }      // repair patches
+      t.strokeStyle = 'rgba(0,0,0,0.22)'; t.lineWidth = 1;
+      for (let i = 0; i < 3; i++) { let x = rs() * 256, y = rs() * 256; t.beginPath(); t.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (rs() - 0.5) * 24; y += (rs() - 0.5) * 24; t.lineTo(x, y); } t.stroke(); } // hairline cracks
+    });
+    const concreteTex = tile(t => { for (let i = 0; i < 1800; i++) { t.fillStyle = rs() > 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'; t.fillRect(rs() * 256, rs() * 256, 1.5, 1.5); } });
+    const masked = (shape: (m: CanvasRenderingContext2D) => void, pattern: CanvasPattern) => {
+      const L = document.createElement('canvas'); L.width = c.width; L.height = c.height; const m = L.getContext('2d')!;
+      m.lineCap = 'round'; m.lineJoin = 'round'; m.fillStyle = m.strokeStyle = '#000'; shape(m);
+      m.globalCompositeOperation = 'source-in'; m.fillStyle = pattern; m.fillRect(0, 0, L.width, L.height); g.drawImage(L, 0, 0);
+    };
+    const lpath = (m: CanvasRenderingContext2D, pts: Vec2[], close = false) => { m.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p[0], p[1]); i ? m.lineTo(x, y) : m.moveTo(x, y); }); if (close) m.closePath(); };
+    masked(m => {
+      for (const a of CAMPUS.areas) if (a.kind === 'parking') { lpath(m, a.poly, true); m.fill(); }
+      for (const r of roads) { m.lineWidth = r.width * PX_PER_M; lpath(m, r.pts); m.stroke(); }
+    }, asphaltTex);
+    masked(m => { for (const r of CAMPUS.roads) if (PATH_KINDS.has(r.kind)) { m.lineWidth = r.width * PX_PER_M; lpath(m, r.pts); m.stroke(); } }, concreteTex);
+    // sidewalk expansion joints every ~1.6 m (skipped on the asphalt)
+    g.strokeStyle = 'rgba(70,60,45,0.28)'; g.lineWidth = 1;
+    for (const r of CAMPUS.roads) {
+      if (!PATH_KINDS.has(r.kind)) continue;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 1) continue;
+        const ux = (bx - ax) / L, uz = (bz - az) / L, hw = r.width / 2;
+        for (let t = 0.8; t < L; t += 1.6) {
+          const x = ax + ux * t, z = az + uz * t; if (onVehicleRoad(x, z)) continue;
+          const [x1, y1] = P(x - uz * hw, z + ux * hw), [x2, y2] = P(x + uz * hw, z - ux * hw);
+          g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+        }
+      }
+    }
+    // centre lines on their own opaque layer with square ends, composited once: overlapping ways never double up
+    const lay = document.createElement('canvas'); lay.width = c.width; lay.height = c.height;
+    const lg = lay.getContext('2d')!; lg.strokeStyle = '#e9cc55'; lg.lineCap = 'butt'; lg.lineJoin = 'miter'; lg.lineWidth = 0.22 * PX_PER_M; lg.setLineDash([3 * PX_PER_M, 3 * PX_PER_M]);
+    for (const r of roads) if (r.width >= 7 && !r.oneway && r.kind !== 'service') { lg.beginPath(); r.pts.forEach((p, i) => { const [x, y] = P(p[0], p[1]); i ? lg.lineTo(x, y) : lg.moveTo(x, y); }); lg.stroke(); }
+    g.globalAlpha = 0.92; g.drawImage(lay, 0, 0); g.globalAlpha = 1;
+    // zebra crosswalks where footpaths cross streets
+    g.fillStyle = '#efece4';
+    for (const r of CAMPUS.roads) {
+      if (!PATH_KINDS.has(r.kind)) continue;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.5) continue;
+        const ux = (bx - ax) / L, uz = (bz - az) / L, w = Math.max(3, r.width * 1.3);
+        const segAng = Math.atan2(uz, ux);
+        for (let t = 0; t <= L; t += 1.0) {
+          const x = ax + ux * t, z = az + uz * t;
+          const sd = streetDirAt(x, z); if (sd === null) continue;
+          let diff = Math.abs(segAng - sd) % Math.PI; diff = Math.min(diff, Math.PI - diff);
+          if (diff < 0.9) continue;                         // sidewalks running alongside a street are not crossings
+          g.save(); g.translate((x - B.minX) * PX_PER_M, (z - B.minZ) * PX_PER_M); g.rotate(Math.atan2(uz, ux));
+          g.fillRect(-0.25 * PX_PER_M, -w / 2 * PX_PER_M, 0.5 * PX_PER_M, w * PX_PER_M); g.restore();
+        }
+      }
+    }
     // Sidewalk/path mask (raised geometry is built from the same polylines)
     const m = document.createElement('canvas'); m.width = Math.ceil(GW); m.height = Math.ceil(GH);
     const mg = m.getContext('2d')!; mg.lineCap = 'round'; mg.lineJoin = 'round'; mg.strokeStyle = '#fff';
@@ -161,8 +266,6 @@ export class World {
     const md = mg.getImageData(0, 0, m.width, m.height).data;
     this.maskW = m.width; this.maskH = m.height; this.pathMask = new Uint8Array(m.width * m.height);
     for (let i = 0; i < this.pathMask.length; i++) this.pathMask[i] = md[i * 4] > 128 ? 1 : 0;
-    // paths drawn on the texture too (shows under the raised slabs' edges + in the map)
-    for (const r of CAMPUS.roads) if (PATH_KINDS.has(r.kind)) { g.strokeStyle = '#d9cfb8'; g.lineWidth = r.width * PX_PER_M; path(r.pts); g.stroke(); }
     return c;
   }
   /** Field markings by sport, drawn in each pitch's own oriented frame. */
@@ -237,7 +340,7 @@ export class World {
           const [x, y, z] = at(s * (o.length / 2 - 0.6), 0);
           put(new THREE.BoxGeometry(0.15, 0.15, gw), white, x, y + 2.4, z, ry);
           for (const t of [-gw / 2, gw / 2]) { const [px, , pz] = at(s * (o.length / 2 - 0.6), t); put(new THREE.BoxGeometry(0.15, 2.4, 0.15), white, px, y + 1.2, pz); this.obstacles.push({ x: px, z: pz, r: 0.25 }); }
-          const [nx, , nz] = at(s * (o.length / 2 + 0.6), 0); const net = put(new THREE.BoxGeometry(1.2, 2.2, gw), new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.35 }), nx, y + 1.1, nz, ry); net.castShadow = false;
+          const [nx, , nz] = at(s * (o.length / 2 + 0.6), 0); const net = put(new THREE.BoxGeometry(1.2, 2.2, gw), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.35 }), nx, y + 1.1, nz, ry); net.castShadow = false;
         }
       } else if (a.sport === 'baseball') {
         const [cx, cz] = polyCentroidLocal(a.poly); let home = a.poly[0], best = -Infinity;
@@ -261,7 +364,7 @@ export class World {
         if (everOccupied(x, z) || onVehicleRoad(x, z)) continue;
         const y = terrainHeight(x, z);
         put(new THREE.BoxGeometry(0.4, 14, 0.4), metal, x, y + 7, z);
-        put(new THREE.BoxGeometry(2.4, 1.2, 0.5), new THREE.MeshLambertMaterial({ color: '#fff7d6', emissive: '#5a5030' }), x, y + 14.2, z);
+        put(new THREE.BoxGeometry(2.4, 1.2, 0.5), new THREE.MeshStandardMaterial({ color: '#fff7d6', emissive: '#5a5030' }), x, y + 14.2, z);
         this.obstacles.push({ x, z, r: 0.4 });
       }
       const [sx, sz] = nudgeFree((minX + maxX) / 2, minZ - 5, 1);
@@ -335,8 +438,10 @@ export class World {
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     g.setIndex(idx); g.computeVertexNormals();
     const tex = new THREE.CanvasTexture(this.groundCanvas);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter; tex.anisotropy = 8;
-    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
+    tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 8; // crisp marks up close, smooth in the distance
+    const gm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.96, metalness: 0 });
+    addWorldDetail(gm, detailTexture(), 4, 0.45);                    // grass blades / asphalt grain up close
+    const m = new THREE.Mesh(g, gm);
     m.receiveShadow = true; m.name = 'terrain';
     const skirt = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), lambert('#7f8f5c'));
     skirt.rotation.x = -Math.PI / 2; skirt.position.set((B.minX + B.maxX) / 2, -2, (B.minZ + B.maxZ) / 2);
@@ -350,7 +455,8 @@ export class World {
    * change reads clearly without breaking paths into blocky slabs.
    */
   private makeCurbs(): THREE.Object3D {
-    const roads = CAMPUS.roads.filter(r => !PATH_KINDS.has(r.kind));
+    const roads = CAMPUS.roads.filter(r => !PATH_KINDS.has(r.kind) && r.kind !== 'service');
+    const lots = CAMPUS.areas.filter(a => a.kind === 'parking');
     // which road covers each 1 m cell (exact half-width); -1 = several roads (intersection)
     const W = Math.ceil(GW), H = Math.ceil(GH), owner = new Int32Array(W * H);
     roads.forEach((r, ri) => {
@@ -381,7 +487,7 @@ export class World {
           const x0 = ax + (bx - ax) * k / n + nx * off, z0 = az + (bz - az) * k / n + nz * off;
           const x1 = ax + (bx - ax) * (k + 1) / n + nx * off, z1 = az + (bz - az) * (k + 1) / n + nz * off;
           const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (otherRoad(mx, mz, ri) || everOccupied(mx, mz)) continue;
+          if (otherRoad(mx, mz, ri) || everOccupied(mx, mz) || onVehicleRoad(mx + nx * 0.6, mz + nz * 0.6) || lots.some(l => pointInPoly(mx, mz, l.poly))) continue;
           const a = new THREE.Vector3(x0, terrainHeight(x0, z0), z0), b = new THREE.Vector3(x1, terrainHeight(x1, z1), z1);
           const d = b.clone().sub(a); q.setFromUnitVectors(Z, d.clone().normalize());
           const mid = a.add(b).multiplyScalar(0.5); mid.y += 0.02;
@@ -410,17 +516,89 @@ export class World {
     return hedge;
   }
 
-  /** Gradient sky dome. */
+  /** A small pond with a stone rim, reeds and lily pads; blocks walking. */
+  private makePond(inCampus: (x: number, z: number) => boolean): THREE.Group {
+    const grp = new THREE.Group();
+    const water = CAMPUS.areas.find(a => a.kind === 'water' && inCampus(...(polyCentroidLocal(a.poly) as [number, number])));
+    let [cx, cz] = water ? polyCentroidLocal(water.poly) : toGame(75, -95);
+    // organic outline, at least ~11 m across (OSM outline scaled down by compaction is tiny)
+    const R = Math.max(5.5, water ? Math.max(...water.poly.map(p => Math.hypot(p[0] - cx, p[1] - cz))) * 1.2 : 6);
+    let tries = 0; while (everOccupied(cx, cz, Math.ceil(R)) && tries++ < 30) { cx += 1.5; }
+    const rnd = rng(17), pts: THREE.Vector2[] = [];
+    for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2, r = R * (0.75 + rnd() * 0.3) * (i % 2 ? 1 : 0.92); pts.push(new THREE.Vector2(cx + Math.cos(a) * r * 1.3, -(cz + Math.sin(a) * r))); }
+    const yMin = Math.min(...pts.map(p => terrainHeight(p.x, -p.y)));
+    // glassy water: mirror-like sky reflections (Fresnel via the environment map) broken up by moving ripples
+    const ripples = waterNormals(); ripples.repeat.set(0.16, 0.16); this.waterTex.push(ripples);
+    const ripples2 = ripples.clone(); ripples2.repeat.set(0.37, 0.37); this.waterTex.push(ripples2);
+    const surf = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), new THREE.MeshStandardMaterial({
+      color: '#2d5f73', roughness: 0.04, metalness: 0.1, normalMap: ripples, normalScale: new THREE.Vector2(0.35, 0.35),
+      envMapIntensity: 1.5, transparent: true, opacity: 0.9 }));
+    const deep = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), new THREE.MeshStandardMaterial({ color: '#1f4a3a', roughness: 1, normalMap: ripples2, normalScale: new THREE.Vector2(0.2, 0.2) }));
+    // the lawn slopes: keep the water level at the rim's highest point so none of it sinks below ground
+    const yMax = Math.max(...pts.map(p => terrainHeight(p.x, -p.y)), terrainHeight(cx, cz));
+    surf.rotation.x = -Math.PI / 2; surf.position.y = yMax + 0.08; surf.receiveShadow = true; grp.add(surf);
+    deep.rotation.x = -Math.PI / 2; deep.position.y = yMax - 0.35; grp.add(deep);
+    const bed = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), lambert('#3b5a3f')); bed.rotation.x = -Math.PI / 2; bed.position.y = yMin - 0.25; grp.add(bed);
+    const stone = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), lambert('#a49c8c'), 200);
+    const m = new THREE.Matrix4(); let n = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a2 = pts[i], b2 = pts[(i + 1) % pts.length], L = a2.distanceTo(b2);
+      for (let t = 0; t < L && n < 200; t += 0.9) {
+        const x = a2.x + (b2.x - a2.x) * t / L, z = -(a2.y + (b2.y - a2.y) * t / L), s = 0.6 + rnd() * 0.5;
+        m.compose(new THREE.Vector3(x, terrainHeight(x, z) + s * 0.25, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 3), new THREE.Vector3(s, s * 0.5, s * 0.8));
+        stone.setMatrixAt(n++, m);
+      }
+    }
+    stone.count = n; stone.castShadow = true; grp.add(stone);
+    const reed = lambert('#4f7d3a'), pad = lambert('#3f8a45');
+    for (let i = 0; i < 10; i++) {
+      const a = rnd() * Math.PI * 2, r = R * (0.55 + rnd() * 0.25);
+      const x = cx + Math.cos(a) * r * 1.3, z = cz + Math.sin(a) * r;
+      if (i < 6) { const rd = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1 + rnd() * 0.6, 0.12), reed); rd.position.set(x, yMax + 0.6, z); grp.add(rd); }
+      else { const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.04, 7), pad); lp.position.set(x * 0.6 + cx * 0.4, yMax + 0.12, z * 0.6 + cz * 0.4); grp.add(lp); }
+    }
+    // keep walkers out of the water
+    for (let z = cz - R; z <= cz + R; z += 1.4) for (let x = cx - R * 1.3; x <= cx + R * 1.3; x += 1.4) {
+      if (pointInPoly(x, z, pts.map(p => [p.x, -p.y] as Vec2))) this.obstacles.push({ x, z, r: 0.9 });
+    }
+    return grp;
+  }
+
+  /** Sky dome (gradient, sun disk + glow, hazy horizon matching the fog) and slow-drifting voxel clouds. */
+  private clouds = new THREE.Group();
+  private waterTex: THREE.Texture[] = [];
   private makeSky(): THREE.Object3D {
     const grp = new THREE.Group();
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 24, 12), new THREE.ShaderMaterial({
+    const sunDir = new THREE.Vector3(50, 100, 35).normalize();
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 32, 16), new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color('#5f97d0') }, mid: { value: new THREE.Color('#a9cbe8') }, bottom: { value: new THREE.Color('#dfe8ec') } },
-      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 top, mid, bottom; varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = h > 0.0 ? mix(mid, top, smoothstep(0.0, 0.6, h)) : bottom; c = mix(bottom, c, smoothstep(-0.05, 0.08, h)); gl_FragColor = vec4(c, 1.0); }',
+      uniforms: { top: { value: new THREE.Color('#3f7fc4') }, mid: { value: new THREE.Color('#9cc3e6') }, horizon: { value: new THREE.Color('#c8d9e6') }, sun: { value: sunDir } },
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = vec4(p.xy, p.w * 0.99999, p.w); }',
+      fragmentShader: `uniform vec3 top, mid, horizon, sun; varying vec3 vP;
+        void main(){ vec3 d = normalize(vP); float h = d.y;
+          vec3 c = mix(horizon, mid, smoothstep(0.0, 0.18, h)); c = mix(c, top, smoothstep(0.18, 0.75, h));
+          if (h < 0.0) c = horizon;
+          float s = max(dot(d, sun), 0.0);
+          c += vec3(1.0, 0.9, 0.7) * (pow(s, 8.0) * 0.18 + pow(s, 120.0) * 0.6);   // glow
+          c = mix(c, vec3(1.0, 0.98, 0.9), smoothstep(0.9993, 0.9997, s));       // disk
+          gl_FragColor = vec4(c, 1.0); }`,
     }));
     sky.renderOrder = -10; sky.frustumCulled = false;
     grp.add(sky);
+    // voxel clouds: chunky flat clusters high above the campus
+    const rnd = rng(55), cubes: THREE.Matrix4[] = [], m = new THREE.Matrix4();
+    for (let c = 0; c < 26; c++) {
+      const a = rnd() * Math.PI * 2, r = 250 + rnd() * 900, cx = Math.cos(a) * r, cz = Math.sin(a) * r, y = 210 + rnd() * 90, n = 4 + (rnd() * 6 | 0);
+      for (let k = 0; k < n; k++) {
+        const w = 22 + rnd() * 30, d = 16 + rnd() * 22, hh = 7 + rnd() * 6;
+        m.compose(new THREE.Vector3(cx + (rnd() - 0.5) * 60, y + (k % 2) * hh * 0.5, cz + (rnd() - 0.5) * 40), new THREE.Quaternion(), new THREE.Vector3(w, hh, d));
+        cubes.push(m.clone());
+      }
+    }
+    const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#c9d6e3', emissiveIntensity: 0.55, roughness: 1, fog: false, transparent: true, opacity: 0.94 });
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cloudMat, cubes.length);
+    cubes.forEach((mm, i) => im.setMatrixAt(i, mm)); im.frustumCulled = false;
+    this.clouds.add(im); grp.add(this.clouds);
     return grp;
   }
 
@@ -428,7 +606,7 @@ export class World {
   private makeProps(): THREE.Group {
     const grp = new THREE.Group(), rnd = rng(31);
     const inCampus = (x: number, z: number) => CAMPUS.campus.some(r => pointInPoly(x, z, r));
-    const ok = (x: number, z: number) => !everOccupied(x, z, 1) && !onVehicleRoad(x, z);
+    const ok = (x: number, z: number) => !everOccupied(x, z, 1) && !onVehicleRoad(x, z) && !this.nearDoor(x, z, 4);
     const benches: { x: number; z: number; yaw: number }[] = [], lamps: { x: number; z: number }[] = [];
     for (const r of CAMPUS.roads) {
       if (r.kind !== 'footway' && r.kind !== 'pedestrian') continue;
@@ -449,6 +627,7 @@ export class World {
     const benchBack = new THREE.InstancedMesh(new THREE.BoxGeometry(1.8, 0.5, 0.1), lambert('#8a5a36'), benches.length);
     const benchLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.45, 0.4), lambert('#3b3b3b'), benches.length);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), Y = new THREE.Vector3(0, 1, 0);
+    this.benches = benches;
     benches.forEach((b, i) => {
       const y = terrainHeight(b.x, b.z); q.setFromAxisAngle(Y, b.yaw);
       const at = (dx: number, dy: number, dz: number) => new THREE.Vector3(dx, dy, dz).applyQuaternion(q).add(new THREE.Vector3(b.x, y, b.z));
@@ -458,7 +637,7 @@ export class World {
       this.obstacles.push({ x: b.x, z: b.z, r: 0.7 });
     });
     const pole = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 4, 0.16), lambert('#2e3236'), lamps.length);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshLambertMaterial({ color: '#fff3c8', emissive: '#6b5a2a' }), lamps.length);
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: '#fff3c8', emissive: '#6b5a2a' }), lamps.length);
     lamps.forEach((l, i) => {
       const y = terrainHeight(l.x, l.z);
       m.makeTranslation(l.x, y + 2, l.z); pole.setMatrixAt(i, m);
@@ -468,38 +647,39 @@ export class World {
     for (const o of [benchSeat, benchBack, benchLegs, pole, head]) o.castShadow = true;
     grp.add(benchSeat, benchBack, benchLegs, pole, head);
 
-    // Fountain on the central quad (OSM water feature if present, else between Manwaring and Kimball)
-    const water = CAMPUS.areas.find(a => a.kind === 'water' && inCampus(...(a.poly[0] as [number, number])));
-    let [fx, fz] = water ? water.poly.reduce((s, p) => [s[0] + p[0] / water.poly.length, s[1] + p[1] / water.poly.length], [0, 0]) : toGame(75, -95);
-    if (everOccupied(fx, fz, 3)) [fx, fz] = toGame(75, -95);
-    const fy = terrainHeight(fx, fz), f = new THREE.Group();
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.2, 0.7, 8), lambert('#cfc6b4')); basin.position.y = 0.35;
-    const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.1, 8), new THREE.MeshLambertMaterial({ color: '#4f9ad0', emissive: '#10304a' })); pool.position.y = 0.66;
-    const col = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), lambert('#cfc6b4')); col.position.y = 1.2;
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.1, 0.25, 8), lambert('#cfc6b4')); top.position.y = 2.1;
-    const spray = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), new THREE.MeshLambertMaterial({ color: '#bfe3ff', transparent: true, opacity: 0.7 })); spray.position.y = 2.7;
-    f.add(basin, pool, col, top, spray); f.position.set(fx, fy, fz); f.traverse(o => (o as THREE.Mesh).castShadow = true);
-    grp.add(f); this.obstacles.push({ x: fx, z: fz, r: 3.2 });
+    // Small pond between the Manwaring Center and the Taylor Building (OSM water feature when present)
+    grp.add(this.makePond(inCampus));
 
-    // Street-name signs at intersections of named streets
-    const named = CAMPUS.roads.filter(r => !PATH_KINDS.has(r.kind) && r.kind !== 'service' && r.name);
+    // Street-name signs at every intersection of streets (blades for the named ones)
+    const streets = CAMPUS.roads.filter(r => !PATH_KINDS.has(r.kind) && r.kind !== 'service');
+    const key = (p: Vec2) => `${Math.round(p[0] * 2)},${Math.round(p[1] * 2)}`;
+    const atVertex = new Map<string, { p: Vec2; roads: Set<number> }>();
+    streets.forEach((r, ri) => r.pts.forEach(p => { const k = key(p); const e = atVertex.get(k) ?? { p, roads: new Set() }; e.roads.add(ri); atVertex.set(k, e); }));
     const placed: Vec2[] = [];
-    for (let i = 0; i < named.length && placed.length < 24; i++) for (let j = i + 1; j < named.length; j++) {
-      if (named[i].name === named[j].name) continue;
-      const shared = named[i].pts.find(p => named[j].pts.some(q2 => Math.abs(q2[0] - p[0]) < 0.3 && Math.abs(q2[1] - p[1]) < 0.3));
-      if (!shared || placed.some(p => Math.hypot(p[0] - shared[0], p[1] - shared[1]) < 25)) continue;
-      const off = Math.max(named[i].width, named[j].width) / 2 + 1.5, x = shared[0] + off, z = shared[1] + off;
-      if (everOccupied(x, z)) continue;
-      placed.push(shared);
-      const s = new THREE.Group(), y = terrainHeight(x, z);
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3, 0.12), lambert('#4a5157')); post.position.y = 1.5; s.add(post);
-      [named[i].name!, named[j].name!].forEach((nm, k) => {
+    for (const { p, roads } of atVertex.values()) {
+      const rs = [...roads].map(i => streets[i]);
+      const names = [...new Set(rs.map(r => r.name).filter(Boolean) as string[])];
+      const isJunction = rs.length >= 3 || (rs.length === 2 && rs[0].name !== rs[1].name);
+      if (!isJunction || !names.length || placed.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 12)) continue;
+      const off = Math.max(...rs.map(r => r.width)) / 2 + 1.6;
+      let spot: Vec2 | null = null;
+      for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+        const x = p[0] + dx * off, z = p[1] + dz * off;
+        if (!everOccupied(x, z, 1) && !onVehicleRoad(x, z) && !this.nearDoor(x, z, 3.5) && !this.obstacles.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + 1) ** 2)) { spot = [x, z]; break; }
+      }
+      if (!spot) continue;
+      placed.push(p);
+      const s = new THREE.Group(), y = terrainHeight(spot[0], spot[1]);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.1, 0.12), lambert('#4a5157')); post.position.y = 1.55; s.add(post);
+      names.slice(0, 2).forEach((nm, k) => {
+        const road = rs.find(r => r.name === nm)!;
+        let best = 0, ang = 0;
+        for (let i = 0; i < road.pts.length - 1; i++) { const d = Math.hypot(road.pts[i][0] - p[0], road.pts[i][1] - p[1]); if (i === 0 || d < best) { best = d; ang = Math.atan2(road.pts[i + 1][1] - road.pts[i][1], road.pts[i + 1][0] - road.pts[i][0]); } }
         const tex = new THREE.CanvasTexture(textCanvas([nm], { w: 512, h: 96, bg: '#1f6b3a', fg: '#ffffff', font: 'bold 54px sans-serif' })); tex.colorSpace = THREE.SRGBColorSpace;
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 0.05), new THREE.MeshLambertMaterial({ map: tex }));
-        blade.position.y = 2.9 - k * 0.5; blade.rotation.y = k ? Math.PI / 2 : 0; s.add(blade);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 0.05), new THREE.MeshStandardMaterial({ map: tex }));
+        blade.position.y = 3.0 - k * 0.5; blade.rotation.y = -ang; s.add(blade); // blade runs along its street
       });
-      s.position.set(x, y, z); grp.add(s); this.obstacles.push({ x, z, r: 0.2 });
-      break;
+      s.position.set(spot[0], y, spot[1]); grp.add(s); this.obstacles.push({ x: spot[0], z: spot[1], r: 0.3 });
     }
     return grp;
   }
@@ -527,39 +707,78 @@ export class World {
       if (everOccupied(x, z, 2) || !isLawn(x, z) || this.onPath(x, z)) continue;
       if (trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < 72)) continue;          // ~8.5 m apart
       if (this.obstacles.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + 3) ** 2)) continue; // clear of benches, lamps, fountain, signs
-      if (onVehicleRoad(x, z) || everOccupied(x, z, 4)) continue;
+      if (onVehicleRoad(x, z) || everOccupied(x, z, 4) || this.nearDoor(x, z, 5)) continue;
       if (CAMPUS.areas.some(a => (a.kind === 'sport' || a.kind === 'stadium' || a.kind === 'parking') && pointInPoly(x, z, a.poly))) continue;
       trees.push({ x, z });
     }
+    // Three voxel species: round broadleaf (most), layered conifer, tall white-trunk aspen (common in Rexburg).
     const N = trees.length;
-    const trunk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 3, 0.6), lambert('#6b4f36'), N);
-    const leaf = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), lambert('#ffffff'), N * 2);
-    const mtx = new THREE.Matrix4(), col = new THREE.Color();
-    trees.forEach((t, i) => {
-      const y = terrainHeight(t.x, t.z), s = 0.7 + rnd() * 0.5;
-      mtx.compose(new THREE.Vector3(t.x, y + 1.5 * s, t.z), new THREE.Quaternion(), new THREE.Vector3(s, s, s)); trunk.setMatrixAt(i, mtx);
-      const conifer = rnd() < 0.3;
-      const greens = conifer ? ['#2f6a3a', '#3a7742'] : ['#4f9a3a', '#62a845', '#74b04a'];
-      const sizes = conifer ? [[3.2, 3], [2, 2.4]] : [[3.8, 2.8], [2.8, 2]];
-      sizes.forEach(([w, h], k) => {
-        mtx.compose(new THREE.Vector3(t.x, y + (3 + k * 2.2 + h / 2) * s, t.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 1.5), new THREE.Vector3(w * s, h * s, w * s));
-        leaf.setMatrixAt(i * 2 + k, mtx); leaf.setColorAt(i * 2 + k, col.set(greens[(rnd() * greens.length) | 0]));
-      });
+    const trunk = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }), N * 2);
+    const leafMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
+    this.swayLeaves(leafMat);
+    const leaf = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), leafMat, N * 6);
+    const mtx = new THREE.Matrix4(), col = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+    const leafIdx: number[][] = [], trunkIdx: number[][] = [];
+    let li = 0, ti = 0;
+    const box = (im: THREE.InstancedMesh, i: number, x: number, y: number, z: number, w: number, h: number, d: number, rot: number, c: string) => {
+      mtx.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(up, rot), new THREE.Vector3(w, h, d)); im.setMatrixAt(i, mtx); im.setColorAt(i, col.set(c));
+    };
+    trees.forEach(t => {
+      const y = terrainHeight(t.x, t.z), s = 0.75 + rnd() * 0.5, r0 = rnd() * 1.5, kind = rnd();
+      const L: number[] = [], Tk: number[] = [];
+      if (kind < 0.24) {                                                  // conifer: stacked tiers
+        box(trunk, ti, t.x, y + 1.2 * s, t.z, 0.55 * s, 2.4 * s, 0.55 * s, r0, '#5a4130'); Tk.push(ti++);
+        const greens = ['#2c6236', '#336d3c', '#3b7744'];
+        [[3.6, 1.8, 1.6], [2.8, 1.7, 3.0], [1.9, 1.6, 4.3], [1.0, 1.4, 5.4]].forEach(([w, h, yy], k) => { box(leaf, li, t.x, y + yy * s + 0.6 * s, t.z, w * s, h * s, w * s, r0 + k * 0.4, greens[(rnd() * 3) | 0]); L.push(li++); });
+      } else if (kind < 0.42) {                                           // aspen: white trunk, narrow tall crown
+        box(trunk, ti, t.x, y + 2.2 * s, t.z, 0.4 * s, 4.4 * s, 0.4 * s, r0, '#e4e0d4'); Tk.push(ti++);
+        box(trunk, ti, t.x, y + 1.6 * s, t.z, 0.42 * s, 0.25 * s, 0.42 * s, r0, '#3a3530'); Tk.push(ti++);   // dark bark band
+        const greens = ['#7fae47', '#8cb84f', '#6f9f3e'];
+        [[2.0, 2.6, 4.6, 0, 0], [1.6, 2.0, 6.4, 0.3, -0.2], [1.3, 1.4, 3.6, -0.5, 0.4]].forEach(([w, h, yy, ox, oz]) => { box(leaf, li, t.x + ox * s, y + yy * s, t.z + oz * s, w * s, h * s, w * s, r0, greens[(rnd() * 3) | 0]); L.push(li++); });
+      } else {                                                            // broadleaf: big lumpy crown
+        box(trunk, ti, t.x, y + 1.5 * s, t.z, 0.6 * s, 3 * s, 0.6 * s, r0, '#6b4f36'); Tk.push(ti++);
+        const greens = ['#4f9a3a', '#5ea443', '#6cae49', '#478f36'];
+        box(leaf, li, t.x, y + 4.4 * s, t.z, 3.6 * s, 2.6 * s, 3.6 * s, r0, greens[(rnd() * 4) | 0]); L.push(li++);
+        for (let k = 0; k < 4; k++) {
+          const a = r0 + k * Math.PI / 2 + rnd() * 0.5, d = 1.5 * s;
+          box(leaf, li, t.x + Math.cos(a) * d, y + (3.8 + rnd() * 1.4) * s, t.z + Math.sin(a) * d, (1.8 + rnd() * 0.8) * s, (1.6 + rnd() * 0.8) * s, (1.8 + rnd() * 0.8) * s, a, greens[(rnd() * 4) | 0]); L.push(li++);
+        }
+        box(leaf, li, t.x, y + 6 * s, t.z, 2.2 * s, 1.4 * s, 2.2 * s, r0 + 0.7, greens[(rnd() * 4) | 0]); L.push(li++);
+      }
+      leafIdx.push(L); trunkIdx.push(Tk);
       this.obstacles.push({ x: t.x, z: t.z, r: 0.5 });
     });
-    trunk.castShadow = leaf.castShadow = true;
+    trunk.count = ti; leaf.count = li;
+    trunk.castShadow = leaf.castShadow = true; leaf.receiveShadow = true;
     grp.add(trunk, leaf);
-    this.treeData = { trees, trunk, leaf };
+    this.treeData = { trees, trunk, leaf, leafIdx, trunkIdx };
     return grp;
   }
-  private treeData: { trees: { x: number; z: number }[]; trunk: THREE.InstancedMesh; leaf: THREE.InstancedMesh } | null = null;
+  /** Wind: crowns sway a little (more at the top of each block), phase varies per tree position. */
+  private windTime = { value: 0 };
+  private swayLeaves(mat: THREE.MeshStandardMaterial) {
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.windTime = this.windTime;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float windTime;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          #ifdef USE_INSTANCING
+            vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+            float ph = ip.x * 0.37 + ip.z * 0.23;
+            float amt = (transformed.y + 0.5) * 0.06;
+            transformed.x += sin(windTime * 1.3 + ph) * amt;
+            transformed.z += cos(windTime * 1.1 + ph * 1.3) * amt * 0.7;
+          #endif`);
+    };
+    mat.customProgramCacheKey = () => 'tree-sway';
+  }
+  private treeData: { trees: { x: number; z: number }[]; trunk: THREE.InstancedMesh; leaf: THREE.InstancedMesh; leafIdx: number[][]; trunkIdx: number[][] } | null = null;
   /** Remove trees that would overlap important things (NPCs, doors, carts, coins, signs). */
   clearTreesAround(points: { x: number; z: number; r: number }[]) {
     const td = this.treeData; if (!td) return;
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
     td.trees.forEach((t, i) => {
       if (!points.some(p => (p.x - t.x) ** 2 + (p.z - t.z) ** 2 < (p.r + 2.5) ** 2)) return;
-      td.trunk.setMatrixAt(i, zero); td.leaf.setMatrixAt(i * 2, zero); td.leaf.setMatrixAt(i * 2 + 1, zero);
+      for (const k of td.trunkIdx[i]) td.trunk.setMatrixAt(k, zero); for (const k of td.leafIdx[i]) td.leaf.setMatrixAt(k, zero);
       const oi = this.obstacles.findIndex(o => o.x === t.x && o.z === t.z); if (oi >= 0) this.obstacles.splice(oi, 1);
       for (const c of this.cache.values()) { const k = c.grid.extra.findIndex(o => o.x === t.x && o.z === t.z); if (k >= 0) c.grid.extra.splice(k, 1); }
     });
@@ -578,47 +797,51 @@ export class World {
       const m = meshBuilding(b.poly, b.style, { construction: b.state === 'construction', detailed: !b.context });
       meshes.set(b.key, m); grid.addBuilding(m);
     }
-    const mesh = new THREE.Mesh(mergeToGeometry([...meshes.values()]), new THREE.MeshLambertMaterial({ vertexColors: true }));
+    const mesh = new THREE.Mesh(mergeToGeometry([...meshes.values()]), buildingMaterials());
     mesh.castShadow = mesh.receiveShadow = true; mesh.name = 'buildings';
     group.add(mesh);
     for (const b of buildings) if (b.state === 'construction') group.add(this.fence(b.poly));
-    for (const b of buildings) if (b.landmark && b.name && b.state !== 'site') {
-      const spot = this.signSpot(b.poly, grid);
-      if (!spot) continue;
-      const sign = makeSign(b.state === 'construction' ? [b.name, '(under construction)'] : [b.name], 5.5, 1.5);
-      sign.position.set(spot.x, terrainHeight(spot.x, spot.z), spot.z); sign.rotation.y = Math.atan2(spot.nx, spot.nz);
-      group.add(sign); grid.extra.push({ x: spot.x, z: spot.z, r: 1.6 });
+    for (const b of buildings) if (b.state === 'standing' && b.registryId) this.addFeatures(b, group, grid, meshes);
+    for (const b of buildings) if (b.state !== 'site' && !b.context) {
+      const doors = b.state === 'standing' ? this.addEntrances(b, group) : [];
+      if (b.landmark && b.name) this.addWallPlaque(b, group, doors[0] ?? null);
     }
-    for (const b of buildings) if (b.state === 'standing' && b.registryId) this.addFeatures(b, group, grid);
-    for (const b of buildings) if (b.state === 'standing' && !b.context) this.addEntrances(b, group);
     return { group, grid, buildings, meshes, map: this.paintMap(buildings) };
   }
 
-  /** Find a free spot in front of a building wall for its name sign (prefers the south side). */
-  private signSpot(poly: Vec2[], grid: CollisionGrid): { x: number; z: number; nx: number; nz: number } | null {
-    const [cx, cz] = polyAvg(poly);
-    const R = Math.max(...poly.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 30;
-    for (const ang of [0, 0.5, -0.5, Math.PI / 2, -Math.PI / 2, 1, -1, Math.PI, 2.2, -2.2]) {
-      const s = snapToPolygon(poly, [cx + Math.sin(ang) * R, cz + Math.cos(ang) * R]);
-      for (const off of [3, 4.5]) {
-        const x = s.point[0] + s.normal[0] * off, z = s.point[1] + s.normal[1] * off;
-        const clear = !everOccupied(x, z, 2) && !onVehicleRoad(x, z) && !grid.blocked(x, z, 2.2)
-          && !this.treeData?.trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < 9);
-        if (clear) return { x, z, nx: s.normal[0], nz: s.normal[1] };
+  /** Building name on the wall (above an entrance when there is one) — never blocks a path. */
+  private addWallPlaque(b: EraBuilding, group: THREE.Group, door: { x: number; z: number; nx: number; nz: number } | null) {
+    let spot = door;
+    if (!spot) {
+      const [cx, cz] = polyAvg(b.poly), R = Math.max(...b.poly.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 30;
+      for (const ang of [0, 0.6, -0.6, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+        const s = snapToPolygon(b.poly, [cx + Math.sin(ang) * R, cz + Math.cos(ang) * R]);
+        const ox = s.point[0] + s.normal[0] * 4, oz = s.point[1] + s.normal[1] * 4;
+        if (everOccupied(ox, oz)) continue;                     // faces another building
+        const f = flushOnWall(b.poly, s.point[0], s.point[1], s.normal[0], s.normal[1]);
+        spot = { x: f[0], z: f[1], nx: s.normal[0], nz: s.normal[1] }; break;
       }
     }
-    return null;
+    if (!spot) return;
+    const lines = b.state === 'construction' ? [b.name!, '(under construction)'] : [b.name!];
+    const tex = new THREE.CanvasTexture(textCanvas(lines, { w: 768, h: 128, bg: '#2a3a4f', fg: '#f6f0e2', border: '#c9b48a' })); tex.colorSpace = THREE.SRGBColorSpace;
+    const side = lambert('#5a4636');
+    const plaque = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 0.12), [side, side, side, side, new THREE.MeshStandardMaterial({ map: tex }), side]);
+    const y = terrainHeight(spot.x, spot.z) + (door ? 4.6 : 3.4);
+    plaque.position.set(spot.x + spot.nx * 0.12, y, spot.z + spot.nz * 0.12); plaque.rotation.y = Math.atan2(spot.nx, spot.nz);
+    group.add(plaque);
   }
 
-  /** Visible (decorative) entrances where sidewalks meet a building's walls. */
-  private addEntrances(b: EraBuilding, group: THREE.Group) {
+  /** Decorative door spots for a footprint (deterministic: where sidewalks end at its walls). */
+  entranceSpotsFor(poly: Vec2[], landmark: boolean): { x: number; z: number; nx: number; nz: number }[] {
+    const spots: { x: number; z: number; nx: number; nz: number }[] = [];
     const cands: { x: number; z: number; d: number }[] = [];
     for (const r of CAMPUS.roads) {
       if (!PATH_KINDS.has(r.kind)) continue;
-      for (const [x, z] of r.pts) {
-        if (pointInPoly(x, z, b.poly)) continue;
-        const s = snapToPolygon(b.poly, [x, z]); const d = Math.hypot(s.point[0] - x, s.point[1] - z);
-        if (d < 7) cands.push({ x, z, d });
+      for (const [x, z] of [r.pts[0], r.pts[r.pts.length - 1]]) { // a path that ends at a wall = an entrance
+        if (pointInPoly(x, z, poly)) continue;
+        const s = snapToPolygon(poly, [x, z]); const d = Math.hypot(s.point[0] - x, s.point[1] - z);
+        if (d < 4) cands.push({ x, z, d });
       }
     }
     cands.sort((a, c) => a.d - c.d);
@@ -627,27 +850,50 @@ export class World {
     const chosen: Vec2[] = [...real];
     const realCount = real.length;
     for (const c of cands) {
-      if (chosen.length - realCount >= (b.landmark ? 3 : 1)) break;
+      if (chosen.length - realCount >= (landmark ? 3 : 1)) break;
       if (chosen.some((p, i) => Math.hypot(p[0] - c.x, p[1] - c.z) < (i < realCount ? 12 : 18))) continue;
       chosen.push([c.x, c.z]);
     }
     for (const [x, z] of chosen.slice(realCount)) {
-      const s = snapToPolygon(b.poly, [x, z]);
-      const door = makeDoor(false);
-      const px = s.point[0] + s.normal[0] * 0.75, pz = s.point[1] + s.normal[1] * 0.75;
-      door.position.set(px, terrainHeight(px, pz), pz); door.rotation.y = Math.atan2(s.normal[0], s.normal[1]);
-      group.add(door);
+      const s = snapToPolygon(poly, [x, z]);
+      const f = flushOnWall(poly, s.point[0], s.point[1], s.normal[0], s.normal[1]);
+      spots.push({ x: f[0], z: f[1], nx: s.normal[0], nz: s.normal[1] });
     }
+    return spots;
   }
 
+  /** Visible (decorative) entrances; returns the door spots. */
+  private addEntrances(b: EraBuilding, group: THREE.Group) {
+    const spots = this.entranceSpotsFor(b.poly, b.landmark);
+    for (const sp of spots) { const door = makeDoor(false); door.position.set(sp.x, terrainHeight(sp.x, sp.z), sp.z); door.rotation.y = Math.atan2(sp.nx, sp.nz); group.add(door); }
+    return spots;
+  }
+
+  /** Every entrance (decorative + enterable) in any era — a clear zone is kept in front of each. */
+  doorZones: { x: number; z: number }[] = [];
+  private computeDoorZones() {
+    for (const b of BUILDINGS) {
+      const poly = registryPoly(b.id); if (!poly) continue;
+      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 });
+    }
+    for (const i of Object.values(GAME_CONFIG.interiors)) { const d = this.doorPlacement(GAME_CONFIG.locations[i.exteriorDoor]); this.doorZones.push({ x: d.x + d.nx * 2, z: d.z + d.nz * 2 }); }
+  }
+  /** True when (x,z) is within `r` m of the space in front of any entrance. */
+  nearDoor(x: number, z: number, r = 4) { return this.doorZones.some(d => (d.x - x) ** 2 + (d.z - z) ** 2 < r * r); }
+
   /** Recognisable stylized details for specific buildings (registry `features`). */
-  private addFeatures(b: EraBuilding, group: THREE.Group, grid: CollisionGrid) {
+  private addFeatures(b: EraBuilding, group: THREE.Group, grid: CollisionGrid, meshes: Map<string, BuiltMesh>) {
     const entry = BUILDINGS.find(x => x.id === b.registryId); const feats = entry?.features; if (!feats?.length) return;
     const [cx, cz] = polyAvg(b.poly);
     const base = Math.min(...b.poly.map(p => terrainHeight(p[0], p[1])));
     const wallTop = terrainHeight(cx, cz) + entry!.style.levels * (entry!.style.floorHeight ?? 4);
     const white = lambert('#f4f0e6'), brick = lambert(entry!.style.wall), glass = lambert('#7fa3bb'), roof = lambert('#5e6d6a');
     const put = (m: THREE.Mesh, x: number, y: number, z: number) => { m.position.set(x, y, z); m.castShadow = true; group.add(m); return m; };
+    if (feats.includes('finial')) {
+      // slim white finial on the central peak
+      let peakTop = wallTop; const mm = meshes.get(b.key); if (mm) for (const v of mm.tops) peakTop = Math.max(peakTop, v);
+      put(new THREE.Mesh(new THREE.BoxGeometry(0.35, 4, 0.35), white), cx, peakTop + 2, cz);
+    }
     if (feats.includes('steeple')) {
       // Chapel steeple at the entrance side facing the main quad (north). Stylized.
       const s = snapToPolygon(b.poly, [cx, cz - 200]);
@@ -764,7 +1010,8 @@ export class World {
     const inst = ERAS[this.era].institution;
     for (const s of GAME_CONFIG.signs) {
       const a = GAME_CONFIG.locations[s.anchor]; if (!a) continue;
-      const lines = (s.text as Record<string, string>)[inst].split('\n');
+      const text = (s.text as Record<string, string>)[inst]; if (!text || s.hideInEras?.includes(this.era)) continue;
+      const lines = text.split('\n');
       const banner = s.banner[inst];
       const sign = makeSign(banner ? [...lines, banner] : lines, 6, 2.4, { bg: inst === 'byui' ? '#1f3550' : '#5b2a24', fg: '#f6f0e2' });
       const [x, z] = this.signSpots.get(s.anchor) ?? toGame(a.x, a.z);
@@ -785,12 +1032,17 @@ export class World {
     const poly = a.building ? registryPoly(a.building) : undefined;
     if (!poly) return { x: gx, z: gz, nx: 0, nz: 1 };
     const s = snapToPolygon(poly, [gx, gz]);
-    return { x: s.point[0], z: s.point[1], nx: s.normal[0], nz: s.normal[1] };
+    const f = flushOnWall(poly, s.point[0], s.point[1], s.normal[0], s.normal[1]); // on the voxel wall face
+    return { x: f[0], z: f[1], nx: s.normal[0], nz: s.normal[1] };
   }
   buildingStanding(id: string): boolean {
     const b = BUILDINGS.find(x => x.id === id); return !!b && eraState(b, ERAS[this.era].year) === 'standing';
   }
   updateSun(target: THREE.Vector3) {
+    this.clouds.rotation.y = (performance.now() / 1000) * 0.0025;                // slow drift
+    this.clouds.position.set(target.x, 0, target.z);
+    const t = performance.now() / 1000; this.windTime.value = t;
+    this.waterTex.forEach((tx, i) => tx.offset.set(t * (i ? -0.011 : 0.007), t * (i ? 0.006 : 0.009)));
     this.sun.position.set(target.x + 50, target.y + 100, target.z + 35);
     this.sun.target.position.copy(target);
   }

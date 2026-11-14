@@ -1,0 +1,182 @@
+// 1B. Art: paint a fictional future-temple concept (data/art.json).
+import * as THREE from 'three';
+import data from './data/art.json';
+import type { ChallengeBody } from '../shared/frame';
+import { btn, h } from '../shared/frame';
+
+export const ART = data as unknown as { note: string; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
+  modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number }> };
+
+export type Grid = (string | null)[][];
+export const refGrid = (): Grid => ART.reference.map(r => [...r].map(c => (c === '.' ? null : c)));
+
+/**
+ * Best-offset score: the reference may be painted anywhere on the larger canvas.
+ * score = matching coloured cells (same colour) / union of coloured cells (either grid), background ignored.
+ */
+export function scoreDrawing(canvas: Grid, ref: Grid): { score: number; ox: number; oy: number } {
+  const H = canvas.length, W = canvas[0]?.length ?? 0, rh = ref.length, rw = ref[0]?.length ?? 0;
+  let painted = 0; for (const row of canvas) for (const c of row) if (c) painted++;
+  let refCount = 0; for (const row of ref) for (const c of row) if (c) refCount++;
+  let best = { score: 0, ox: 0, oy: 0 };
+  for (let oy = -rh + 1; oy < H; oy++) for (let ox = -rw + 1; ox < W; ox++) {
+    let match = 0, both = 0;
+    for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) {
+      const r = ref[y][x]; if (!r) continue;
+      const cy = oy + y, cx = ox + x; if (cy < 0 || cx < 0 || cy >= H || cx >= W) continue;
+      const c = canvas[cy][cx]; if (!c) continue;
+      both++; if (c === r) match++;
+    }
+    const union = painted + refCount - both;
+    const s = union ? match / union : 0;
+    if (s > best.score) best = { score: s, ox, oy };
+  }
+  return best;
+}
+
+/** 4-connected flood fill of the region under (x, y) with colour v (returns cells changed). */
+export function floodFill(g: Grid, x: number, y: number, v: string | null): number {
+  const H = g.length, W = g[0].length, from = g[y][x]; if (from === v) return 0;
+  const st: [number, number][] = [[x, y]]; let n = 0;
+  while (st.length) {
+    const [cx, cy] = st.pop()!; if (cx < 0 || cy < 0 || cx >= W || cy >= H || g[cy][cx] !== from) continue;
+    g[cy][cx] = v; n++; st.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  return n;
+}
+
+/** Turn the finished painting into a spinning voxel model (result-screen reveal). */
+export function voxelReveal(el: HTMLElement, canvas: Grid): () => void {
+  const cells: { x: number; y: number; c: string }[] = [];
+  canvas.forEach((r, y) => r.forEach((c, x) => { if (c) cells.push({ x, y, c }); }));
+  if (!cells.length) return () => {};
+  const minX = Math.min(...cells.map(c => c.x)), maxX = Math.max(...cells.map(c => c.x)), minY = Math.min(...cells.map(c => c.y)), maxY = Math.max(...cells.map(c => c.y));
+  const cv = document.createElement('canvas'); cv.className = 'art-reveal'; cv.width = 360; cv.height = 280; el.append(cv, h('div', { class: 'small', text: 'Your concept, built in voxels' }));
+  let renderer: THREE.WebGLRenderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch { cv.remove(); return () => {}; }
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 360 / 280, 0.1, 200);
+  scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404050, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(5, 10, 8); scene.add(sun);
+  const geo = new THREE.BoxGeometry(0.96, 0.96, 1), mat = new THREE.MeshLambertMaterial();
+  const mesh = new THREE.InstancedMesh(geo, mat, cells.length * 2), m = new THREE.Matrix4(), col = new THREE.Color();
+  let k = 0;
+  for (const c of cells) {
+    const depth = c.c === 'b' ? 1 : c.c === 'g' ? 3 : 2;                                  // windows recessed, gold proud
+    for (let d = 0; d < Math.min(2, depth); d++) {
+      m.makeScale(1, 1, depth / 2); m.setPosition(c.x - (minX + maxX) / 2, maxY - c.y, d * depth / 2 - depth / 4);
+      mesh.setMatrixAt(k, m); mesh.setColorAt(k, col.set(ART.palette.find(p => p.id === c.c)!.color)); k++;
+    }
+  }
+  mesh.count = k; scene.add(mesh);
+  const size = Math.max(maxX - minX, maxY - minY) + 4;
+  let id = 0; const t0 = performance.now();
+  const tick = () => {
+    const t = (performance.now() - t0) / 1000, a = Math.sin(t * 0.8) * 0.9;
+    cam.position.set(Math.sin(a) * size * 1.6, (maxY - minY) / 2 + size * 0.25, Math.cos(a) * size * 1.6); cam.lookAt(0, (maxY - minY) / 2, 0);
+    mesh.scale.y = Math.min(1, t * 1.2);                                                        // rises from the ground
+    renderer.render(scene, cam); id = requestAnimationFrame(tick);
+  };
+  tick();
+  return () => { cancelAnimationFrame(id); geo.dispose(); mat.dispose(); renderer.dispose(); renderer.forceContextLoss(); };
+}
+
+export const artChallenge: ChallengeBody = (root, api) => {
+  const mode = ART.modes[api.difficulty], { width: W, height: H } = ART.canvas, ref = refGrid();
+  const canvas: Grid = Array.from({ length: H }, () => Array(W).fill(null));
+  let cx = Math.floor(W / 2), cy = Math.floor(H / 2), colorIdx = 0, mirror = false, bucket = false, hintsLeft = mode.hints;
+  const t0 = performance.now();
+  const inCanvas = true;
+  const color = () => ART.palette[colorIdx];
+
+  const cells: HTMLElement[][] = [];
+  const grid = h('div', { class: 'art-canvas', role: 'grid', 'aria-label': 'Painting canvas', style: `grid-template-columns: repeat(${W}, 1fr)` });
+  for (let y = 0; y < H; y++) { cells.push([]); for (let x = 0; x < W; x++) { const c = h('div', { class: 'cell' }); c.dataset.x = String(x); c.dataset.y = String(y); grid.append(c); cells[y].push(c); } }
+  const refEl = h('div', { class: 'art-ref', style: `grid-template-columns: repeat(${ref[0].length}, 1fr)` });
+  for (const row of ref) for (const c of row) refEl.append(h('div', { class: 'cell', style: c ? `background:${ART.palette.find(p => p.id === c)!.color}` : '' }));
+  const refBox = h('div', { class: 'art-refbox' }, h('div', { class: 'ref-title', text: 'Reference (future concept)' }), refEl);
+  const meter = h('div', { class: 'meter' }, h('div', { class: 'meter-fill' }), h('span', { class: 'meter-text' }));
+  const palette = h('div', { class: 'palette' }, ...ART.palette.map((p, i) => { const b = btn(p.name, () => { colorIdx = i; paintUI(); }, 'swatch'); b.style.setProperty('--sw', p.color); return b; }));
+  const mirrorBtn = btn('Mirror: off', () => { mirror = !mirror; paintUI(); });
+  const bucketBtn = btn('Bucket: off', () => { bucket = !bucket; paintUI(); });
+  const undoStack: Grid[] = []; const snap = () => { undoStack.push(canvas.map(r => [...r])); if (undoStack.length > 20) undoStack.shift(); };
+  const undo = () => { const u = undoStack.pop(); if (u) { u.forEach((r, y) => { canvas[y] = r; }); paintUI(); } };
+  const tools = h('div', { class: 'art-tools tools-zone' }, btn('✔ Check painting', () => check(), 'primary'), mirrorBtn, bucketBtn, btn('Undo fill/clear', () => undo()), btn('Clear', () => { snap(); canvas.forEach(r => r.fill(null)); paintUI(); }));
+  root.append(h('div', { class: 'art-wrap' }, h('div', {}, grid),
+    h('div', { class: 'art-side' }, refBox, mode.liveMeter ? meter : null, h('div', { class: 'ref-title', text: 'Colours (right stick / R·F)' }), palette, tools)));
+  palette.querySelectorAll('[data-focus]').forEach(b => b.removeAttribute('data-focus')); // colours: right stick (mouse can click)
+  api.setControls([['L', 'move brush'], ['R', 'colour'], ['RU', '↑ mirror · ↓ fill bucket'], ['1', 'paint'], ['2', 'erase'], ['3', 'hint'], ['4', 'check / tools']]);
+
+  const set = (x: number, y: number, v: string | null) => {
+    canvas[y][x] = v;
+    if (mirror) { const mx = W - 1 - x; canvas[y][mx] = v; }
+  };
+  let ghost: { ox: number; oy: number } | null = null;
+  const paintUI = () => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const c = cells[y][x], v = canvas[y][x];
+      c.style.background = v ? ART.palette.find(p => p.id === v)!.color : '';
+      c.classList.toggle('cursor', inCanvas && x === cx && y === cy);
+      let g = ''; if (ghost) { const ry = y - ghost.oy, rx = x - ghost.ox; const r = ref[ry]?.[rx]; if (r) g = ART.palette.find(p => p.id === r)!.color; }
+      c.style.boxShadow = g ? `inset 0 0 0 3px ${g}` : '';
+    }
+    palette.querySelectorAll('.swatch').forEach((b, i) => b.classList.toggle('active', i === colorIdx));
+    mirrorBtn.textContent = `Mirror: ${mirror ? 'on' : 'off'}`; bucketBtn.textContent = `Bucket: ${bucket ? 'on' : 'off'}`;
+    if (mode.liveMeter) { const s = scoreDrawing(canvas, ref).score; (meter.firstChild as HTMLElement).style.width = `${Math.round(s * 100)}%`; (meter.lastChild as HTMLElement).textContent = `Match ${Math.round(s * 100)}% (need ${Math.round(mode.pass * 100)}%)`; }
+    api.setStatus(`Colour: ${color().name}${mirror ? ' · mirror on' : ''}${bucket ? ' · bucket on (mouse)' : ''}`);
+    grid.classList.toggle('active', inCanvas);
+  };
+  const check = () => {
+    const { score } = scoreDrawing(canvas, ref);
+    const pass = score >= mode.pass, secs = Math.round((performance.now() - t0) / 1000);
+    const snapshot = canvas.map(r => [...r]);
+    api.finish({ pass, quality: Math.min(1, score) * 0.85 + (secs < 120 ? 0.15 : secs < 240 ? 0.07 : 0) - api.hintsUsed() * 0.05,
+      summary: `Your painting matches ${Math.round(score * 100)}% of the reference (needed ${Math.round(mode.pass * 100)}%) · ${secs} s.`,
+      extra: pass ? el => voxelReveal(el, snapshot) : undefined });
+  };
+  // mouse
+  let drag: 'paint' | 'erase' | null = null;
+  const at = (e: PointerEvent) => { const t = (e.target as HTMLElement).closest('.cell') as HTMLElement | null; return t && t.dataset.x ? [+t.dataset.x, +t.dataset.y!] : null; };
+  grid.addEventListener('contextmenu', e => e.preventDefault());
+  grid.addEventListener('pointerdown', e => {
+    const p = at(e); if (!p) return; cx = p[0]; cy = p[1];
+    if (bucket) { fill(e.button === 2 ? null : color().id); return; }
+    drag = e.button === 2 ? 'erase' : 'paint'; set(p[0], p[1], drag === 'paint' ? color().id : null); paintUI();
+  });
+  grid.addEventListener('pointermove', e => { if (!drag) return; const p = at(e); if (p) { set(p[0], p[1], drag === 'paint' ? color().id : null); paintUI(); } });
+  const up = () => { drag = null; }; window.addEventListener('pointerup', up);
+  // actions (keyboard + controllers)
+  api.onAction(a => {
+    if (a === 'alt') { colorIdx = (colorIdx + 1) % ART.palette.length; paintUI(); return true; }
+    if (a === 'alt2') { colorIdx = (colorIdx + ART.palette.length - 1) % ART.palette.length; paintUI(); return true; }
+    if (a === 'rup') { mirror = !mirror; paintUI(); return true; }
+    if (a === 'rdown') { fill(color().id); return true; }
+    if (a === 'left') cx = Math.max(0, cx - 1); else if (a === 'right') cx = Math.min(W - 1, cx + 1);
+    else if (a === 'up') cy = Math.max(0, cy - 1);
+    else if (a === 'down') cy = Math.min(H - 1, cy + 1);
+    else if (a === 'confirm') set(cx, cy, color().id);
+    else if (a === 'back') set(cx, cy, null);
+    else return false;
+    paintUI(); return true;
+  });
+  function fill(v: string | null) {
+    snap();
+    const n = floodFill(canvas, cx, cy, v);
+    if (mirror) floodFill(canvas, W - 1 - cx, cy, v);
+    api.setStatus(n ? `Filled ${n} squares` : 'Already that colour'); paintUI();
+  }
+  // reference visibility: Hard shows a short preview, then hides it
+  const showRef = (v: boolean) => refEl.classList.toggle('hidden-ref', !v);
+  let timer = 0;
+  if (!mode.showReference) { showRef(true); api.setStatus('Memorise the reference…'); timer = window.setTimeout(() => showRef(false), (mode.previewSeconds ?? 6) * 1000); }
+  api.onHint(() => {
+    if (hintsLeft <= 0) return null; hintsLeft--;
+    if (mode.showReference) {
+      const b = scoreDrawing(canvas, ref); ghost = b.score > 0 ? { ox: b.ox, oy: b.oy } : { ox: Math.floor((W - ref[0].length) / 2), oy: Math.floor((H - ref.length) / 2) };
+      paintUI(); window.setTimeout(() => { ghost = null; paintUI(); }, mode.hintSeconds * 1000);
+      return 'The template is outlined where your painting lines up best.';
+    }
+    showRef(true); window.setTimeout(() => showRef(false), mode.hintSeconds * 1000);
+    return 'The reference is visible again for a few seconds.';
+  });
+  paintUI();
+  return () => { clearTimeout(timer); window.removeEventListener('pointerup', up); };
+};

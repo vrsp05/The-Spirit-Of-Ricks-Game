@@ -528,6 +528,25 @@ export class Game {
    * Face-to-face conversation: both characters turn toward each other and the camera frames
    * them side-on (a two-shot), on whichever side has room (indoors too). Released afterwards.
    */
+  /**
+   * Story conversations (Bednar, candidates — not students on the street) always start from the same spot:
+   * the player stands 1.7 m in front of the character, facing them, on the side with the most open space
+   * (picked once per character from the room geometry), so every scene gets the same camera shot.
+   */
+  private stageConversation(npc: THREE.Object3D) {
+    const o = npc.position, ud = npc.userData as { homeYaw?: number; stageYaw?: number };
+    ud.homeYaw ??= npc.rotation.y;
+    if (ud.stageYaw === undefined) {
+      const clear = (yaw: number) => { const fx = Math.sin(yaw), fz = Math.cos(yaw); for (let k = 0.8; k <= 4.2; k += 0.35) if (this.space.blocked(o.x + fx * k, o.z + fz * k, 0.3)) return false; return true; };
+      const tries = [0, 1, -1, 2, -2, 3, -3, 4].map(i => ud.homeYaw! + i * Math.PI / 4);
+      ud.stageYaw = tries.find(clear) ?? ud.homeYaw;
+    }
+    const yaw = ud.stageYaw!, fx = Math.sin(yaw), fz = Math.cos(yaw), d = 1.7;
+    this.player.place(this.space, o.x + fx * d, o.z + fz * d, yaw + Math.PI);
+    this.player.avatar.root.rotation.y = yaw + Math.PI; npc.rotation.y = yaw;
+    this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
+  }
+
   private async faceToFace(other: THREE.Object3D, talk: () => Promise<void>) {
     const p = this.player.position, o = other.position;
     const dx = o.x - p.x, dz = o.z - p.z, d = Math.hypot(dx, dz) || 1;
@@ -555,7 +574,7 @@ export class Game {
 
   async talkToQuestGiver() {
     // Bednar turns toward the assistant
-    if (this.bednar) { const b = this.bednar.root.position, p = this.player.position; this.bednar.root.rotation.y = Math.atan2(p.x - b.x, p.z - b.z); }
+    if (this.bednar) this.stageConversation(this.bednar.root);   // same spot, same shot, every time
     const active = this.quests.active();
     if (active && this.quests.readyToReport(active)) { await this.quests.report(active); return; }
     const talk = (lines: Parameters<UI['dialogue']>[0]) => (this.bednar ? this.faceToFace(this.bednar.root, () => this.ui.dialogue(lines)) : this.ui.dialogue(lines));
@@ -866,6 +885,7 @@ export class Game {
       { label: `Difficulty: ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} — switch to ${other === 'easy' ? 'Easy' : 'Hard'}`, action: () => {
         this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
       } },
+      ...(this.player.jetpack ? [{ label: 'Take off the jetpack', action: () => { this.player.jetpack = false; this.player.avatar.setJetpack(false); this.ui.toast('Jetpack off.'); close(); } }] : []),
       { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
       { label: '⌨ Cheat codes', action: () => this.showCheats() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
@@ -877,7 +897,6 @@ export class Game {
       { label: 'Reset saved game', action: () => this.confirmReset() },
     ];
     const s = this.ui.menu('Paused', items, { subtitle: `${ERAS[this.world.era].label} · ${this.difficulty === 'easy' ? 'Easy' : 'Hard'} · quest timers paused`, onBack: close });
-    this.ui.attachMap(s);   // options on the left, the zoomable campus map on the right
     s.onPause = close;
   }
   private confirmSkip() {
@@ -1150,7 +1169,7 @@ export class Game {
       if (canAct) {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
         else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
-        else if (focus && a.pressed('interact')) { a.consume('interact'); void this.interactions.trigger(); }
+        else if (focus && a.pressed('interact')) { a.consume('interact'); if (focus.kind === 'npc' && focus.visual) this.stageConversation(focus.visual); void this.interactions.trigger(); }
         else if (ballNear && a.pressed('interact')) { a.consume('interact'); if (this.balls.action(this.player.position, this.player.yaw)) playSound(ballNear.startsWith('Kick') ? 'kick' : 'tick'); }
         else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }

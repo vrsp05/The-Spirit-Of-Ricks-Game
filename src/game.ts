@@ -7,6 +7,7 @@ import { Ambience } from './fx/ambience';
 import { VoiceActor } from './fx/voice';
 import { EngineSound, loadSamples, playStep, SampleLoop } from './fx/audio';
 import { Traffic } from './world/Traffic';
+import { CLOSED, textCanvas } from './world/World';
 import { BallGames } from './world/ballGames';
 import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
 import { InputManager } from './input/actions';
@@ -194,6 +195,7 @@ export class Game {
     this.player.place(this.exteriorSpace, sp.x, sp.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     this.setupCoreInteractables();
+    this.setupBuildingDoors();
     this.setupVehicles();
     this.setupBenches();
     this.npcs = new NpcCrowd(this.renderer.scene, GAME_CONFIG.npcs.count, () => this.world.activeDoors());
@@ -283,10 +285,11 @@ export class Game {
     for (const [id, def] of this.interiors.defs) {
       const cfg = (GAME_CONFIG.interiors as any)[id] as { eras: EraId[] | null; label: string; building?: string };
       const open = () => !cfg.building || this.world.buildingStanding(cfg.building) || this.gateBuilt(cfg.building);
+      if (cfg.building && this.world.buildingDoors().some(d => d.id === cfg.building)) continue;   // its real doors are the entrances (setupBuildingDoors)
       const anchor = this.location(def.exteriorDoor);
       const d = this.world.doorPlacement(anchor);
       const door = makeDoor(true);
-      const tag = makeLabel('ENTRANCE', def.label.split(' — ')[0]); tag.scale.multiplyScalar(1.7); tag.position.set(0, 5.6, 0.6); door.add(tag);
+      door.add(wallSign(['ENTRANCE', def.label.split(' — ')[0]]));   // flat sign on the wall above the door
       door.rotation.y = Math.atan2(d.nx, d.nz);
       this.entrances.push({ id, x: d.x, z: d.z, eras: cfg.eras, label: def.label.split(' — ')[0] });
       // The door visual sits on the wall; the interaction point is just outside.
@@ -393,6 +396,30 @@ export class Game {
     this.player.place(this.exteriorSpace, p.x + sx * dir, p.z + sz * dir, this.player.yaw);
     this.unstick();
     this.addVehicleInteract(cart);
+  }
+  /** Which interior a building's doors lead into. */
+  private interiorFor(buildingId: string): string | null {
+    if (buildingId === 'kimball') return 'kimball-office';
+    return this.interiors.defs.has(`bldg-${buildingId}`) ? `bldg-${buildingId}` : null;
+  }
+  /** Where you came in (so you leave by the same door). */
+  private entryDoor: { space: string; x: number; z: number; nx: number; nz: number } | null = null;
+  /** Every door on every campus building is an entrance into that building's interior. */
+  private setupBuildingDoors() {
+    const taken = [...this.interactions.items.values()].filter(it => it.kind === 'door' && it.space === 'exterior').map(it => ({ x: it.x, z: it.z }));
+    this.world.buildingDoors().forEach((d, i) => {
+      const room = this.interiorFor(d.id); if (!room || CLOSED.has(d.id)) return;
+      const ox = d.x + d.nx * 1.8, oz = d.z + d.nz * 1.8;
+      if (taken.some(t => Math.hypot(t.x - ox, t.z - oz) < 4)) return;                  // already an entrance here
+      const cfg = (GAME_CONFIG.interiors as Record<string, { label: string; eras: EraId[] | null }>)[room];
+      this.interactions.add({
+        id: `core:bdoor-${i}`, kind: 'door', at: { x: ox, z: oz }, radius: 2.4, eras: cfg?.eras ?? null,
+        enabled: () => this.world.buildingStanding(d.id) || this.gateBuilt(d.id),
+        prompt: `Enter: ${(this.interiors.defs.get(room)?.label ?? room).split(' — ')[0]}`,
+        onInteract: () => { this.entryDoor = { space: room, x: d.x, z: d.z, nx: d.nx, nz: d.nz }; void this.enterInterior(room); },
+      });
+      this.entrances.push({ id: `bdoor-${i}`, x: d.x, z: d.z, eras: cfg?.eras ?? null, label: d.id });
+    });
   }
   /** Era-specific vehicles (cars) only show in their era — unless you're driving one. */
   private syncVehicles() {
@@ -618,7 +645,8 @@ export class Game {
     if (!instant) playSound('door');
     const go = () => {
       const def = this.interiors.defs.get(id)!;
-      const d = this.world.doorPlacement(this.location(def.exteriorDoor));
+      const e = this.entryDoor?.space === id ? this.entryDoor : null; this.entryDoor = null;
+      const d = e ?? this.world.doorPlacement(this.location(def.exteriorDoor));
       this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true;
       this.player.place(this.exteriorSpace, d.x + d.nx * 3, d.z + d.nz * 3, Math.atan2(d.nx, d.nz));
       this.unstick();
@@ -1015,7 +1043,7 @@ export class Game {
   private mapPosition() {
     const def = this.spaceId === 'exterior' ? null : this.interiors.defs.get(this.spaceId);
     if (!def) return { mapX: this.player.position.x, mapZ: this.player.position.z };
-    const d = this.world.doorPlacement(this.location(def.exteriorDoor)); return { mapX: d.x, mapZ: d.z };
+    const d = this.entryDoor?.space === this.spaceId ? this.entryDoor : this.world.doorPlacement(this.location(def.exteriorDoor)); return { mapX: d.x, mapZ: d.z };
   }
 
   // ---------------- frame loop ----------------
@@ -1031,6 +1059,7 @@ export class Game {
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
     this.updateTraffic(dt);
+    if (this.spaceId !== 'exterior') this.interiors.update(dt);
     if (this.balls) {
       const out = this.spaceId === 'exterior';
       this.balls.setVisible(out);
@@ -1147,3 +1176,10 @@ export class Game {
 
 export { CAMPUS };
 export type { InteractableDef };
+
+/** A flat sign mounted on the wall above a door (door-local space; the door faces +z). */
+function wallSign(lines: string[]): THREE.Mesh {
+  const tex = new THREE.CanvasTexture(textCanvas(lines, { w: 512, h: 128, bg: '#2a3a4f', fg: '#f6f0e2', border: '#c9b48a' })); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+  m.position.set(0, 4.25, 0.08); return m;
+}

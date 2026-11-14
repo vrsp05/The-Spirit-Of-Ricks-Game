@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/game.config';
 import type { Space } from '../player/PlayerController';
 import { textCanvas } from '../world/World';
-import { CAMPUS_LAYOUTS } from './campusInteriors';
+import { CAMPUS_LAYOUTS, updateActors } from './campusInteriors';
 import type { EraId } from '../world/eras';
 
 interface Rect { x0: number; z0: number; x1: number; z1: number; h?: number; color?: string }
@@ -151,9 +151,13 @@ export class InteriorManager {
     };
   }
   private decorated = new Set<string>();
+  private current: string | null = null; private t = 0;
+  /** Animate the people in the room the player is in. */
+  update(dt: number) { this.t += dt; const g = this.current ? this.groups.get(this.current) : null; if (g) updateActors(g, dt, this.t); }
   /** Show one interior (null = none). Furniture/people are built on first entry; era-dependent bits refresh. */
   show(id: string | null, era?: EraId) {
     for (const [k, g] of this.groups) g.visible = k === id;
+    this.current = id;
     if (!id) return;
     const d = this.defs.get(id), g = this.groups.get(id);
     if (d?.decorate && g && !this.decorated.has(id)) { this.decorated.add(id); d.decorate(g); }

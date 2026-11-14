@@ -221,6 +221,21 @@ export class Avatar {
     if (!this.jet) return;
     for (const f of this.jet.flames) { f.visible = k > 0.02; f.scale.set(1, (0.4 + k * 1.4) * (0.85 + Math.random() * 0.3), 1); }
   }
+  /** Seated idle: write in a notebook, look up at the board now and then, the odd raised hand. */
+  seatedIdle(t: number, seed: number, dt: number) {
+    this.time += dt; this.idleFace(dt);
+    const writing = Math.sin(t * 0.35 + seed) > -0.2, hand = Math.sin(t * 0.11 + seed * 3) > 0.985;
+    this.armR.rotation.x = hand ? -2.7 : -0.9 + (writing ? Math.sin(t * 9 + seed) * 0.06 : 0);
+    this.foreR.rotation.x = hand ? 0 : -0.6 + (writing ? Math.sin(t * 13 + seed) * 0.12 : 0);
+    this.head.rotation.x = writing ? 0.28 : -0.05;
+  }
+  /** Talking with the hands (teachers, staff, the speaker at the pulpit). */
+  gesture(t: number, seed: number) {
+    const k = Math.sin(t * 1.7 + seed);
+    this.armR.rotation.x = -0.4 - Math.max(0, k) * 0.9; this.armR.rotation.z = 0.15;
+    this.foreR.rotation.x = -0.5 - Math.max(0, Math.sin(t * 2.3 + seed)) * 0.6;
+    this.armL.rotation.x = -0.2 - Math.max(0, -k) * 0.5;
+  }
   wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; this.foreR.rotation.x = -0.4 + Math.sin(t * 8) * 0.3; }
 
   /** Deterministic poses for the opening, without replacing gameplay animation. */

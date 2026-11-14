@@ -69,6 +69,8 @@ export function snapToPolygon(poly: Vec2[], p: Vec2): { point: Vec2; normal: Vec
 }
 
 /** Door model. `enterable` doors get a green frame, lamp and step so they read as usable entrances. */
+/** Buildings whose doors stay closed (sacred / utility). */
+export const CLOSED = new Set(['temple', 'heating-plant', 'pplt-shop']);
 export function makeDoor(enterable: boolean): THREE.Group {
   const g = new THREE.Group();
   const add = (w: number, h: number, d: number, c: string, x: number, y: number, z: number, emissive?: string) => {
@@ -1023,13 +1025,16 @@ export class World {
   /** Visible (decorative) entrances; returns the door spots. */
   private addEntrances(b: EraBuilding, group: THREE.Group) {
     const spots = this.entranceSpotsFor(b.poly, b.landmark);
-    for (const sp of spots) { const door = makeDoor(false); door.position.set(sp.x, terrainHeight(sp.x, sp.z), sp.z); door.rotation.y = Math.atan2(sp.nx, sp.nz); group.add(door); }
+    const enterable = !!b.registryId && !CLOSED.has(b.registryId);   // every campus door opens, except these
+    for (const sp of spots) { const door = makeDoor(enterable); door.position.set(sp.x, terrainHeight(sp.x, sp.z), sp.z); door.rotation.y = Math.atan2(sp.nx, sp.nz); group.add(door); }
     return spots;
   }
 
   /** Every entrance (decorative + enterable) in any era — a clear zone is kept in front of each. */
   doorZones: { x: number; z: number }[] = [];
-  private doorInfo: { x: number; z: number; id: string }[] = [];
+  private doorInfo: { x: number; z: number; id: string; wx: number; wz: number; nx: number; nz: number }[] = [];
+  /** Every building entrance (all eras): wall point, outward normal and building id. */
+  buildingDoors() { return this.doorInfo.map(d => ({ x: d.wx, z: d.wz, nx: d.nx, nz: d.nz, id: d.id })); }
   private doorCache: { era: string; pts: [number, number][] } | null = null;
   /** Entrances of buildings standing in the current era (destinations for NPCs). */
   activeDoors(): [number, number][] {
@@ -1039,7 +1044,7 @@ export class World {
   private computeDoorZones() {
     for (const b of BUILDINGS) {
       const poly = registryPoly(b.id); if (!poly) continue;
-      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) { this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 }); this.doorInfo.push({ x: sp.x + sp.nx * 1.2, z: sp.z + sp.nz * 1.2, id: b.id }); }
+      for (const sp of this.entranceSpotsFor(poly, !!b.landmark)) { this.doorZones.push({ x: sp.x + sp.nx * 2, z: sp.z + sp.nz * 2 }); this.doorInfo.push({ x: sp.x + sp.nx * 1.2, z: sp.z + sp.nz * 1.2, id: b.id, wx: sp.x, wz: sp.z, nx: sp.nx, nz: sp.nz }); }
     }
     for (const i of Object.values(GAME_CONFIG.interiors)) { const d = this.doorPlacement(GAME_CONFIG.locations[i.exteriorDoor]); this.doorZones.push({ x: d.x + d.nx * 2, z: d.z + d.nz * 2 }); }
   }

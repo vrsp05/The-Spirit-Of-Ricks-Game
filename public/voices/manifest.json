@@ -568,5 +568,65 @@
   "file": "q1-reminder-math-art-engineering.mp3",
   "voice": "Bednar",
   "text": "Candidates still to hire: Math (Romney Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "de9d2c5b9551": {
+  "file": "q1-reminder-math-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "25619b9a10ed": {
+  "file": "q1-reminder-english.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: English (Smith Building). They wait in Personnel Services, down the hall."
+ },
+ "e421e7c66970": {
+  "file": "q1-reminder-english-art.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: English (Smith Building), Art (Spori Building). They wait in Personnel Services, down the hall."
+ },
+ "77d82f98e77f": {
+  "file": "q1-reminder-english-art-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: English (Smith Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "c2910408be5e": {
+  "file": "q1-reminder-english-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: English (Smith Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "0a9692ee6260": {
+  "file": "q1-reminder-art.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Art (Spori Building). They wait in Personnel Services, down the hall."
+ },
+ "ae6d3dc393e2": {
+  "file": "q1-reminder-art-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "2e56ddbd4217": {
+  "file": "q1-reminder-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "8e9d6a951e7b": {
+  "file": "q2-reminder-taylor.mp3",
+  "voice": "Bednar",
+  "text": "Blueprints still to solve: John Taylor Building."
+ },
+ "64320edf52ef": {
+  "file": "q2-reminder-taylor-icenter.mp3",
+  "voice": "Bednar",
+  "text": "Blueprints still to solve: John Taylor Building, Campus Center."
+ },
+ "b1885fafa5de": {
+  "file": "q2-reminder-icenter.mp3",
+  "voice": "Bednar",
+  "text": "Blueprints still to solve: Campus Center."
+ },
+ "e23b23b11da2": {
+  "file": "q2-ready.mp3",
+  "voice": "Bednar",
+  "text": "Both blueprints are solved? Tell me what you found."
  }
 }

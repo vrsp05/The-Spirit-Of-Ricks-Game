@@ -82,11 +82,11 @@ describe('art scoring', () => {
   const ref = refGrid();
   const paint = (ox: number, oy: number) => { const c = blank(); ref.forEach((r, y) => r.forEach((v, x) => { if (v) c[y + oy][x + ox] = v; })); return c; };
   it('perfect copy scores 1 at any offset', () => {
-    for (const [ox, oy] of [[0, 0], [3, 4], [8, 8]]) { const s = scoreDrawing(paint(ox, oy), ref); expect(s.score).toBeCloseTo(1); expect([s.ox, s.oy]).toEqual([ox, oy]); }
+    for (const [ox, oy] of [[0, 0], [2, 1], [ART.canvas.width - ref[0].length, ART.canvas.height - ref.length]]) { const s = scoreDrawing(paint(ox, oy), ref); expect(s.score).toBeCloseTo(1); expect([s.ox, s.oy]).toEqual([ox, oy]); }
   });
   it('empty canvas scores 0; wrong colours and extra paint lower the score', () => {
     expect(scoreDrawing(blank(), ref).score).toBe(0);
-    const c = paint(2, 2); c[0][0] = 'g'; c[23][19] = 'w';
+    const c = paint(2, 2); c[0][0] = 'g'; c[ART.canvas.height - 1][ART.canvas.width - 1] = 'w';
     expect(scoreDrawing(c, ref).score).toBeLessThan(1);
     const recolor = paint(2, 2).map(r => r.map(v => (v ? 'b' : v)));
     expect(scoreDrawing(recolor, ref).score).toBeLessThan(0.3);
@@ -183,12 +183,15 @@ describe('english answer keys', () => {
 });
 
 describe('art subjects', () => {
-  it('temple and Tabernacle templates are symmetric 12 × 16 grids using palette colours', () => {
+  it('templates are rectangular, symmetric grids in palette colours that fit the canvas (the temple is small: 9 × 10)', () => {
     const ids = new Set(ART_DATA.palette.map(p => p.id));
     for (const [k, rows] of Object.entries(ART_DATA.references!)) {
-      expect(rows, k).toHaveLength(16);
-      for (const r of rows) { expect(r).toHaveLength(12); expect([...r].every(c => c === '.' || ids.has(c)), k).toBe(true); }
+      for (const r of rows) { expect(r, k).toHaveLength(rows[0].length); expect([...r].every(c => c === '.' || ids.has(c)), k).toBe(true); }
     }
+    const t = ART_DATA.references!.temple;
+    expect([t[0].length, t.length]).toEqual([9, 10]);
+    expect(t.every(r => r === [...r].reverse().join(''))).toBe(true);
+    expect(t[0].length).toBeLessThanOrEqual(ART.canvas.width); expect(t.length).toBeLessThanOrEqual(ART.canvas.height);
     expect(ART_DATA.references!.tabernacle.every(r => r === [...r].reverse().join(''))).toBe(true);
   });
 });

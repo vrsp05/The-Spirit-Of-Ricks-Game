@@ -46,8 +46,8 @@
     "ssssssssssss"
   ],
   "canvas": {
-    "width": 20,
-    "height": 24
+    "width": 14,
+    "height": 13
   },
   "modes": {
     "easy": {
@@ -92,22 +92,16 @@
   ],
   "references": {
     "temple": [
-      ".....gg.....",
-      ".....gg.....",
-      ".....ww.....",
-      ".....ww.....",
-      "....wwww....",
-      "....wbbw....",
-      "....wwww....",
-      "...wwwwww...",
-      ".wwwwwwwwww.",
-      ".wbwwbbwwbw.",
-      ".wbwwbbwwbw.",
-      ".wwwwwwwwww.",
-      ".wbwwwwwwbw.",
-      ".wwwwddwwww.",
-      ".wwwwddwwww.",
-      "ssssssssssss"
+      "....g....",
+      "....w....",
+      "...www...",
+      "...wbw...",
+      ".wwwwwww.",
+      ".wbwbwbw.",
+      ".wwwwwww.",
+      ".wbwdwbw.",
+      ".wwwdwww.",
+      "sssssssss"
     ],
     "tabernacle": [
       "s.s......s.s",
@@ -138,5 +132,6 @@
     "volume": 0.35,
     "enabled": false,
     "note": "Off: the game's background playlist (src/fx/music.ts, public/music/) already plays the team's recordings, including 'High on the Mountain Top', during demos. Turn on only if the playlist is paused for the art demo."
-  }
+  },
+  "marksNote": "The 1999 scenes are drawn in sepia, so painted colours also carry a mark (gold dot, blue window cross, door planks, step lines) to stay readable."
 }

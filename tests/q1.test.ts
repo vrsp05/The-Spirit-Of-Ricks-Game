@@ -200,11 +200,8 @@ describe('math tutorial', () => {
   });
 });
 
-describe('art hymn phrase', () => {
-  it('uses the verified hymnary incipit (51112 32354 32232) in G major, one beat per note', async () => {
-    const { degreeHz } = await import('../src/quests/q1/hymn');
-    const h = ART_DATA.hymn!;
-    expect(h.degrees.join('')).toBe('511123235432232'); expect(h.beats).toHaveLength(h.degrees.length);
-    expect(degreeHz(392, 1)).toBeCloseTo(392); expect(degreeHz(392, 5)).toBeCloseTo(587.33, 1); expect(degreeHz(392, -2)).toBeCloseTo(293.66, 1);
+describe('art music', () => {
+  it('points at the team recording in public/audio (silent until the file is added)', () => {
+    expect(ART_DATA.music!.src).toMatch(/^audio\/.+\.(mp3|ogg|m4a|wav)$/); expect(ART_DATA.music!.volume).toBeLessThanOrEqual(1);
   });
 });

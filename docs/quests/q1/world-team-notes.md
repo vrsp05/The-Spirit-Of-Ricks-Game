@@ -28,4 +28,4 @@ Quest 1 sticks to the quest contract, with a few marked additions in world-owned
 ## Things Q1 relies on from the world
 - From `QuestWorld`: `focusCamera`/`releaseCamera` (Q1 updates the camera every frame during demos), `playerPosition` (the escort), `addObject` (furniture and NPCs placed in interiors), `label` and `npc`.
 - `QuestModule.update(dt)` must keep running while a custom UI screen is open, which it does today. The walk-in, escort and camera views depend on it.
-- `src/core/settings.ts` `SETTINGS.muted` is read by the hymn player (`q1/hymn.ts`), so the mute setting also silences the art music.
+- `src/core/settings.ts` `SETTINGS.muted` is read by the music player (`q1/hymn.ts`), so the mute setting also silences the art music.

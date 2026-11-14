@@ -96,7 +96,7 @@ Read these first; they win over this brief if they disagree:
   - **Questions:** Pay 6 · read 011 · Pay 7 (one limnah) · why is a limnah 7 · Zeezrom's six onties = 42 days of pay. Hard adds Pay 9 and Pay 13.
   - **Rules:** misses allowed are Easy 2, Hard 1. On Hard, a right amount with too many coins counts as a miss.
 - **English:** Easy has 3 mistakes, Hard 6. Wrong marks allowed: Easy unlimited, Hard 2. Hints highlight the sentence.
-- **Art:** pass at 60% on Easy, 85% on Hard. Scoring ignores position, the class guesses as you draw, the first mirror stroke gets an "ooh", and passing shows a voxel reveal. The opening phrase of "High on the Mountain Top" (Beesley, 1854, public domain) plays softly at the start and on passing: the pitches are the verified hymnary.org incipit, the rhythm is approximated, and it lives in `art.json` → `hymn` so it can be corrected by ear. Mute silences it.
+- **Art:** pass at 60% on Easy, 85% on Hard. Scoring ignores position, the class guesses as you draw, the first mirror stroke gets an "ooh", and passing shows a voxel reveal. The team's recording of "High on the Mountain Top" plays during the demo once the file is at `public/audio/high-on-the-mountain-top.mp3` (path in `art.json` → `music`); it stays silent until then, and mute silences it.
 - **Engineering:** Easy plays 3 levels, Hard 5: lamp; lamp + fan in parallel; fan switch; dim power light + slow fan in series with the lamp bright; **Find the short** (the board starts sparking because one stray wire bridges + to −; find it and turn it).
 
 ### 4. Content and tests
@@ -116,7 +116,7 @@ Read these first; they win over this brief if they disagree:
 ## Part 3: Plan (what's left)
 
 1. **Fail paths:** played on Easy for math: losing, Retry (straight to the lesson), Leave and walking back in (the short walk-in plays). The other demos use the same frame.
-2. **Check by ear:** the hymn phrase's rhythm in `art.json` → `hymn.beats`.
+2. **Music:** add the team recording at `public/audio/high-on-the-mountain-top.mp3`.
 3. **Tune after playtests:** walk-in shot timing, waiting-spot offsets (`wait` in `GAME_CONFIG.quests.professors.candidates`), short times in `art.json`.
 4. **World teammate:** review the marked additions in `src/interiors/interiors.ts` (Kimball Personnel Services room and the four classrooms) and in `GAME_CONFIG`.
 5. **Team content:** the candidates have fictional names (Sister Ames, Brother Nielsen, Sister Okada, Brother Ruiz, set in `GAME_CONFIG.quests.professors.candidates[].name`); change them freely. Dialogue is authored placeholder text.

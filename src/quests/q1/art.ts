@@ -8,9 +8,9 @@ import type { ChallengeBody } from '../shared/frame';
 import { btn, h } from '../shared/frame';
 import { classroom } from './classroom';
 import { chalk, type Surface } from './room3d';
-import { playHymn, type HymnData } from './hymn';
+import { playMusic, type MusicData } from './hymn';
 
-export const ART = data as unknown as { note: string; hymn?: HymnData & { enabled: boolean }; subject: string; references?: Record<string, string[]>; subjects?: Record<string, string>; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
+export const ART = data as unknown as { note: string; music?: MusicData; subject: string; references?: Record<string, string[]>; subjects?: Record<string, string>; guesses: { at: number; text: string }[]; palette: { id: string; name: string; color: string }[]; reference: string[]; canvas: { width: number; height: number };
   modes: Record<string, { pass: number; liveMeter: boolean; showReference: boolean; previewSeconds?: number; hintSeconds: number; hints: number; shortAtSeconds?: number }> };
 
 /** Index of the furthest class guess reached for a live score (−1 = none yet). */
@@ -180,7 +180,6 @@ export const artChallenge: ChallengeBody = (root, api) => {
     let poppedAtEnd = false;
     if (score >= mode.pass) {
       finished = true; clearTimeout(bulbClock);
-      if (ART.hymn?.enabled) { stopHymn(); window.setTimeout(() => { stopHymn = playHymn(ART.hymn!); }, 1800); }
       // The projector always shorts out during the art demo — if you finished first, it pops right at the end.
       if (bulb === 'on') { poppedAtEnd = true; bulb = 'out'; refBox.classList.add('q1-dark'); drawProjected(false); room?.signal('fuse', true); cls?.react('gasp', 'Pop! The projector just shorted out — right at the end!'); }
     }
@@ -243,8 +242,8 @@ export const artChallenge: ChallengeBody = (root, api) => {
     return 'The reference is visible again for a few seconds.';
   });
   drawProjected(true);
-  // the temple vision gets the opening phrase of "High on the Mountain Top" (quietly)
-  let stopHymn = ART.hymn?.enabled ? playHymn(ART.hymn) : () => {};
+  // the temple vision plays the team's recording of "High on the Mountain Top" (if it's in public/audio)
+  const stopHymn = playMusic(ART.music);
   paintUI();
   return () => { finished = true; stopHymn(); clearTimeout(timer); clearTimeout(bulbClock); window.removeEventListener('pointerup', up); };
 };

@@ -4,7 +4,8 @@ import type { ActionState } from '../input/actions';
 import type { ButtonName } from '../input/actions';
 import type { CustomPanel, DialogueLine, PanelAction, PanelSpec } from '../quests/contract';
 import type { RewardReceipt } from '../quests/rewards';
-import { CAMPUS } from '../world/campusData';
+import { CAMPUS, allFootprints, buildingsForEra } from '../world/campusData';
+import type { EraId } from '../world/eras';
 import './styles.css';
 
 export const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -27,7 +28,7 @@ export interface HudData {
   objective: string; era: string; prompt: string | null;
   buildingHint?: string | null;
   px: number; pz: number; pyaw: number; camYaw: number;
-  map: HTMLCanvasElement | null; target: { x: number; z: number } | null; interior: string | null;
+  map: HTMLCanvasElement | null; /** current era (the map's default view fits the buildings standing in it) */ eraId?: EraId; target: { x: number; z: number } | null; interior: string | null;
   markers: { x: number; z: number }[];   // every current objective point (minimap / map)
   doors: { x: number; z: number; label: string }[]; // enterable entrances
   targetLabel: string | null;            // where the pointer leads ("Romney Building")
@@ -352,24 +353,43 @@ export class UI {
 
   bigMap(onClose: () => void) {
     const d = this.lastHud; if (!d?.map) return;
+    const map = d.map, B = CAMPUS.bounds, s = map.width / (B.maxX - B.minX);   // map px per game metre
+    // Default view: the campus buildings plus a small margin (and wherever you are); "Whole map" shows everything.
+    const campusView = () => {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      const polys = d.eraId ? buildingsForEra(d.eraId).filter(b => b.registryId && b.state !== 'site').map(b => b.poly) : allFootprints();
+      for (const poly of polys) for (const [x, z] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      if (!isFinite(x0)) return { x0: B.minX, x1: B.maxX, z0: B.minZ, z1: B.maxZ };
+      const near = 25; x0 = Math.min(x0, d.px - near); x1 = Math.max(x1, d.px + near); z0 = Math.min(z0, d.pz - near); z1 = Math.max(z1, d.pz + near);
+      const m = Math.max(x1 - x0, z1 - z0) * 0.12;                                             // "a little bigger"
+      return { x0: Math.max(B.minX, x0 - m), x1: Math.min(B.maxX, x1 + m), z0: Math.max(B.minZ, z0 - m), z1: Math.min(B.maxZ, z1 + m) };
+    };
     const el = document.createElement('div'); el.className = 'screen map';
-    // fit the whole map inside the viewport (both dimensions), whatever the window/zoom
-    const k = Math.min((window.innerWidth - 32) / d.map.width, (window.innerHeight - 70) / d.map.height);
-    const c = document.createElement('canvas'); c.width = d.map.width; c.height = d.map.height;
-    c.style.width = Math.floor(d.map.width * k) + 'px'; c.style.height = Math.floor(d.map.height * k) + 'px';
-    const g = c.getContext('2d')!; g.drawImage(d.map, 0, 0);
-    const s = d.map.width / (CAMPUS.bounds.maxX - CAMPUS.bounds.minX);
-    const P = (x: number, z: number) => [(x - CAMPUS.bounds.minX) * s, (z - CAMPUS.bounds.minZ) * s];
-    g.font = 'bold 12px sans-serif'; g.textAlign = 'left';
-    for (const e of d.doors) { const [x, y] = P(e.x, e.z); drawDoorIcon(g, x, y, 8); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText('Entrance', x + 10, y + 4); g.fillText('Entrance', x + 10, y + 4); }
-    for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
-    if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 8, 0, 7); g.fill(); g.stroke(); }
-    const [x, y] = P(d.px, d.pz); g.fillStyle = '#fff'; g.strokeStyle = '#c00'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke();
-    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)} · <small>north is up · yellow = objectives · green = entrances · red = you · © OpenStreetMap contributors</small> <button data-focus>Close</button></div>`;
-    el.appendChild(c);
+    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)} · <small>north is up · yellow = objectives · green = entrances · red = you · © OpenStreetMap contributors</small> <button data-focus class="map-zoom">Whole map</button> <button data-focus class="map-close">Close</button></div>`;
+    const c = document.createElement('canvas'); el.appendChild(c);
+    let whole = false;
+    const draw = () => {
+      const v = whole ? { x0: B.minX, x1: B.maxX, z0: B.minZ, z1: B.maxZ } : campusView();
+      const sx = (v.x0 - B.minX) * s, sy = (v.z0 - B.minZ) * s, sw = (v.x1 - v.x0) * s, sh = (v.z1 - v.z0) * s;
+      // render the view at the size it's shown (fit inside the viewport, both dimensions), so a zoomed-in view stays sharp and large
+      const R = Math.min((window.innerWidth - 32) / sw, (window.innerHeight - 80) / sh);
+      c.width = Math.round(sw * R); c.height = Math.round(sh * R);
+      c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
+      const g = c.getContext('2d')!; g.imageSmoothingEnabled = false; g.clearRect(0, 0, c.width, c.height); g.drawImage(map, sx, sy, sw, sh, 0, 0, c.width, c.height);
+      const P = (x: number, z: number) => [(x - v.x0) * s * R, (z - v.z0) * s * R];
+      const u = 1;                                                                               // icons and labels in screen pixels
+      g.font = `bold ${Math.round(12 * u)}px sans-serif`; g.textAlign = 'left';
+      for (const e of d.doors) { const [x, y] = P(e.x, e.z); drawDoorIcon(g, x, y, 8 * u); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3 * u; g.strokeText('Entrance', x + 10 * u, y + 4 * u); g.fillText('Entrance', x + 10 * u, y + 4 * u); }
+      for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke(); }
+      if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2 * u; g.beginPath(); g.arc(x, y, 8 * u, 0, 7); g.fill(); g.stroke(); }
+      const [x, y] = P(d.px, d.pz); g.fillStyle = '#fff'; g.strokeStyle = '#c00'; g.lineWidth = 3 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke();
+      (el.querySelector('.map-zoom') as HTMLButtonElement).textContent = whole ? 'Campus view' : 'Whole map';
+    };
+    draw();
     let sc: Screen;
     const close = () => { this.pop(sc); onClose(); };
-    el.querySelector('button')!.addEventListener('click', close);
+    el.querySelector('.map-close')!.addEventListener('click', close);
+    el.querySelector('.map-zoom')!.addEventListener('click', () => { whole = !whole; draw(); });
     sc = this.push(el, { onBack: close, onMap: close });
   }
 }

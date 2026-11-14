@@ -1042,7 +1042,7 @@ export class Game {
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
         prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
-        map: this.world.mapCanvas, target: this.targetPoint(obj.target), interior: interiorLabel,
+        map: this.world.mapCanvas, eraId: this.world.era, target: this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],
         targetLabel: this.targetLabel(obj.target),
         doors: this.spaceId === 'exterior' ? this.entrances.filter(e => !e.eras || e.eras.includes(this.world.era)) : [],

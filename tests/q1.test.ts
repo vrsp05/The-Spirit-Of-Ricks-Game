@@ -177,3 +177,13 @@ describe('art subjects', () => {
     expect(ART_DATA.references!.tabernacle.every(r => r === [...r].reverse().join(''))).toBe(true);
   });
 });
+
+describe('math tutorial', () => {
+  it('walks through Pay 5 with the fewest coins, coin by coin, ending at 101', () => {
+    const t = MATH.tutorial, ids = t.steps.map(s => s.coin);
+    expect(comboValue(ids)).toBe(t.target);
+    expect(ids.length).toBe(fewestCoins(t.target, MATH.tray)!.length);
+    expect(bits(ids)).toEqual([1, 0, 1]);
+    expect(questionsFor('easy').some(q => q.target === t.target && q.kind === 'pay')).toBe(false);
+  });
+});

@@ -14,7 +14,7 @@ export interface Question { id: string; kind: 'pay' | 'choice'; who: string; ask
 export const MATH = data as unknown as {
   source: string; story: string; reference: { gold: string; silver: string; value: number; note: string }[];
   coins: Coin[]; tray: string[]; questions: Question[];
-  opening: { who: string; text: string }[]; howItWorks: string[]; closing: { student: string; candidate: string };
+  opening: { who: string; text: string }[]; howItWorks: string[]; tutorial: { who: string; ask: string; target: number; steps: { coin: string; say: string }[]; wrong: string; done: string }; closing: { student: string; candidate: string };
   modes: Record<string, { misses: number; hints: number; tray: boolean }>;
 };
 
@@ -47,7 +47,8 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   const cls = classroom();
   let qi = 0, misses = 0, right = 0, hintsLeft = mode.hints, hintStep = 0, sel = 0, busy = false;
   let hand: string[] = [], opts: string[] = [], gone = new Set<string>(), hintCoins: string[] = [], dead = false;
-  let phase: 'intro' | 'ask' | 'review' = 'intro', reveal: number[] | null = null, revealExtra = '';
+  let phase: 'intro' | 'ask' | 'review' = 'intro', reveal: number[] | null = null, revealExtra = '', tutStep = 0;
+  const tut = MATH.tutorial;
   const later = (fn: () => void, ms: number) => window.setTimeout(() => { if (!dead) fn(); }, ms);
 
   const qEl = h('div', { class: 'q1-bin-q' });
@@ -91,14 +92,15 @@ export const mathChallenge: ChallengeBody = (root, api) => {
     chalk(b);
     const cur = q();
     if (phase === 'intro' || !cur) {
-      let y = text(b, 'Binary, the Nephite way', b.w / 2, 30, 56, '#ffe08a', 'center');
-      for (const l of MATH.howItWorks.slice(0, 3)) y = text(b, '• ' + l, 70, y + 4, 30, '#f1efe6', 'left', undefined, b.w - 140);
+      text(b, 'TUTORIAL', b.w - 70, 30, 30, '#9cff57', 'right');
+      const y = text(b, `${tut.who}:`, 70, 36, 38, '#ffe08a');
+      text(b, `“${tut.ask}”`, 70, y, 44, '#f1efe6', 'left', undefined, b.w - 300);
     } else {
       const y = text(b, `${cur.who}:`, 70, 36, 38, '#ffe08a');
       text(b, `“${cur.ask}”`, 70, y, cur.ask.length > 70 ? 34 : 44, '#f1efe6', 'left', undefined, b.w - 140);
     }
-    const held = usesTray() && phase === 'ask' ? hand : [];
-    const bs = reveal ?? bits(held), blank = !reveal && !held.length && phase !== 'intro';
+    const held = phase === 'intro' ? hand : usesTray() && phase === 'ask' ? hand : [];
+    const bs = reveal ?? bits(held), blank = !reveal && !held.length;
     const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.25, b.w * 0.42, b.w * 0.59], top = b.h * 0.56;
     cols.forEach((id, k) => {
       const hl = hintCoins.includes(id);
@@ -113,15 +115,33 @@ export const mathChallenge: ChallengeBody = (root, api) => {
     if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.70, top + 130, 34, '#ffe08a', 'left', undefined, b.w * 0.28);
     b.refresh();
   };
-  const renderScore = () => score.textContent = `Question ${Math.min(qi + 1, qs.length)} of ${qs.length} · misses ${misses} / ${mode.misses} allowed`;
+  const renderScore = () => score.textContent = phase === 'intro' ? 'Tutorial — not scored' : `Question ${Math.min(qi + 1, qs.length)} of ${qs.length} · misses ${misses} / ${mode.misses} allowed`;
+  // ---- guided tutorial: "Pay 5", walked through coin by coin (not scored) ----
   const renderIntro = () => {
-    qEl.replaceChildren(h('b', { text: 'How it works: ' }), 'binary with Nephite gold coins');
-    reveal = [1, 0, 1]; revealExtra = '  (shum + senine)';
-    work.replaceChildren(h('ul', { class: 'q1-bin-how' }, ...MATH.howItWorks.map(t => h('li', { text: t }))),
-      (() => { const b = btn('Start the lesson ▶', () => startLesson(), 'sel'); b.removeAttribute('data-focus'); return b; })());
-    fb.textContent = ''; renderBoard(); renderScore(); drawBoard();
+    qEl.replaceChildren(h('b', { text: `Tutorial — ${tut.who}: ` }), `“${tut.ask}”`);
+    const step = tut.steps[tutStep];
+    hintCoins = step ? [step.coin] : [];
+    if (!step) { reveal = bits(hand); revealExtra = '  (shum + senine)'; }
+    const tray = h('div', { class: 'q1-tray' }, ...MATH.tray.map((id, k) => {
+      const c = h('div', { class: `q1-coin ${k === sel ? 'sel' : ''} ${step && id === step.coin ? 'hinted' : ''}` }, h('span', {}, id, h('i', { text: String(coin(id).value) })));
+      c.addEventListener('click', () => { sel = k; tutAdd(); }); return c;
+    }));
+    const handEl = h('div', { class: 'q1-hand' }, ...hand.map(id => h('div', { class: 'q1-coin' }, h('span', {}, id, h('i', { text: String(coin(id).value) })))), hand.length ? h('b', { text: ` = ${comboValue(hand)} of ${tut.target}` }) : '');
+    fb.className = `q1-bin-fb ${step ? '' : 'ok'}`; fb.textContent = step ? `Step ${tutStep + 1}: ${step.say}` : `✔ ${tut.done}`;
+    const parts: (HTMLElement | string)[] = [tray, handEl];
+    if (!step) { const b = btn('Start the lesson ▶', () => startLesson(), 'q1-next sel'); b.removeAttribute('data-focus'); parts.push(b); }
+    work.replaceChildren(...parts);
+    renderBoard(); renderScore(); drawBoard();
   };
-  const startLesson = () => { phase = 'ask'; reveal = null; revealExtra = ''; load(); };
+  const tutAdd = () => {
+    const step = tut.steps[tutStep]; if (!step) return;
+    const id = MATH.tray[sel];
+    if (id !== step.coin) { fb.className = 'q1-bin-fb bad'; fb.textContent = `${tut.wrong} (${step.say})`; return; }
+    hand.push(id); tutStep++; cls?.react('nod', tutStep >= tut.steps.length ? 'Ohhh — 1 0 1 is 5!' : undefined);
+    sel = Math.max(0, MATH.tray.indexOf(tut.steps[tutStep]?.coin ?? 'senine'));
+    renderIntro();
+  };
+  const startLesson = () => { hand = []; phase = 'ask'; reveal = null; revealExtra = ''; load(); };
   const renderQ = () => {
     const cur = q(); if (!cur) return;
     qEl.replaceChildren(h('b', { text: `${cur.who}: ` }), `“${cur.ask}”`);
@@ -202,7 +222,13 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   api.onAction(a => {
     if (busy) return true;
     if (a === 'rup' && room) { room.nextView(); const vb = (root.closest('.ch-body') as (HTMLElement & { q1ViewBtn?: HTMLElement }) | null)?.q1ViewBtn; if (vb) vb.textContent = `👁 View: ${room.viewLabel(room.current)} (T)`; return true; }
-    if (phase === 'intro') { if (a === 'confirm') startLesson(); return a !== 'back' && a !== 'hint'; }
+    if (phase === 'intro') {
+      const n4 = MATH.tray.length;
+      if (a === 'left' || a === 'up' || a === 'alt2') { sel = (sel + n4 - 1) % n4; renderIntro(); return true; }
+      if (a === 'right' || a === 'down' || a === 'alt') { sel = (sel + 1) % n4; renderIntro(); return true; }
+      if (a === 'confirm') { tut.steps[tutStep] ? tutAdd() : startLesson(); return true; }
+      return a !== 'back' && a !== 'hint';
+    }
     if (phase === 'review') { if (a === 'confirm') next(); return a !== 'back' && a !== 'hint'; }
     const n = usesTray() ? MATH.tray.length : opts.length;
     if (a === 'left' || a === 'up' || a === 'alt2') { sel = (sel + n - 1) % n; renderQ(); return true; }
@@ -216,6 +242,7 @@ export const mathChallenge: ChallengeBody = (root, api) => {
 
   MATH.opening.forEach((l, i) => later(() => cls?.react(i ? 'nod' : 'confused', l.text, l.who), 200 + i * 2200));
   drawPoster();
+  sel = MATH.tray.indexOf(tut.steps[0].coin);
   renderIntro();
   return () => { busy = true; dead = true; };
 };

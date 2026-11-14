@@ -284,5 +284,22 @@
   "For any amount up to 7, each coin is either in your hand (1) or not (0).",
   "Write the coins biggest to smallest — shum · seon · senine — and you have a binary number.",
   "Example: 5 = shum + senine = 1 0 1."
- ]
+ ],
+ "tutorial": {
+  "who": "Sister Hall",
+  "ask": "Pay 5 with the fewest coins.",
+  "target": 5,
+  "steps": [
+   {
+    "coin": "shum",
+    "say": "Start with the biggest coin that fits. A limnah (7) is too much, so put down a shum (4)."
+   },
+   {
+    "coin": "senine",
+    "say": "That's 4 so far — you need 1 more. Put down a senine (1)."
+   }
+  ],
+  "wrong": "Not that one — try the highlighted coin.",
+  "done": "Shum yes, seon no, senine yes → 1 0 1. That's 5 in binary! Each coin is a digit: in your hand = 1, not in your hand = 0."
+ }
 }

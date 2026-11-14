@@ -134,9 +134,9 @@
   },
   "projectorNote": "The overhead projector always shorts out partway through the demo (Easy after 90 s, Hard after 40 s) and stays dead; the player finishes from memory. The engineering demo repairs that circuit.",
   "music": {
-    "src": "audio/high-on-the-mountain-top.mp3",
+    "src": "music/high-on-the-mountain-top.m4a",
     "volume": 0.35,
-    "enabled": true,
-    "note": "Team recording of 'High on the Mountain Top' (Ebenezer Beesley, 1854). Put the file in public/audio/ with this name (or change src). Silent until the file exists."
+    "enabled": false,
+    "note": "Off: the game's background playlist (src/fx/music.ts, public/music/) already plays the team's recordings, including 'High on the Mountain Top', during demos. Turn on only if the playlist is paused for the art demo."
   }
 }

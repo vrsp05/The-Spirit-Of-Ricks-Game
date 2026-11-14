@@ -7,10 +7,10 @@ export interface MusicData { src: string; volume: number; enabled: boolean }
 
 /** Starts the recording (if present); returns a function that fades it out. */
 export function playMusic(m: MusicData | undefined): () => void {
-  if (!m?.enabled || SETTINGS.muted) return () => {};
+  if (!m?.enabled || SETTINGS.muted || !SETTINGS.music) return () => {};
   let el: HTMLAudioElement | null = null, fade = 0;
   try {
-    el = new Audio(m.src); el.loop = false; el.volume = m.volume;
+    el = new Audio(`${import.meta.env.BASE_URL}${m.src}`); el.loop = false; el.volume = m.volume * SETTINGS.musicVolume;
     el.addEventListener('error', () => { el = null; });            // no file yet → stay silent
     void el.play().catch(() => { el = null; });
   } catch { return () => {}; }

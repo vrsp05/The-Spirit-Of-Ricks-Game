@@ -1,0 +1,28 @@
+{
+  "note": "Authored game dialogue for fictional characters. The Bednar character's lines are NOT real quotes. Montage text is labelled fiction except the cited opening year.",
+  "assign": [
+    { "speaker": "President Bednar (game character)", "text": "Our campus is growing. I have two blueprints that need careful hands." },
+    { "speaker": "President Bednar (game character)", "text": "One is the John Taylor Building. Its site is fenced off and waiting for the right plan." },
+    { "speaker": "President Bednar (game character)", "text": "The other is a great gathering place west of the Manwaring Center. Solve both blueprints, then report back." }
+  ],
+  "reminder": "Blueprints still to solve: {list}.",
+  "readyReminder": "Both blueprints are solved? Tell me what you found.",
+  "report": [
+    { "speaker": "President Bednar (game character)", "text": "The Taylor Building and the Campus Center both stand now. Thank you." },
+    { "speaker": "President Bednar (game character)", "text": "Let's see what the years bring to this campus." }
+  ],
+  "montage": {
+    "taylor": [
+      { "speaker": "Construction", "text": "The blueprint lines rise from the site…" },
+      { "speaker": "Construction", "text": "The John Taylor Building now stands. (Symbolic build — the real building first opened in 1997.)" }
+    ],
+    "icenter": [
+      { "speaker": "Construction", "text": "A great gathering place rises from the blueprint…" },
+      { "speaker": "Construction", "text": "The Campus Center now stands. (Symbolic build — the real BYU–Idaho Center was dedicated in 2010.)" }
+    ]
+  },
+  "sites": {
+    "taylor": "Open the Taylor Building blueprint",
+    "icenter": "Open the Campus Center blueprint"
+  }
+}

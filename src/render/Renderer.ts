@@ -51,6 +51,7 @@ export class Renderer {
   /** Aerial haze: distant buildings fade toward the horizon colour. */
   readonly fog = new THREE.FogExp2('#c8d9e6', 0.0036);
   private composer: EffectComposer;
+  private scenePass: RenderPass;
   private sepia: ShaderPass;
   quality: 'high' | 'low' = 'high';
   private colorTarget = 0;
@@ -71,7 +72,8 @@ export class Renderer {
     // and flicker as the camera moves.
     const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(this.renderer, rt);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.scenePass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.scenePass);
     this.sepia = new ShaderPass(SepiaShader);
     this.composer.addPass(this.sepia);
     this.composer.addPass(new OutputPass());
@@ -107,6 +109,7 @@ export class Renderer {
     this.sepia.uniforms.exposure.value = a.exposure;
   }
   get canvas() { return this.renderer.domElement; }
+  useScene(scene: THREE.Scene | null) { this.scenePass.scene = scene ?? this.scene; }
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h); this.composer.setSize(w, h);

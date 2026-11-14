@@ -75,23 +75,6 @@ export function createLetters(): QuestModule {
     }
   }
 
-  async function celebrate() {
-    const sp = ctx.world.position(ctx.config.signAnchor);
-    const yaw = GAME_CONFIG_SIGN_YAW(ctx), fx = Math.sin(yaw), fz = Math.cos(yaw);      // the side the letters face
-    const cam = { x: sp.x + fx * 14 + fz * 4, y: sp.y + 4, z: sp.z + fz * 14 - fx * 4 }, look = { x: sp.x, y: sp.y + 2, z: sp.z };
-    await ctx.cutscene({
-      id: 'q3-celebration',
-      steps: [
-        { camera: { from: { x: cam.x + fx * 6, y: cam.y + 3, z: cam.z + fz * 6 }, to: cam, dur: 1.6 }, look, say: { speaker: '', text: 'B · Y · U · I — the sign is complete.' } },
-        { look, dur: 1.2, run: () => { for (const g of signGlyphs.values()) (g.userData.material as THREE.MeshStandardMaterial).emissive.set('#1d3f9a'); ctx.world.sound('chime'); } },
-        { camera: { from: cam, to: { x: sp.x + fx * 40 + fz * 12, y: sp.y + 26, z: sp.z + fz * 40 - fx * 12 }, dur: 5 }, look: { x: sp.x, y: sp.y + 10, z: sp.z },
-          run: () => { ctx.world.colorWave(sp.x, sp.z); ctx.world.fireworks(sp.x, sp.y + 22, sp.z, 7); ctx.world.gatherCrowd(sp.x, sp.z - 10, 14); ctx.world.sound('cheer'); } },
-        { look: { x: sp.x, y: sp.y + 10, z: sp.z }, say: { speaker: '', text: C.dialogue.allPlaced } },
-      ],
-      onDone: () => ctx.complete(),
-    });
-  }
-
   async function signPanel() {
     if (ctx.status() === 'completed') { ctx.ui.toast('The sign is complete.'); return; }
     if (!ctx.isActive()) return;
@@ -104,8 +87,8 @@ export function createLetters(): QuestModule {
       });
       if (!r || r === 'leave') return;
       ctx.progress.set('placed', [...placed(), r]);
-      addSignGlyph(r, true); ctx.world.sound('tick'); updateObjective();
-      if (placed().length === 4) { await new Promise(res => setTimeout(res, 500)); await celebrate(); return; }
+      addSignGlyph(r, placed().length < 4); ctx.world.sound('tick'); updateObjective();
+      if (placed().length === 4) { ctx.complete(); return; }
     }
   }
 
@@ -130,6 +113,7 @@ export function createLetters(): QuestModule {
         }
       }
       sign = buildSign();
+      sign.group.name = 'quest-byui-sign';
       const sa = GAME_CONFIG_SIGN_YAW(ctx);
       ctx.world.addObject(sign.group, ctx.config.signAnchor); sign.group.rotation.y = sa;
       for (const l of placed()) addSignGlyph(l, false);
@@ -184,6 +168,16 @@ export function createLetters(): QuestModule {
     },
     qualityScore: () => Math.max(0, 1 - 0.08 * ctx.progress.get('hints', 0) - 0.1 * ctx.progress.get('wrong', 0)),
     skippedFraction: () => 0,
+    dispose() {
+      // Continue/New game re-register the module: retire its previous sign and props.
+      for (const object of objs) object.removeFromParent(); objs.length = 0;
+      sign?.group.removeFromParent(); sign = null; signGlyphs.clear();
+      if (ctx) {
+        for (const card of C.cards) ctx.world.removeInspectable(`letter-${card.letter}`);
+        for (let i = 0; i < 4; i++) ctx.world.removeInspectable(`decoy-${i}`);
+        ctx.removeInteractable('sign');
+      }
+    },
   };
 }
 

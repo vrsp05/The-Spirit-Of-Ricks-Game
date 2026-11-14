@@ -1,0 +1,272 @@
+[
+  {
+    "id": "kimball",
+    "name": "SPENCER W. KIMBALL BUILDING",
+    "about": "The university's administrative hub, where students find help with admissions, financial aid, registration, housing, and other campus services.",
+    "fact": "A portrait of President Kimball unveiled at the building's dedication was painted by Ricks College alumnus Gregg Thorkelson.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Spencer W. Kimball Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/kimball"
+    }
+  },
+  {
+    "id": "taylor",
+    "name": "JOHN TAYLOR BUILDING",
+    "about": "A center for religious learning, with classrooms and a chapel used for lectures, worship, quiet study, and reflection.",
+    "fact": "The chapel's custom organ combines real pipes with electronic voices: nine ranks of pipes work alongside 50 electronic voices.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - John Taylor Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/taylor"
+    }
+  },
+  {
+    "id": "spori-original",
+    "name": "JACOB SPORI BUILDING - ORIGINAL",
+    "about": "The historic heart of the early school, bringing classrooms and campus life together inside one building.",
+    "fact": "In 1903, this single building accommodated the entire school! The much larger campus of today grew around this early landmark.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Jacob Spori Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/spori/"
+    }
+  },
+  {
+    "id": "spori-new",
+    "name": "JACOB SPORI BUILDING - REPLACEMENT",
+    "about": "A home for visual art, design, and communication, including classrooms, creative workspaces, and the Spori Art Gallery.",
+    "fact": "Pieces of the original building survive inside its replacement. Recovered woodwork, stone, and old bricks preserve traces of earlier students.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Jacob Spori Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/spori/"
+    }
+  },
+  {
+    "id": "kirkham",
+    "name": "OSCAR A. KIRKHAM BUILDING",
+    "about": "A former campus gathering and performance building, remembered for its auditorium and the speakers who addressed students there.",
+    "fact": "Former First Lady Eleanor Roosevelt spoke in the Kirkham Auditorium on March 2, 1959.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - Kirkham Building",
+      "url": "https://video.byui.edu/media/t/0_xfn5uro1/15540072"
+    }
+  },
+  {
+    "id": "romney",
+    "name": "GEORGE S. ROMNEY BUILDING",
+    "about": "A physical sciences building with teaching spaces for subjects such as chemistry, physics, and geology, plus a museum and planetarium.",
+    "fact": "You can explore both the sky and the ground here: the building has an observatory and a seismology center that records distant earthquakes.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - George S. Romney Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/romney"
+    }
+  },
+  {
+    "id": "clarke",
+    "name": "JOHN L. CLARKE BUILDING",
+    "about": "A place to learn practical skills in nursing, home and family studies, early childhood education, cooking, and clothing design.",
+    "fact": "Nursing students train in a simulated hospital, practicing patient care in realistic clinical settings before entering the workplace.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - John L. Clarke Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/clarke"
+    }
+  },
+  {
+    "id": "hart",
+    "name": "JOHN W. HART BUILDING",
+    "about": "A center for fitness, swimming, sports, and physical education, with gymnasiums, courts, classrooms, and a pool.",
+    "fact": "Before the BYU-Idaho Center opened, the Hart also welcomed students for campus devotionals, firesides, and graduation ceremonies.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - Hart Building",
+      "url": "https://video.byui.edu/media/t/0_08nqvi6i/15540072"
+    }
+  },
+  {
+    "id": "mckay",
+    "name": "DAVID O. MCKAY LIBRARY",
+    "about": "The university's library, supporting reading, research, quiet study, tutoring, and the preservation of campus history.",
+    "fact": "In 2010, a skybridge connected the library's third floor to the Manwaring Center, linking two busy student destinations above ground level.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - David O. McKay Library",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/mckay"
+    }
+  },
+  {
+    "id": "smith",
+    "name": "JOSEPH FIELDING SMITH BUILDING",
+    "about": "An academic building where students develop skills in business, accounting, economics, languages, and communication.",
+    "fact": "Students in the Integrated Business Core gain experience by running real companies, taking responsibility for marketing and daily operations.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Joseph Fielding Smith Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/smith"
+    }
+  },
+  {
+    "id": "benson",
+    "name": "EZRA TAFT BENSON BUILDING",
+    "about": "A life sciences building with laboratories, plant-growing facilities, and a wildlife museum that helps students explore the living world.",
+    "fact": "Its jungle greenhouse offers a miniature green retreat, with lush plants, places to sit, and even a koi pond.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Ezra Taft Benson Building",
+      "url": "https://www.byui.edu/campus-tours/benson"
+    }
+  },
+  {
+    "id": "austin",
+    "name": "MARK AUSTIN BUILDING",
+    "about": "A place for automotive learning, where students connect classroom knowledge with hands-on work on vehicles.",
+    "fact": "Automotive students have held free vehicle-inspection nights, helping classmates check their cars while gaining practical experience.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - Austin Building",
+      "url": "https://video.byui.edu/media/t/0_df439xnp/15540072"
+    }
+  },
+  {
+    "id": "manwaring",
+    "name": "HYRUM MANWARING STUDENT CENTER / MANWARING CENTER",
+    "about": "A hub for student life, bringing together food, the University Store, activities, and places to meet friends between classes.",
+    "fact": "After the Teton Dam failed in 1976, the Manwaring Center helped the community recover by providing meals and first aid.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Hyrum Manwaring Center",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/manwaring-center"
+    }
+  },
+  {
+    "id": "snow",
+    "name": "ELIZA R. SNOW PERFORMING ARTS CENTER",
+    "about": "A home for music and theatre, with rehearsal spaces, classrooms, theaters, and the Barrus Concert Hall.",
+    "fact": "The Barrus Concert Hall's pipe organ contains 3,833 pipes. Its construction stretched across 21 years, from 1983 to 2004.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Eliza R. Snow Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/snow"
+    }
+  },
+  {
+    "id": "heating-plant",
+    "name": "HEATING PLANT",
+    "about": "A utility building that supplied heat across campus.",
+    "fact": "Steam traveled through insulated underground pipes to warm other campus buildings.",
+    "source": {
+      "title": "Steve Moser, History of Buildings at BYU-Idaho, pp. 22-23",
+      "url": "https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf"
+    }
+  },
+  {
+    "id": "rigby",
+    "name": "WILLIAM F. RIGBY HALL",
+    "about": "A campus building that has supported both student housing and the academic work of faculty members.",
+    "fact": "Originally a men's dormitory, Rigby was later adapted into faculty office space, giving an old residence hall a new purpose.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - Rigby Hall description",
+      "url": "https://video.byui.edu/category/General%2BInformation%3ECampus%2BBuildings/15540072"
+    }
+  },
+  {
+    "id": "biddulph",
+    "name": "LOWELL G. BIDDULPH HALL",
+    "about": "A former men's residence hall that later became space for university offices and services.",
+    "fact": "Students originally knew this building as Ensign Hall. It received the name Lowell G. Biddulph Hall in 1995.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - Biddulph Hall description",
+      "url": "https://video.byui.edu/category/General%2BInformation%3ECampus%2BBuildings/15540072"
+    }
+  },
+  {
+    "id": "lamprecht",
+    "name": "HELEN LAMPRECHT HALL",
+    "about": "A residence hall that housed Ricks College students.",
+    "fact": "Its student apartments became 37 family-housing units for winter semester 2002.",
+    "source": {
+      "title": "Steve Moser, History of Buildings at BYU-Idaho, p. 59",
+      "url": "https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf"
+    }
+  },
+  {
+    "id": "chapman",
+    "name": "CHAPMAN HALL",
+    "about": "A residence hall from the Ricks College years.",
+    "fact": "Originally called Dorm 6, it received the name Chapman Hall on March 20, 1999.",
+    "source": {
+      "title": "Steve Moser, History of Buildings at BYU-Idaho, p. 59",
+      "url": "https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf"
+    }
+  },
+  {
+    "id": "pplt-shop",
+    "name": "PHYSICAL PLANT SHOP BUILDING",
+    "about": "Maintenance workshops for university buildings and equipment.",
+    "fact": "Its workshops included carpentry, painting, upholstery, and campus vehicle repairs.",
+    "source": {
+      "title": "Steve Moser, History of Buildings at BYU-Idaho, p. 50",
+      "url": "https://content.byui.edu/file/18087cb9-1eb2-41e6-a11f-30f3216c0cb6/1/CampusBuildingHistories.pdf"
+    }
+  },
+  {
+    "id": "hinckley",
+    "name": "GORDON B. HINCKLEY BUILDING",
+    "about": "A teaching and gathering place for education and religion, with classrooms, chapels, and spaces for student activities.",
+    "fact": "The building stands at the highest point on campus. Its entrance displays a portrait of the president who announced the move to BYU-Idaho.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Gordon B. Hinckley Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/hinckley"
+    }
+  },
+  {
+    "id": "ricks-building",
+    "name": "THOMAS E. RICKS BUILDING",
+    "about": "A building for mathematics and the study of people and society, including subjects such as history, psychology, sociology, and political science.",
+    "fact": "Faculty helped shape its design. Their input led to bright common areas with large windows where students could gather and study.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Thomas E. Ricks Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/ricks"
+    }
+  },
+  {
+    "id": "temple",
+    "name": "REXBURG IDAHO TEMPLE",
+    "about": "A temple of The Church of Jesus Christ of Latter-day Saints beside the university, serving worshippers from Rexburg and the surrounding area.",
+    "fact": "Most of its 700 art-glass windowpanes feature wheat stalks, designed by artist Tom Holdman.",
+    "source": {
+      "title": "Church Newsroom - Rexburg Idaho Temple Facts",
+      "url": "https://www.nr-united-states.churchofjesuschrist.org/ldsnewsroom/eng/news-releases-stories/rexburg-idaho-temple-facts"
+    }
+  },
+  {
+    "id": "icenter",
+    "name": "BYU-IDAHO CENTER",
+    "about": "The university's large gathering place for devotionals and major events, with additional space for recreation and student activities.",
+    "fact": "Its auditorium seats 15,000 people, while its activity area is large enough to fit ten basketball courts.",
+    "source": {
+      "title": "BYU-Idaho Campus Buildings - BYU-Idaho Center",
+      "url": "https://video.byui.edu/media/t/0_34zxruri/15540072"
+    }
+  },
+  {
+    "id": "stc",
+    "name": "SCIENCE AND TECHNOLOGY CENTER",
+    "about": "A place where computing and engineering meet animal, food, and plant sciences through classrooms, laboratories, and practical projects.",
+    "fact": "The building brings daylight inside through 1,096 exterior glass panels and 26 skylights.",
+    "source": {
+      "title": "BYU-Idaho Campus Tours - Science & Technology Building",
+      "url": "https://www.byui.edu/campus-tours/campus-tours/stc"
+    }
+  },
+  {
+    "id": "visual-arts",
+    "name": "VISUAL ARTS STUDIO",
+    "about": "A hands-on art building with teaching spaces for ceramics and sculpture, plus facilities for working with clay, wood, and metal.",
+    "fact": "Its glass-fronted lobby was designed as a student gallery, letting people outside see artwork as they walk past.",
+    "source": {
+      "title": "BYU-Idaho Newsroom - BYU-Idaho to Dedicate Three Buildings on Campus",
+      "url": "https://www.byui.edu/newsroom/announcements/byu-idaho-to-dedicate-three-buildings-on-campus"
+    }
+  },
+  {
+    "id": "etc",
+    "name": "ENGINEERING TECHNOLOGY CENTER",
+    "about": "A practical learning center for automotive engineering, civil engineering, and construction management, with classrooms and specialized laboratories.",
+    "fact": "This was once the Auxiliary Services Building, serving campus mail, printing, and supplies before being remodeled for engineering students.",
+    "source": {
+      "title": "BYU-Idaho Newsroom - BYU-Idaho to Dedicate Three Buildings on Campus",
+      "url": "https://www.byui.edu/newsroom/announcements/byu-idaho-to-dedicate-three-buildings-on-campus"
+    }
+  }
+]

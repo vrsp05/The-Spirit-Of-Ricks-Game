@@ -120,6 +120,23 @@ npm run data:build            # → src/world/data/campus.generated.json
 
 The bounding box and origin are in `tools/geo-config.mjs`. Historical dates, names and styles are in `src/world/buildingRegistry.ts`, and each entry cites its sources.
 
+## Building information
+
+Walk near a building's existing name sign and click it to open a card with **About** and **Interesting fact**. A nearby hint points out the interaction; aiming the center reticle at the sign also allows E/controller Interact. Player movement and quest timers pause while reading. Close with **Esc** or **×**.
+
+Cards include the complete approved text regardless of the game era. Data for all 27 curated building entries, including source attribution, lives in `src/world/data/building-info.json`; only buildings that already have plaques expose cards. Buildings without signs remain deferred.
+
+To import edits from the reference file: `node tools/import-building-info.cjs "path/to/building_info_cards.txt"`. Browser regression check: `node tools/check-building-info.cjs http://localhost:5173` with Playwright available, or pass its module path after the URL.
+
+## Opening and ending cutscenes
+
+- New Game plays the 48-second opening: campus, Kimball office telephone call, title, then the assistant knocking and entering. Gameplay begins in President Bednar's office before Quest 1.
+- Completing Quest 3 by placing the fourth letter on the BYUI lawn sign starts the 40-second ending immediately. The sign placement leads into the torch ceremony, drones, Vikings, and the STC presentation reveal with the `BYUI iHack 2026` sign.
+- Title-screen **Watch opening** and **Watch ending** options preview either scene without changing the saved game. Direct links: `/?cutscene=preview` and `/?cutscene=ending`.
+- Pause with Enter or the on-screen button; skip with Esc. Continue resumes ordinary progress, or finishes an ending that was pending when the game was closed.
+- Sources live in `src/opening_cutscene/` and `src/ending_cutscene/`. The ending's approved portrait models are isolated in `CutsceneAvatar.ts` so the current gameplay wardrobes and animations remain intact.
+- Browser regression check: run the dev server, then `node tools/check-cutscenes.cjs http://localhost:5173` with Playwright available (or pass its module path after the URL).
+
 ## Credits and licences
 
 - **Code:** MIT (see [LICENSE](LICENSE)).

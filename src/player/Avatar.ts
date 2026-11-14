@@ -195,6 +195,39 @@ export class Avatar {
     this.body.rotation.x = 0.25;
   }
   wave(t: number) { this.armR.rotation.x = -2.6 + Math.sin(t * 8) * 0.3; this.armR.rotation.z = 0.2; this.foreR.rotation.x = -0.4 + Math.sin(t * 8) * 0.3; }
+
+  /** Deterministic poses for the opening, without replacing gameplay animation. */
+  phonePose(amount: number, glance = 0) {
+    this.armR.rotation.set(-2.2 * amount, 0, 0.1 * amount);
+    this.armR.scale.y = 1 - 0.25 * amount; this.foreR.rotation.x = 0;
+    this.head.rotation.set(0, glance, 0);
+  }
+
+  mouthOpen(amount: number) {
+    const open = Math.round(THREE.MathUtils.clamp(amount, 0, 1) * 3) / 3;
+    this.mouth.scale.set(1 - open * .25, 1 + open * 2.2, 1);
+  }
+
+  poseArms(right: number, left = 0, rightZ = 0, leftZ = 0) {
+    this.armR.rotation.set(right, 0, rightZ); this.armL.rotation.set(left, 0, leftZ);
+    this.armR.scale.y = this.armL.scale.y = 1;
+    this.foreR.rotation.x = this.foreL.rotation.x = 0;
+  }
+
+  cinematicWalk(distance: number, strength = 1) {
+    const step = Math.sin(distance * 5.5) * .48 * strength;
+    this.legL.rotation.x = step; this.legR.rotation.x = -step;
+    this.shinL.rotation.x = this.shinR.rotation.x = 0;
+    this.hips.position.y = 0; this.body.rotation.x = 0;
+    this.torso.rotation.y = 0; this.torso.scale.y = 1;
+    this.poseArms(step * .7, -step * .7);
+  }
+
+  knockPose(raised: number, contact: number) {
+    this.cinematicWalk(0);
+    this.armR.rotation.set((-1.3 - contact * .25) * raised, 0, .08 * raised);
+    this.armR.scale.y = 1 + contact * .035;
+  }
 }
 
 /** Floating, always-readable text label. */

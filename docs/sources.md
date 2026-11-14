@@ -73,3 +73,6 @@ Three songs recorded by the team, in `public/music/`: "High on the Mountain Top"
 
 ## Sound effects
 Recorded CC0 sound effects from Kenney (RPG Audio, Interface Sounds, Impact Sounds) and a CC0 birds-and-wind ambience by spring-spring on OpenGameArt; see `public/sfx/CREDITS.md`. The engine, bike bell, whoosh and fireworks are synthesized (`src/fx/audio.ts`).
+
+## Presidents gallery (Manwaring Center)
+Principals and presidents of Bannock Stake Academy / Ricks Academy / Ricks College / BYU–Idaho with term years, from Wikipedia's [List of presidents of Brigham Young University–Idaho](https://en.wikipedia.org/wiki/List_of_presidents_of_Brigham_Young_University%E2%80%93Idaho) (checked 2026-11-14) and [byui.edu/president](https://www.byui.edu/president). The game shows names and years only, with generic silhouettes (no portraits/likenesses).

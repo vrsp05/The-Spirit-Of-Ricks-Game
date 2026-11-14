@@ -23,6 +23,7 @@ export class PlayerController {
   /** Cheat code "jetpack": hold jump to fly. */
   jetpack = false;
   private thrust = false;
+  get thrusting() { return this.thrust; }
   /** High enough to clear the campus roofs: building collision is ignored up here. */
   private aboveRoofs() { return this.jetpack && this.position.y - this.space.groundY(this.position.x, this.position.z) > ROOF - 1.5; }
   vy = 0;

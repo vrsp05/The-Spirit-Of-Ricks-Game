@@ -3,7 +3,7 @@
 // and a colder, stronger wind; fewer birds in autumn. Nearly silent indoors; softer during cutscenes.
 import type { Season } from '../config/atmosphere';
 import { SETTINGS } from '../core/settings';
-import { audioCtx, sampleBuffer } from './audio';
+import { audioCtx, sampleBuffer, SampleLoop } from './audio';
 
 export class Ambience {
   private a: AudioContext | null = null;
@@ -12,6 +12,8 @@ export class Ambience {
   private leaves!: GainNode;
   private t = 0; private nextBird = 2; private level = 0;
   private rec: { src: AudioBufferSourceNode; gain: GainNode } | null = null;   // recorded birds + wind loop (CC0)
+  private winterWind = new SampleLoop('wind-winter');
+  private crowds = { foodcourt: new SampleLoop('crowd-foodcourt'), auditorium: new SampleLoop('crowd-auditorium') };
 
   private init(a: AudioContext) {
     this.a = a;
@@ -30,8 +32,13 @@ export class Ambience {
   }
 
   /** Call every frame. */
-  update(dt: number, ctx: { outdoor: boolean; season: Season; cinematic: boolean }) {
+  update(dt: number, ctx: { outdoor: boolean; season: Season; cinematic: boolean; room?: string }) {
     const vol = SETTINGS.muted ? 0 : SETTINGS.ambienceVolume;
+    // indoor crowds (food court chatter, auditorium murmur) and recorded winter wind, when fetched
+    const k = ctx.cinematic ? 0.5 : 1;
+    this.crowds.foodcourt.update(ctx.room === 'bldg-manwaring' ? vol * 0.5 * k : 0);
+    this.crowds.auditorium.update(ctx.room === 'bldg-icenter' ? vol * 0.4 * k : 0);
+    this.winterWind.update(ctx.outdoor && ctx.season === 'winter' ? vol * 0.35 * k : 0);
     if (!this.a) { if (vol <= 0) return; const a = audioCtx(); if (!a || a.state !== 'running') return; this.init(a); }
     const a = this.a!; this.t += dt;
     const target = vol * (ctx.outdoor ? 1 : 0.06) * (ctx.cinematic ? 0.5 : 1);
@@ -40,7 +47,7 @@ export class Ambience {
     // gusts: two slow sines multiplied
     const gust = 0.5 + 0.5 * Math.sin(this.t * 0.13) * Math.sin(this.t * 0.41 + 1.3);
     const winter = ctx.season === 'winter';
-    this.wind.gain.setTargetAtTime((winter ? 0.035 : 0.018) * (0.4 + gust * 0.8), a.currentTime, 0.5);   // gentle: a soft breeze, not a gale
+    this.wind.gain.setTargetAtTime(winter && this.winterWind.available() ? 0 : (winter ? 0.035 : 0.018) * (0.4 + gust * 0.8), a.currentTime, 0.5);   // gentle: a soft breeze, not a gale
     this.windFilter.frequency.setTargetAtTime((winter ? 520 : 360) + gust * 260, a.currentTime, 0.3);
     this.leaves.gain.setTargetAtTime(winter ? 0.001 : 0.006 * gust * gust, a.currentTime, 0.5);
     // recorded birds-and-wind loop (spring/summer/autumn); synthesized birds only as a fallback

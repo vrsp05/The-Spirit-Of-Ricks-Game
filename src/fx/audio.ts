@@ -43,6 +43,7 @@ function noise(dur: number, gain = 0.15, delay = 0, lowpass = 1200, highpass = 0
 const SAMPLES: Record<string, string[]> = {
   door: ['door-open'], doorClose: ['door-close'], carDoor: ['car-door'], coin: ['coin', 'coin-2'],
   tick: ['tick'], chime: ['chime'], success: ['success'], error: ['error'], sit: ['sit'],
+  bell: ['bike-bell'], whoosh: ['car-pass'], bounce: ['basketball-bounce'], kick: ['ball-kick'],   // Freesound (optional)
   'step-grass': [0, 1, 2, 3, 4].map(i => `step-grass-${i}`), 'step-concrete': [0, 1, 2, 3, 4].map(i => `step-concrete-${i}`),
   'step-snow': [0, 1, 2, 3, 4].map(i => `step-snow-${i}`), 'step-wood': [0, 1, 2, 3, 4].map(i => `step-wood-${i}`),
 };
@@ -52,9 +53,11 @@ let loading = false;
 /** Fetch + decode all samples once the audio context exists (after the first click). */
 export function loadSamples() {
   const a = audioCtx(); if (!a || loading) return; loading = true;
-  const files = new Set(Object.values(SAMPLES).flat().concat(['ambience-birds-wind']));
+  const files = new Set(Object.values(SAMPLES).flat().concat(['ambience-birds-wind', 'engine-car', 'engine-cart', 'engine-scooter', 'jetpack', 'wind-winter', 'crowd-foodcourt', 'crowd-auditorium']));
+  // Kenney/OpenGameArt files are .m4a; Freesound downloads (npm run sounds:fetch) are .mp3 — use whichever exists
+  const get = (f: string) => fetch(`${import.meta.env.BASE_URL}sfx/${f}.m4a`).then(r => (r.ok && !r.headers.get('content-type')?.includes('html') ? r : fetch(`${import.meta.env.BASE_URL}sfx/${f}.mp3`)));
   for (const f of files) {
-    fetch(`${import.meta.env.BASE_URL}sfx/${f}.m4a`).then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+    get(f).then(r => (r.ok && !r.headers.get('content-type')?.includes('html') ? r.arrayBuffer() : Promise.reject(r.status)))
       .then(b => a.decodeAudioData(b)).then(buf => { buffers.set(f, buf); }).catch(() => { /* keep the synthesized fallback */ });
   }
 }
@@ -71,7 +74,7 @@ function playSample(name: string, gain = 1, rate = 1): boolean {
 /** Footstep on a surface (quiet; random variant). */
 export function playStep(surface: 'grass' | 'concrete' | 'snow' | 'wood', volume = 0.35) { if (!playSample(`step-${surface}`, volume)) playSound('step'); }
 
-export type SoundName = 'tick' | 'error' | 'chime' | 'success' | 'cheer' | 'pop' | 'coin' | 'door' | 'carDoor' | 'bell' | 'whoosh' | 'sit' | 'engineStart' | 'step';
+export type SoundName = 'tick' | 'error' | 'chime' | 'success' | 'cheer' | 'pop' | 'coin' | 'door' | 'carDoor' | 'bell' | 'whoosh' | 'sit' | 'engineStart' | 'step' | 'bounce' | 'kick';
 export function playSound(name: SoundName) {
   if (name !== 'step' && playSample(name === 'door' ? 'door' : name)) { if (name === 'door') setTimeout(() => playSample('doorClose'), 650); return; }
   switch (name) {
@@ -89,13 +92,33 @@ export function playSound(name: SoundName) {
     case 'sit': noise(0.1, 0.18, 0, 400); tone(110, 0.1, 'sine', 0.06); break;
     case 'engineStart': tone(55, 0.5, 'sawtooth', 0.05, 0, 95); noise(0.5, 0.06, 0, 300); break;
     case 'step': noise(0.05, 0.05, 0, 900, 200); break;
+    case 'bounce': tone(120, 0.12, 'sine', 0.12, 0, 70); noise(0.06, 0.12, 0, 500); break;
+    case 'kick': noise(0.08, 0.3, 0, 900); tone(90, 0.1, 'sine', 0.15); break;
   }
 }
 
-/** Continuous engine hum for the vehicle you drive (pitch follows speed). */
+/** A looping recorded sample (engine, jetpack, crowd) with live gain/pitch. */
+export class SampleLoop {
+  private src: AudioBufferSourceNode | null = null; private g: GainNode | null = null;
+  constructor(private name: string) {}
+  available() { return !!buffers.get(this.name); }
+  update(gain: number, rate = 1) {
+    const a = gain > 0.001 ? ac() : null, buf = buffers.get(this.name);
+    if (!a || !buf) { this.stop(); return; }
+    if (!this.src) { this.src = a.createBufferSource(); this.g = a.createGain(); this.src.buffer = buf; this.src.loop = true; this.g.gain.value = 0; this.src.connect(this.g).connect(out(a)); this.src.start(); }
+    this.g!.gain.setTargetAtTime(gain, a.currentTime, 0.15); this.src.playbackRate.setTargetAtTime(rate, a.currentTime, 0.15);
+  }
+  stop() { if (!this.src) return; const s = this.src, g = this.g!; g.gain.setTargetAtTime(0, s.context.currentTime, 0.08); setTimeout(() => { try { s.stop(); } catch { /* stopped */ } }, 300); this.src = null; this.g = null; }
+}
+
+/** Continuous engine hum for the vehicle you drive (pitch follows speed). Uses a recorded loop if one was fetched. */
 export class EngineSound {
+  private loops = { car: new SampleLoop('engine-car'), cart: new SampleLoop('engine-cart'), scooter: new SampleLoop('engine-scooter') };
   private o: OscillatorNode | null = null; private o2: OscillatorNode | null = null; private g: GainNode | null = null; private f: BiquadFilterNode | null = null;
   update(on: boolean, speed: number, kind: 'car' | 'cart' | 'scooter') {
+    for (const [k, l] of Object.entries(this.loops)) if (k !== kind || !on) l.update(0);
+    const rec = this.loops[kind];
+    if (on && rec.available()) { this.stop(); const s = Math.min(1, Math.abs(speed) / (kind === 'scooter' ? 8.5 : 20)); rec.update(0.35 + s * 0.4, 0.8 + s * 0.7); return; }
     const a = on ? ac() : null;
     if (!a) { this.stop(); return; }
     if (!this.o) {

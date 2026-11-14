@@ -11,7 +11,10 @@
     "data:fetch-osm": "node tools/fetch-osm.mjs",
     "data:fetch-elevation": "node tools/fetch-elevation.mjs",
     "data:build": "node tools/build-campus.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "voices:export": "vite-node tools/export-voice-lines.ts",
+    "voices:generate": "node tools/gen-voices.mjs",
+    "sounds:fetch": "node tools/fetch-sounds.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"

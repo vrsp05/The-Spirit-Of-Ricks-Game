@@ -5,7 +5,7 @@ import { ATMOSPHERE } from './config/atmosphere';
 import { MusicPlayer } from './fx/music';
 import { Ambience } from './fx/ambience';
 import { VoiceActor } from './fx/voice';
-import { EngineSound, loadSamples, playStep } from './fx/audio';
+import { EngineSound, loadSamples, playStep, SampleLoop } from './fx/audio';
 import { Traffic } from './world/Traffic';
 import { BallGames } from './world/ballGames';
 import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
@@ -68,6 +68,7 @@ export class Game {
   readonly ambience = new Ambience();
   readonly voice = new VoiceActor();
   private engine = new EngineSound();
+  private jetLoop = new SampleLoop('jetpack');
   traffic!: Traffic;
   balls!: BallGames;
   playerName = '';
@@ -1025,16 +1026,17 @@ export class Game {
     this.input.update(dt);
     const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
     this.music.update(dt, !cinematic);
-    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic });
+    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.spaceId });
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
+    this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
     this.updateTraffic(dt);
     if (this.balls) {
       const out = this.spaceId === 'exterior';
       this.balls.setVisible(out);
       if (out && !this.pauseOpen) for (const e of this.balls.update(dt, { p: this.player.position, yaw: this.player.yaw, speed: this.player.speed, active: this.mode === 'playing' && !this.player.vehicle && !this.cutscenes.active })) {
         if (e.type === 'score' || e.type === 'goal') { this.ui.toast(e.text!, 1800); playSound(e.type === 'goal' ? 'cheer' : 'success'); }
-        else if (e.type === 'bounce') playSound('step');
+        else if (e.type === 'bounce') playSound('bounce');
       }
     }
     // footsteps: one per ~0.8 m walked (shorter when running), surface from where you are
@@ -1106,7 +1108,7 @@ export class Game {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
         else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
         else if (focus && a.pressed('interact')) { a.consume('interact'); void this.interactions.trigger(); }
-        else if (ballNear && a.pressed('interact')) { a.consume('interact'); this.balls.action(this.player.position, this.player.yaw); }
+        else if (ballNear && a.pressed('interact')) { a.consume('interact'); if (this.balls.action(this.player.position, this.player.yaw)) playSound(ballNear.startsWith('Kick') ? 'kick' : 'tick'); }
         else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }

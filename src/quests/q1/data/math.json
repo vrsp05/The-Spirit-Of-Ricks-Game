@@ -86,12 +86,8 @@
  ],
  "opening": [
   {
-   "who": "Brother Hale (math chair)",
-   "text": "Our computer science students keep tripping on binary. Explain it so it sticks."
-  },
-  {
    "who": "You (candidate)",
-   "text": "Forget computers for a minute. The Nephites already used binary. Look at their coins: 1, 2, 4… and a limnah is 7."
+   "text": "To understand binary, let's look at how Nephite currency works. A senine is 1, a seon is 2, a shum is 4… and a limnah is 7."
   }
  ],
  "closing": {

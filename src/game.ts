@@ -954,7 +954,7 @@ export class Game {
     this.gamepads.update();
     this.input.update(dt);
     const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
-    this.music.update(dt, !cinematic);
+    this.music.update(dt, !cinematic, !!this.ui.currentSpeaker);   // ducked under dialogue
     this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: ATMOSPHERE[this.world.era].season, cinematic });
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : 'car');

@@ -14,7 +14,7 @@ function systemReducedMotion() {
 }
 
 function load(): Settings {
-  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.45, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true };
+  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true };
   try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(d, JSON.parse(raw)); } catch { /* ignore */ }
   return d;
 }

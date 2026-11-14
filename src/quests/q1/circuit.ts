@@ -174,7 +174,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   const cv = h('canvas', { class: 'cx-board', 'aria-label': 'Circuit board' }) as HTMLCanvasElement;
   const goal = h('div', { class: 'cx-goal' }), bulbsEl = h('div', { class: 'cx-bulbs' }), info = h('div', { class: 'cx-info' });
   root.append(h('div', { class: 'cx-wrap' }, h('div', { class: 'cx-boardbox' }, cv), h('div', { class: 'cx-side' }, goal, bulbsEl, info)));
-  api.setControls([['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['RU', 'flip switch'], ['3', 'hint'], ['4', 'tools']]);
+  api.setControls([['L', 'move'], ['1', 'rotate ↻'], ['2', 'rotate ↺'], ['R', 'rotate'], ['3', 'hint'], ['4', 'tools']]);
 
   const load = () => {
     const l = levels[li]; board = parseLevel(l);
@@ -205,7 +205,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
       return h('div', { class: `cx-bulb ${got === w ? 'ok' : ''}` }, h('span', { class: `dot ${got}` }), `${lab}: `, h('b', { text: word(got) }), ` (wants ${word(w)}) ${got === w ? '✔' : ''}`);
     }), sim.short ? h('div', { class: 'cx-short', text: '⚡ The fuse blew — there’s a short (+ wired straight to −). A new fuse is in; fix the wiring.' }) : "");
     const sw = Object.keys(switchState);
-    info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — flip with right stick ↑ / T` }) : "");
+    info.replaceChildren(h('div', { text: `Moves: ${moves} (best possible ${par})` }), sw.length ? h('div', { text: `Switch: ${sw.map(k => `${switchState[k] ? 'ON' : 'OFF'}`).join(', ')} — click it (or ①) to flip` }) : "");
     api.setStatus(sim.short ? 'Pop! The fuse blew — something connects the plug to itself.' : '');
     if (sim.short && !wasShort) classroom()?.react('gasp', 'Whoa! The fuse popped!');
     wasShort = sim.short;
@@ -274,7 +274,7 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
   });
   load();
   const intro = [
-    window.setTimeout(() => classroom()?.react('gasp', 'It shorted out in the middle of the art demo. The art department needs it back.', 'Physical Plant worker'), 300),
+    window.setTimeout(() => classroom()?.react('gasp', 'It died halfway through our art demo this morning. We really need it back!', 'Brother Lee (art student)'), 300),
     window.setTimeout(() => classroom()?.react('nod', 'Forget the lesson plan. Show us.', 'Brother Frost (engineering chair)'), 2600),
   ];
   return () => { stop(); intro.forEach(clearTimeout); };

@@ -30,6 +30,14 @@ export class VoiceActor {
     load(); this.synth.addEventListener?.('voiceschanged', load);
   }
 
+  /** One identity per character, however the speaker is written ("President Bednar (game character)", "Elder David A. Bednar", …). */
+  static character(speaker: string) {
+    const s = speaker.replace(/\(.*?\)|·.*$/g, '').trim();
+    if (/Bednar/i.test(s)) return 'Bednar';
+    if (/Hinckley/i.test(s)) return 'Hinckley';
+    if (!s || /Narrator|Construction|Teaching demonstration/i.test(s)) return 'Narrator';
+    return s.replace(/^(President|Elder|Brother|Sister|Dr\.?|Professor)\s+/i, '').trim() || s;
+  }
   /** Read a line in the speaker's voice (cancels whatever is being said). */
   speak(speaker: string, text: string) {
     this.stop();
@@ -37,10 +45,10 @@ export class VoiceActor {
     const file = this.recorded.get(VoiceActor.norm(text));
     if (file) { this.clip = new Audio(`${import.meta.env.BASE_URL}voices/${file}`); this.clip.volume = Math.min(1, SETTINGS.voiceVolume); void this.clip.play().catch(() => {}); return; }
     if (!this.synth) return;
-    const name = speaker.replace(/\(.*?\)|·.*$/g, '').trim() || 'Narrator', h = hash(name);
+    const name = VoiceActor.character(speaker), h = hash(name);
     const u = new SpeechSynthesisUtterance(text.replace(/[★✔✖▸]/g, ''));
     if (this.voices.length) u.voice = this.voices[h % this.voices.length];
-    const narrator = name === 'Narrator', leader = /Bednar|President/i.test(name);
+    const narrator = name === 'Narrator', leader = name === 'Bednar' || name === 'Hinckley';
     u.pitch = narrator ? 0.9 : leader ? 0.8 : 0.85 + ((h >> 8) % 40) / 100;     // 0.85–1.25 for everyone else
     u.rate = narrator ? 0.92 : leader ? 0.95 : 0.98 + ((h >> 16) % 12) / 100;
     u.volume = Math.min(1, SETTINGS.voiceVolume);

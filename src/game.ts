@@ -802,7 +802,11 @@ export class Game {
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Reset saved game', disabled: !save, action: () => this.confirmReset() },
     ], { subtitle: GAME_CONFIG.disclaimer, className: 'title-screen', footer: `Map data © OpenStreetMap contributors (ODbL) · elevation USGS 3DEP · see docs/sources.md` });
-    void s;
+    // modern title: tagline under the logo + "now playing" chip for the team's music
+    s.el.querySelector('h1')?.insertAdjacentHTML('afterend', '<div class="title-tag">Ricks College · BYU–Idaho · 25 years of legacy</div>');
+    const chip = document.createElement('div'); chip.className = 'now-playing'; s.el.appendChild(chip);
+    const paint = () => { chip.innerHTML = `<span class="np-note">♪</span> <span class="np-label">Now playing</span> <b>${esc(this.music.title)}</b>`; };
+    paint(); const t = setInterval(paint, 1000); s.cleanup = () => clearInterval(t);
   }
   /** Testing only: start at any quest with the earlier ones marked complete (no coins). */
   private showQuestJump() {
@@ -1114,7 +1118,7 @@ export class Game {
     } else this.stepDist = 0.5;
     const a = this.input.state;
     for (const h of this.devHooks) h(dt);
-    const uiBlocking = this.ui.update(a);
+    const uiBlocking = this.mode === 'title' && !document.body.classList.contains('booted') ? true : this.ui.update(a);   // menus wait for the loading screen
 
     if (this.mode === 'title') {
       this.markers.forEach(m => m.visible = false);

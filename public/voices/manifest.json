@@ -1,0 +1,517 @@
+{
+ "aa8c20f10001": {
+  "file": "story-greeting-2.mp3",
+  "voice": "Bednar",
+  "text": "This college is about to grow in ways most people can’t imagine yet, and I’m going to need your help."
+ },
+ "db28aca65460": {
+  "file": "story-done-2.mp3",
+  "voice": "Bednar",
+  "text": "Go and see the campus as it is today. I think you’ll be proud of what it became."
+ },
+ "2850273b9ac4": {
+  "file": "q1-assign-1.mp3",
+  "voice": "Bednar",
+  "text": "Thank you for coming. Our college is growing, and our students will need more great teachers."
+ },
+ "6bc6c48614a3": {
+  "file": "q1-assign-2.mp3",
+  "voice": "Bednar",
+  "text": "Four faculty candidates are waiting in Personnel Services, just down the hall: math, English, art and engineering."
+ },
+ "c2f1659f020f": {
+  "file": "q1-assign-3.mp3",
+  "voice": "Bednar",
+  "text": "Walk each one over to their department for a teaching demonstration, then come back for the next. Please take the art candidate before the engineering candidate; that's how the departments scheduled them. When all four are done, report to me."
+ },
+ "9cdea35347f3": {
+  "file": "q1-report-1.mp3",
+  "voice": "Bednar",
+  "text": "Math, English, art and engineering, all hired. And I hear the art studio's projector works again."
+ },
+ "f8ec181deb5c": {
+  "file": "q1-report-2.mp3",
+  "voice": "Bednar",
+  "text": "These teachers will bless many students. Well done."
+ },
+ "b8e1e19c2a29": {
+  "file": "q3-assign-2.mp3",
+  "voice": "Bednar",
+  "text": "I have one more job for you. Four letters are hidden around campus, right in plain sight. These cards will help you find them."
+ },
+ "3351789e9b3e": {
+  "file": "q3-assign-3.mp3",
+  "voice": "Bednar",
+  "text": "Once you have them, bring them to the sign by the roundabout. Let’s finish it together."
+ },
+ "287e4409d9e8": {
+  "file": "q2-assign-1.mp3",
+  "voice": "Bednar",
+  "text": "Our campus is growing. I have two blueprints that need careful hands."
+ },
+ "8ac79882b994": {
+  "file": "q2-assign-2.mp3",
+  "voice": "Bednar",
+  "text": "One is the John Taylor Building. Its site is fenced off and waiting for the right plan."
+ },
+ "955c5019908c": {
+  "file": "q2-assign-3.mp3",
+  "voice": "Bednar",
+  "text": "The other is a great gathering place west of the Manwaring Center. Solve both blueprints, then report back."
+ },
+ "eb975007c08c": {
+  "file": "q2-report-1.mp3",
+  "voice": "Bednar",
+  "text": "The Taylor Building and the Campus Center both stand now. Thank you."
+ },
+ "8d414c651085": {
+  "file": "q2-report-2.mp3",
+  "voice": "Bednar",
+  "text": "Let's see what the years bring to this campus."
+ },
+ "7c81edf94131": {
+  "file": "q2-montage-taylor-1.mp3",
+  "voice": "Narrator",
+  "text": "The blueprint lines rise from the site…"
+ },
+ "b5eb9ebc2d67": {
+  "file": "q2-montage-taylor-2.mp3",
+  "voice": "Narrator",
+  "text": "The John Taylor Building now stands. (Symbolic build — the real building first opened in 1997.)"
+ },
+ "7f95ddb024f6": {
+  "file": "q2-montage-icenter-1.mp3",
+  "voice": "Narrator",
+  "text": "A great gathering place rises from the blueprint…"
+ },
+ "af34124032e1": {
+  "file": "q2-montage-icenter-2.mp3",
+  "voice": "Narrator",
+  "text": "The Campus Center now stands. (Symbolic build — the real BYU–Idaho Center was dedicated in 2010.)"
+ },
+ "de5e39ff8108": {
+  "file": "opening-2.mp3",
+  "voice": "Bednar",
+  "text": "President, what would you have me do?"
+ },
+ "98b270bd3e7e": {
+  "file": "opening-5.mp3",
+  "voice": "Bednar",
+  "text": "Come in."
+ },
+ "c68c9445d398": {
+  "file": "opening-6.mp3",
+  "voice": "Bednar",
+  "text": "We have a great deal of work ahead of us. Let’s begin."
+ },
+ "63203a06117e": {
+  "file": "ending-1.mp3",
+  "voice": "Bednar",
+  "text": "The Spirit of Ricks lives on."
+ },
+ "cfdca927447f": {
+  "file": "ending-2.mp3",
+  "voice": "Bednar",
+  "text": "Together, we made it happen."
+ },
+ "36cd18078204": {
+  "file": "q1-ready.mp3",
+  "voice": "Bednar",
+  "text": "All four are hired? Wonderful — tell me about them."
+ },
+ "afc80ec2e032": {
+  "file": "q1-greetings-math-1.mp3",
+  "voice": "Candidate math",
+  "text": "Hi! I'm due in the Romney Building to teach the computer science students. They're stuck on binary — I have an idea from Alma 11."
+ },
+ "26d1c0695f7a": {
+  "file": "q1-walk-math-1.mp3",
+  "voice": "Candidate math",
+  "text": "I tried this lesson on my little brother. He's eight. He got it in five minutes."
+ },
+ "eeecf532e7c8": {
+  "file": "q1-walk-math-2.mp3",
+  "voice": "Candidate math",
+  "text": "Fun fact: a limnah is exactly a shum, a seon and a senine. That's my whole hook."
+ },
+ "96854f17f7aa": {
+  "file": "q1-waitingOutside-math-1.mp3",
+  "voice": "Candidate math",
+  "text": "Over here! Ready when you are."
+ },
+ "7c1944d4383f": {
+  "file": "q1-room-math-chair.mp3",
+  "voice": "Chair math",
+  "text": "Class, this is our math candidate. Our computer science students keep tripping on binary. Sister Ames, could you explain it so it finally sticks?"
+ },
+ "b8f346704e9e": {
+  "file": "q1-room-math-verdict.mp3",
+  "voice": "Chair math",
+  "text": "That's the clearest binary lesson I've seen. I'll recommend you to President Bednar."
+ },
+ "575f18b53b2d": {
+  "file": "q1-room-math-thanks.mp3",
+  "voice": "Chair math",
+  "text": "Thank you! I think it finally clicked for them."
+ },
+ "c62abe41e1ec": {
+  "file": "q1-greetings-english-1.mp3",
+  "voice": "Candidate english",
+  "text": "Hello. My demonstration is in the Smith Building — a student's write-up needs a careful red pen."
+ },
+ "34a03a2daf58": {
+  "file": "q1-walk-english-1.mp3",
+  "voice": "Candidate english",
+  "text": "Brother Price wrote the summary himself. I hope he doesn't mind a little red ink."
+ },
+ "0cd81523d379": {
+  "file": "q1-walk-english-2.mp3",
+  "voice": "Candidate english",
+  "text": "Rule one of editing: check the facts against a source. Rule two: be kind about it."
+ },
+ "ffeb120af2d0": {
+  "file": "q1-waitingOutside-english-1.mp3",
+  "voice": "Candidate english",
+  "text": "There you are! Shall we head in?"
+ },
+ "b5e552675afd": {
+  "file": "q1-room-english-chair.mp3",
+  "voice": "Chair english",
+  "text": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. Brother Nielsen, would you show the class how to proofread a paper like this and get it ready to hand in?"
+ },
+ "3856a421d880": {
+  "file": "q1-room-english-verdict.mp3",
+  "voice": "Chair english",
+  "text": "Careful, kind and accurate. I'll recommend you to President Bednar."
+ },
+ "b45ab553992e": {
+  "file": "q1-room-english-thanks.mp3",
+  "voice": "Chair english",
+  "text": "Thank you — and thanks, Brother Price, for being a good sport."
+ },
+ "7e19357f83d4": {
+  "file": "q1-greetings-art-1.mp3",
+  "voice": "Candidate art",
+  "text": "Hi there! My demo is up in the old Spori's art studio. I'll be teaching the grid method."
+ },
+ "658d37ddfeb8": {
+  "file": "q1-walk-art-1.mp3",
+  "voice": "Candidate art",
+  "text": "The Spori's art studio has a wonderful old overhead projector. I'm counting on it today."
+ },
+ "2333eaea6b4c": {
+  "file": "q1-walk-art-2.mp3",
+  "voice": "Candidate art",
+  "text": "The grid method is simple: one square at a time, and don't panic."
+ },
+ "85b8bedbd43d": {
+  "file": "q1-waitingOutside-art-1.mp3",
+  "voice": "Candidate art",
+  "text": "Hi! The studio's on the third floor."
+ },
+ "56f8528e39fd": {
+  "file": "q1-room-art-chair.mp3",
+  "voice": "Chair art",
+  "text": "Class, meet our art candidate. Our students hold a pencil out at arm's length to measure proportions, and their drawings still come out lopsided. Sister Okada, can you show them a better way? If that old projector cooperates."
+ },
+ "0efcb96c6a2b": {
+  "file": "q1-room-art-verdict.mp3",
+  "voice": "Chair art",
+  "text": "Even with the projector dying, you kept the class drawing. I'll recommend you to President Bednar."
+ },
+ "217975e9d5eb": {
+  "file": "q1-room-art-thanks.mp3",
+  "voice": "Chair art",
+  "text": "Thank you! I'm sorry about your projector."
+ },
+ "751b95ef78b4": {
+  "file": "q1-greetings-engineering-1.mp3",
+  "voice": "Candidate engineering",
+  "text": "Ready when you are. I'm demonstrating in the Austin Building's electronics lab."
+ },
+ "316342c978e4": {
+  "file": "q1-waiting-engineering-1.mp3",
+  "voice": "Candidate engineering",
+  "text": "I'm scheduled after the art candidate. Come get me once the art demo is done."
+ },
+ "f95fbaf94883": {
+  "file": "q1-walk-engineering-1.mp3",
+  "voice": "Candidate engineering",
+  "text": "I brought a whole lesson on circuits. Let's see if I get to use it."
+ },
+ "d8830cf28370": {
+  "file": "q1-walk-engineering-2.mp3",
+  "voice": "Candidate engineering",
+  "text": "A short circuit is just electricity taking the lazy way home. That's my favourite thing to explain."
+ },
+ "c9dbbee7cc26": {
+  "file": "q1-waitingOutside-engineering-1.mp3",
+  "voice": "Candidate engineering",
+  "text": "Did the art demo finish? Let's go fix that projector."
+ },
+ "20f864dff5f9": {
+  "file": "q1-room-engineering-chair.mp3",
+  "voice": "Chair engineering",
+  "text": "Class, this is our engineering candidate. Change of plans: a student just carried in the art studio's overhead projector. It shorted out in the middle of their demo this morning. Brother Ruiz, instead of the lesson you planned, would you fix it in front of the class and explain what went wrong?"
+ },
+ "6defe3908da1": {
+  "file": "q1-room-engineering-verdict.mp3",
+  "voice": "Chair engineering",
+  "text": "Fixed it live, and they understood why. I'll recommend you to President Bednar."
+ },
+ "988b64eb1aee": {
+  "file": "q1-room-engineering-thanks.mp3",
+  "voice": "Chair engineering",
+  "text": "Thank you! Let's get this projector back to the art studio."
+ },
+ "72cdf68e1c12": {
+  "file": "q1-notYet.mp3",
+  "voice": "Candidate math",
+  "text": "I'm not ready yet."
+ },
+ "3d37c9784ca1": {
+  "file": "q1-othersWait.mp3",
+  "voice": "Candidate math",
+  "text": "Walk me over, and then come back here for the next candidate."
+ },
+ "b8105e397ddb": {
+  "file": "student-ricks1999-01.mp3",
+  "voice": "Student A",
+  "text": "I’ve got a chemistry test in the Romney Building in ten minutes. Pray for me."
+ },
+ "5db9af8cb25f": {
+  "file": "student-ricks1999-02.mp3",
+  "voice": "Student B",
+  "text": "The Manwaring Center has the best snacks on campus. Don’t tell anyone."
+ },
+ "426c88929d55": {
+  "file": "student-ricks1999-03.mp3",
+  "voice": "Student C",
+  "text": "Go Vikings! Are you coming to the game at the stadium?"
+ },
+ "3e6dd40de409": {
+  "file": "student-ricks1999-05.mp3",
+  "voice": "Student A",
+  "text": "I’m headed to the library to study. It’s the quietest place on campus."
+ },
+ "b4e84f9f5634": {
+  "file": "student-ricks1999-06.mp3",
+  "voice": "Student B",
+  "text": "Everyone keeps joking that the computers will break when it turns 2000."
+ },
+ "2e2407497e77": {
+  "file": "student-ricks1999-07.mp3",
+  "voice": "Student C",
+  "text": "The new Kimball Building looks amazing. I heard the president’s office is in there."
+ },
+ "3f28b8a873e7": {
+  "file": "student-ricks1999-09.mp3",
+  "voice": "Student A",
+  "text": "I keep finding coins on the sidewalks. Free money!"
+ },
+ "42239d7a9f23": {
+  "file": "student-ricks1999-10.mp3",
+  "voice": "Student B",
+  "text": "Intramurals on the upper fields tonight. You in?"
+ },
+ "1129c39b3bd8": {
+  "file": "student-ricks1999-11.mp3",
+  "voice": "Student C",
+  "text": "Have you seen the old Spori Building? It’s been here forever."
+ },
+ "10da1ba8173f": {
+  "file": "student-ricks1999-13.mp3",
+  "voice": "Student A",
+  "text": "I took a photo by the pond near the Manwaring Center. So pretty in the fall."
+ },
+ "4a720f05defd": {
+  "file": "student-ricks1999-14.mp3",
+  "voice": "Student B",
+  "text": "There’s a devotional this week. Want to sit together?"
+ },
+ "ccb37c7120d3": {
+  "file": "student-ricks1999-15.mp3",
+  "voice": "Student C",
+  "text": "I’m from out of state. Idaho is way flatter than I expected… except this hill."
+ },
+ "bb4931d4e1af": {
+  "file": "student-ricks1999-17.mp3",
+  "voice": "Student A",
+  "text": "Professors here actually learn your name. That’s the best part."
+ },
+ "8fed5df4873b": {
+  "file": "student-ricks1999-18.mp3",
+  "voice": "Student B",
+  "text": "I signed up for a ballroom class. Two left feet, but I’m trying."
+ },
+ "c826235f0001": {
+  "file": "student-transition-01.mp3",
+  "voice": "Student C",
+  "text": "Did you see? The old Spori Building is gone. They’re planning something new."
+ },
+ "f04fe4d8f6b4": {
+  "file": "student-transition-03.mp3",
+  "voice": "Student A",
+  "text": "I heard there’s a brand-new building going up near the Taylor Building."
+ },
+ "75f254358c93": {
+  "file": "student-transition-04.mp3",
+  "voice": "Student B",
+  "text": "Things feel different on campus this year. Exciting different."
+ },
+ "6153dc2ef68d": {
+  "file": "student-transition-05.mp3",
+  "voice": "Student C",
+  "text": "The Hart gym is still packed every night."
+ },
+ "61a6dd946f69": {
+  "file": "student-transition-07.mp3",
+  "voice": "Student A",
+  "text": "Free hot chocolate at the Manwaring Center today!"
+ },
+ "c8331bf9d0ff": {
+  "file": "student-transition-08.mp3",
+  "voice": "Student B",
+  "text": "My professor says the campus is growing faster than ever."
+ },
+ "2e02a97ac501": {
+  "file": "student-transition-12.mp3",
+  "voice": "Student B",
+  "text": "The pond by the Manwaring Center freezes in winter. Don’t walk on it!"
+ },
+ "52b4cee51b00": {
+  "file": "student-byui-01.mp3",
+  "voice": "Student C",
+  "text": "Have you been inside the big new Center? It holds thousands of people."
+ },
+ "123d3e476858": {
+  "file": "student-byui-03.mp3",
+  "voice": "Student A",
+  "text": "I heard someone hid letters all over campus. Weird, right?"
+ },
+ "66c38bf9bb4f": {
+  "file": "student-byui-04.mp3",
+  "voice": "Student B",
+  "text": "The sign by the roundabout looks unfinished. I wonder why."
+ },
+ "bbb145b64919": {
+  "file": "student-byui-07.mp3",
+  "voice": "Student A",
+  "text": "The library is my second home during finals."
+ },
+ "98ea676306cb": {
+  "file": "student-byui-09.mp3",
+  "voice": "Student C",
+  "text": "The Snow Building has a concert every weekend."
+ },
+ "154ff8a2b5e3": {
+  "file": "student-byui-11.mp3",
+  "voice": "Student A",
+  "text": "Campus keeps getting bigger every year."
+ },
+ "d652c2ad327d": {
+  "file": "student-byui-12.mp3",
+  "voice": "Student B",
+  "text": "Did you know the pond by the Manwaring Center has lily pads?"
+ },
+ "481f97246c3e": {
+  "file": "student-present-01.mp3",
+  "voice": "Student C",
+  "text": "Welcome to BYU–Idaho!"
+ },
+ "57a27e5e6bce": {
+  "file": "student-present-03.mp3",
+  "voice": "Student A",
+  "text": "The STC is where all the science happens."
+ },
+ "b3e950a3852a": {
+  "file": "student-present-04.mp3",
+  "voice": "Student B",
+  "text": "Can you believe this all used to be Ricks College?"
+ },
+ "0517cf92bd96": {
+  "file": "student-present-05.mp3",
+  "voice": "Student C",
+  "text": "Heading to the upper fields for intramurals!"
+ },
+ "fa5e944e0d70": {
+  "file": "student-present-07.mp3",
+  "voice": "Student A",
+  "text": "The temple grounds are so peaceful."
+ },
+ "7fbf973e77f0": {
+  "file": "student-present-08.mp3",
+  "voice": "Student B",
+  "text": "The I-Center track is great when it’s snowing outside."
+ },
+ "0efca8b6e587": {
+  "file": "student-present-09.mp3",
+  "voice": "Student C",
+  "text": "Coins on the sidewalk again? This campus is lucky."
+ },
+ "4c284afaf436": {
+  "file": "opening-1.mp3",
+  "voice": "Hinckley",
+  "text": "David, Ricks College is going to become a four-year institution."
+ },
+ "bdf1630e2f5e": {
+  "file": "opening-3.mp3",
+  "voice": "Hinckley",
+  "text": "Make it happen."
+ },
+ "772b7cc33e0a": {
+  "file": "student-ricks1999-04.mp3",
+  "voice": "Student D",
+  "text": "Rexburg winters are no joke. Bring a real coat, not a fashion coat."
+ },
+ "26e262de1551": {
+  "file": "student-ricks1999-08.mp3",
+  "voice": "Student D",
+  "text": "Watch out for the golf carts. They come around corners fast."
+ },
+ "d896be3a1b37": {
+  "file": "student-ricks1999-12.mp3",
+  "voice": "Student D",
+  "text": "My roommate auditioned at the Snow Building. She was so nervous."
+ },
+ "1571a2cff660": {
+  "file": "student-ricks1999-16.mp3",
+  "voice": "Student D",
+  "text": "The Hart gym is packed every night. Good luck finding a court."
+ },
+ "5906675b9ff4": {
+  "file": "student-transition-02.mp3",
+  "voice": "Student D",
+  "text": "There are construction fences everywhere. Something big is coming."
+ },
+ "d62b5eff278c": {
+  "file": "student-transition-06.mp3",
+  "voice": "Student D",
+  "text": "I can’t wait to see what they build next."
+ },
+ "70b9abaaa10f": {
+  "file": "student-byui-02.mp3",
+  "voice": "Student D",
+  "text": "The temple on the hill looks beautiful at night."
+ },
+ "b5a0aa16433c": {
+  "file": "student-byui-10.mp3",
+  "voice": "Student D",
+  "text": "I love walking past the Hart Building when the teams are training."
+ },
+ "868f1cd8830a": {
+  "file": "student-present-02.mp3",
+  "voice": "Student D",
+  "text": "Big devotional in the I-Center this week."
+ },
+ "069e017ff190": {
+  "file": "student-present-06.mp3",
+  "voice": "Student D",
+  "text": "I heard there’s a hackathon celebration in the STC today!"
+ },
+ "1f301540bd36": {
+  "file": "student-present-10.mp3",
+  "voice": "Student D",
+  "text": "I love the new sign by the roundabout."
+ }
+}

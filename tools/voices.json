@@ -1,5 +1,5 @@
 {
-  "note": "ElevenLabs voice per character (premade voice IDs; run `npm run voices:generate -- --list` to see the voices on your account and swap any ID). model: eleven_multilingual_v2.",
+  "note": "ElevenLabs voice per character (premade voice IDs; run `npm run voices:generate -- --list` to see the voices on your account and swap any ID). model: eleven_multilingual_v2. Free plan: only ElevenLabs default voices work over the API (library voices return 402).",
   "model": "eleven_multilingual_v2",
   "settings": {
     "stability": 0.5,
@@ -21,8 +21,8 @@
     "Student A": "bIHbv24MWmeRgasZH58o",
     "Student B": "EXAVITQu4vr4xnSDxMaL",
     "Student C": "IKne3meq5aSn9XLyUdCD",
-    "Student D": "XB0fDUnXU5powFXDhCwa",
-    "Hinckley": "2EiwWnXFnvU5JabPnv8n"
+    "Student D": "Xb7hH8MSUJpSbSDYk0k2",
+    "Hinckley": "JBFqnCBsd6RMkjVDRZzb"
   },
   "fallback": "nPczCjzI2devNBz1zQrb"
 }

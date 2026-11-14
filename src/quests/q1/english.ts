@@ -69,7 +69,8 @@ export const englishChallenge: ChallengeBody = (root, api) => {
     const space = p.g.measureText(' ').width * 1.6;
     lines = layoutLines(tokens, t => p.g.measureText(t).width, p.w - MX * 2, space);
     pos = [];
-    lines.forEach((ln, li) => { let x = MX; for (const i of ln) { const w = p.g.measureText(tokens[i]).width; pos[i] = { x, y: TOP + li * LH, w }; x += w + space; } });
+    const top = Math.max(TOP, Math.round((p.h - lines.length * LH) / 2) + 24);   // short passages sit centred, not stuck to the top
+    lines.forEach((ln, li) => { let x = MX; for (const i of ln) { const w = p.g.measureText(tokens[i]).width; pos[i] = { x, y: top + li * LH, w }; x += w + space; } });
   };
   const draw = () => {
     const p = page(); if (!p) return; const g = p.g;

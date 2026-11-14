@@ -14,7 +14,7 @@ export interface RoomDef {
   students: { name: string; shirt: string; hair: string; skin: string }[];
   props: string[];
   followUp: { q: string; options: string[]; correct: string };
-  intro: { title: string; whisper: string; chair: string; verdict: string; thanks: string };
+  intro: { title: string; whisper: string; chair: string; frame: string; verdict: string; thanks: string };
 }
 export const CLASSROOM = data as unknown as { rooms: Record<string, RoomDef>; lines: Record<Cue, string[]>; passLine: string };
 
@@ -53,6 +53,9 @@ export function withClassroom(ctx: QuestContext, roomId: string, body: Challenge
       (root as HTMLElement & { q1ViewBtn?: HTMLElement }).q1ViewBtn = viewBtn;
       const mini = h('div', { class: 'q1-mini' }, h('span', { class: 'q1-place', text: room.place }), speech, h('div', { class: 'q1-eng' }, h('span', { text: 'Class' }), h('div', { class: 'q1-eng-bar' }, fill)), viewBtn);
       root.append(mini, stage);
+      // one compact top row: the frame's Hint / Skip / Leave buttons join the room row (no extra rows to scroll)
+      const footer = root.parentElement?.querySelector(':scope > .ch-footer.tools-zone');
+      if (footer) mini.append(footer);
       root.closest('.panel')?.classList.add('q1-inroom-panel');
     } else root.append(strip, stage);
 
@@ -175,8 +178,20 @@ function injectStyles() {
 .q1-mini .q1-speech{flex:1;min-width:240px;opacity:1;font-size:14px;padding:3px 10px}
 .q1-mini .q1-eng{color:#f3ecdc}
 .q1-viewbtn{padding:4px 10px!important;font-size:12px!important}
+.q1-inroom .ch-head{display:none}
+.q1-mini{flex-wrap:nowrap}
+.q1-mini .q1-speech{min-width:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.3}
+.q1-mini .q1-place{display:none}
+body:has(.q1-inroom) .hud-help{visibility:hidden}
+.q1-mini .ch-footer{display:flex;gap:6px;margin:0 0 0 auto;padding:0!important;border:0!important;background:none!important;flex:none}
+.q1-mini .tools-label{display:none}
+.q1-mini .ch-footer button,.q1-mini .q1-viewbtn{padding:3px 8px!important;font-size:11px!important;white-space:nowrap}
+.q1-inroom .ch-hint:empty{display:none}
+.q1-inroom .ch-hint{font-size:13px;padding:2px 8px;margin:0}
+.q1-inroom .q1-follow{padding:8px 12px}.q1-inroom .q1-follow h3{margin:2px 0 6px;font-size:16px}
+.q1-inroom .q1-follow-opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .q1-inroom .q1-bin-q,.q1-inroom .q1-bin-board,.q1-inroom .q1-bin-how,.q1-inroom .ch-status{display:none}
-.screen.fullscreen.q1-inroom:not(.q1-closeup) .panel{max-height:36dvh}
+.screen.fullscreen.q1-inroom:not(.q1-closeup) .panel{max-height:40dvh}
 .q1-inroom .ch-result{padding:6px}.q1-inroom .ch-result h2{font-size:18px!important}
 .q1-inroom .art-reveal{max-height:28dvh}
 /* English in-room: keep the paper strip laid out but invisible (it drives timing) */

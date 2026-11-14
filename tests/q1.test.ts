@@ -68,6 +68,9 @@ describe('quest flow config', () => {
   it('every candidate has a classroom with a Hard follow-up whose answer is an option', () => {
     for (const c of cands) { const r = CLASSROOM.rooms[c.id]; expect(r, c.id).toBeTruthy(); expect(r.followUp.options).toContain(r.followUp.correct); }
   });
+  it('every walk-in sets up the demo: the chair asks the candidate, and the candidate frames the lesson', () => {
+    for (const c of cands) { const i = CLASSROOM.rooms[c.id].intro; expect(i.chair, c.id).toMatch(/\{name\}.*\?/); expect(i.frame.length, c.id).toBeGreaterThan(20); }
+  });
   it('nothing in Q1 data names BYU–Idaho (Fall 1999)', async () => {
     const fs = await import('node:fs');
     for (const f of fs.readdirSync('src/quests/q1/data')) expect(fs.readFileSync(`src/quests/q1/data/${f}`, 'utf8'), f).not.toMatch(/BYU|Brigham Young University/);

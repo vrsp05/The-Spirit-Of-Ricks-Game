@@ -144,7 +144,7 @@ export function createProfessors(): QuestModule {
   /** The classroom walk-in: students turn to the door, the candidate walks to the front,
    *  the chair sets the problem, and the title is chalked on the board. Short on repeat visits. */
   const walkIn = async (c: Candidate, room: Room3D, full: boolean) => {
-    const I = CLASSROOM.rooms[c.id].intro, spot = room.teachSpot();
+    const I = CLASSROOM.rooms[c.id].intro, spot = room.teachSpot(), ask = I.chair.replace('{name}', nameOf(c));
     const door = room.w(0, 0, 5.2), doorEye = room.w(4.6, 3.2, 6.4), classLook = room.w(-1, 1.2, -1.5);
     // aisle route along the west wall so the candidate doesn't walk through desks
     const path = [door, room.w(-6.6, 0, 4.6), room.w(-6.6, 0, spot.z - room.w(0, 0, 0).z + 0.4), { x: spot.x, y: spot.y, z: spot.z }];
@@ -165,10 +165,17 @@ export function createProfessors(): QuestModule {
         run: () => room.faceDoor(false),
         tick: (_dt, k) => { if (follower) { const q = along(k); follower.position.set(q.x, spot.y, q.z); follower.rotation.y = q.ry; } } });
       steps.push({ camera: { from: room.w(-2.6, 2.4, -6.2), to: room.w(2.2, 2.6, 0.8), dur: 1.2 }, look: { x: chairPos.x, y: chairPos.y + 1.8, z: chairPos.z },
-        run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } room.bubble(chairNpc, I.chair, 6); room.hop([chairNpc]); },
-        say: { speaker: CLASSROOM.rooms[c.id].chair, text: I.chair } });
+        run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } room.bubble(chairNpc, ask, 6); room.hop([chairNpc]); },
+        say: { speaker: CLASSROOM.rooms[c.id].chair, text: ask } });
     }
-    steps.push({ camera: { from: full ? room.w(2.2, 2.6, 0.8) : room.w(0.8, 2.4, 3), to: boardEye, dur: 1.4 }, look: boardLook, dur: 2.0,
+    // the candidate answers the chair and frames the lesson (also on retries, so the demo never starts cold)
+    // (art: shoot along the board so the projector beam isn't between camera and candidate)
+    const off = c.id === 'art' ? { x: 3.0, z: -0.5 } : { x: 2.4, z: 3.2 };
+    const faceCam = { x: spot.x + off.x, y: spot.y + 2.0, z: spot.z + off.z }, faceRy = Math.atan2(off.x, off.z) * 0.8;
+    steps.push({ camera: { from: full ? room.w(2.2, 2.6, 0.8) : room.w(0.8, 2.4, 3), to: faceCam, dur: 1.0 }, look: { x: spot.x, y: spot.y + 1.6, z: spot.z },
+      run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = faceRy; } },
+      say: { speaker: who(c), text: I.frame } });
+    steps.push({ camera: { from: faceCam, to: boardEye, dur: 1.4 }, look: boardLook, dur: 2.0,
       run: () => { if (follower) { follower.position.set(spot.x, spot.y, spot.z); follower.rotation.y = 0; } },
       tick: (_dt, k) => room.writeTitle(I.title, k * 1.25) });
     room.showCeiling(true);

@@ -187,7 +187,13 @@ export const circuitChallenge: ChallengeBody = (root, api) => {
     const firstWire = board.tiles.flatMap((r, y) => r.map((t, x) => ({ t, x, y }))).find(o => o.t.kind === 'wire'); cur = firstWire ? { x: firstWire.x, y: firstWire.y } : { x: 0, y: 0 };
     goal.replaceChildren(h('div', { class: 'cx-lvl', text: `Circuit ${li + 1} / ${levels.length}` }), h('div', { class: 'cx-title', text: l.title }), h('p', { text: l.goal }));
     const wb = classroom()?.room?.get('board');
-    if (wb) { chalk(wb, '#22303a'); let y = text(wb, 'PROJECTOR REPAIR', wb.w / 2, 30, 52, '#ffe08a', 'center'); y = text(wb, `Circuit ${li + 1} of ${levels.length}: ${l.title}`, wb.w / 2, y + 10, 38, '#f1efe6', 'center'); text(wb, l.goal, wb.w / 2, y + 16, 32, '#cfe6ff', 'center', undefined, wb.w - 120); wb.refresh(); }
+    // written in the board's right-hand column: the pegboard on the bench hides the left side from the bench view
+    if (wb) {
+      chalk(wb, '#22303a'); const x = wb.w * 0.7, mw = wb.w * 0.3 - 30;
+      let y = text(wb, 'PROJECTOR REPAIR', x, 28, 32, '#ffe08a', 'left', undefined, mw);
+      y = text(wb, `Circuit ${li + 1} of ${levels.length}: ${l.title}`, x, y + 10, 26, '#f1efe6', 'left', undefined, mw);
+      text(wb, l.goal, x, y + 12, 24, '#cfe6ff', 'left', undefined, mw); wb.refresh();
+    }
     update();
   };
   const update = () => {

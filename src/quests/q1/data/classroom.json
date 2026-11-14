@@ -79,9 +79,10 @@
       "intro": {
         "title": "Binary, the Nephite way",
         "whisper": "Is that the new math teacher?",
-        "chair": "Class, this is our math candidate. Our computer science students keep tripping on binary — let's see if this helps.",
+        "chair": "Class, this is our math candidate. Our computer science students keep tripping on binary. {name}, could you explain it so it finally sticks?",
         "verdict": "That's the clearest binary lesson I've seen. I'll recommend you to President Bednar.",
-        "thanks": "Thank you! I think it finally clicked for them."
+        "thanks": "Thank you! I think it finally clicked for them.",
+        "frame": "Of course. Binary is easier than it looks. Let's look at it through Nephite money: the gold coins in Alma 11."
       }
     },
     "english": {
@@ -136,9 +137,10 @@
       "intro": {
         "title": "Editing for accuracy",
         "whisper": "Is that the new English teacher?",
-        "chair": "Class, this is our English candidate. Brother Price has kindly volunteered his write-up of the Kimball Building dedication.",
+        "chair": "Class, this is our English candidate. Brother Price has volunteered his write-up of the Kimball Building dedication. {name}, would you show us how to edit it for accuracy?",
         "verdict": "Careful, kind and accurate. I'll recommend you to President Bednar.",
-        "thanks": "Thank you — and thanks, Brother Price, for being a good sport."
+        "thanks": "Thank you — and thanks, Brother Price, for being a good sport.",
+        "frame": "Happy to. Good editing starts with the facts. Let's put Brother Price's page up and check it line by line against the Church News."
       }
     },
     "art": {
@@ -193,9 +195,10 @@
       "intro": {
         "title": "Drawing what you see",
         "whisper": "Ooh — a new art teacher?",
-        "chair": "Class, meet our art candidate. Today: the grid method — if that old projector cooperates.",
+        "chair": "Class, meet our art candidate. Our students struggle to draw what they actually see. {name}, can you show them how? If that old projector cooperates.",
         "verdict": "Even with the projector dying, you kept the class drawing. I'll recommend you to President Bednar.",
-        "thanks": "Thank you! Someone should look at that projector, though."
+        "thanks": "Thank you! Someone should look at that projector, though.",
+        "frame": "Let's try the grid method. I'll project a picture, and we'll copy it one square at a time. Today's picture: my vision of a temple on the hill."
       }
     },
     "engineering": {
@@ -244,9 +247,10 @@
       "intro": {
         "title": "Projector repair",
         "whisper": "Hey — isn't that the Spori's projector?",
-        "chair": "Class, this is our engineering candidate. Physical Plant just brought us a patient.",
+        "chair": "Class, this is our engineering candidate. Physical Plant just brought us the Spori's projector; it shorted out during the art demo. {name}, can you fix it and explain what went wrong?",
         "verdict": "Fixed it live, and they understood why. I'll recommend you to President Bednar.",
-        "thanks": "Thank you! Tell the art studio their projector is ready."
+        "thanks": "Thank you! Tell the art studio their projector is ready.",
+        "frame": "Sure. A projector is just a few circuits. Let's lay its wiring out on the pegboard and follow the path the power takes."
       }
     }
   }

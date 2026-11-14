@@ -94,29 +94,26 @@ export const mathChallenge: ChallengeBody = (root, api) => {
   const drawBoard = () => {
     const b = room?.get('board'); if (!b) return;
     chalk(b);
-    const cur = q();
-    if (phase === 'intro' || !cur) {
-      text(b, 'TUTORIAL', b.w - 70, 30, 30, '#9cff57', 'right');
-      const y = text(b, `${tut.who}:`, 70, 36, 38, '#ffe08a');
-      text(b, `“${tut.ask}”`, 70, y, 44, '#f1efe6', 'left', undefined, b.w - 300);
-    } else {
-      const y = text(b, `${cur.who}:`, 70, 36, 38, '#ffe08a');
-      text(b, `“${cur.ask}”`, 70, y, cur.ask.length > 70 ? 34 : 44, '#f1efe6', 'left', undefined, b.w - 140);
-    }
+    const cur = q(), tutorial = phase === 'intro' || !cur;
+    const who = tutorial ? tut.who : cur.who, ask = tutorial ? tut.ask : cur.ask;
+    if (tutorial) text(b, 'TUTORIAL', b.w - 60, 28, 28, '#9cff57', 'right');
+    let y = text(b, `${who}:`, 80, 28, 32, '#ffe08a');
+    y = text(b, `“${ask}”`, 80, y, ask.length > 60 ? 32 : 40, '#f1efe6', 'left', undefined, b.w - 260);
+    // the shum · seon · senine board, centred under the question with room to breathe
     const held = phase === 'intro' ? hand : usesTray() && phase === 'ask' ? hand : [];
     const bs = reveal ?? bits(held), blank = !reveal && !held.length;
-    const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.25, b.w * 0.42, b.w * 0.59], top = b.h * 0.56;
+    const cols = ['shum', 'seon', 'senine'], cx = [b.w * 0.25, b.w * 0.385, b.w * 0.52], top = Math.max(y + 24, b.h * 0.4);
     cols.forEach((id, k) => {
       const hl = hintCoins.includes(id);
-      if (hl) { b.g.strokeStyle = '#9cff57'; b.g.lineWidth = 6; b.g.setLineDash([16, 10]); b.g.strokeRect(cx[k] - 95, top - 20, 190, 230); b.g.setLineDash([]); }
-      text(b, blank ? '?' : bs[k] ? '✔' : '·', cx[k], top, 84, bs[k] && !blank ? '#ffd34d' : '#f1efe6', 'center');
-      text(b, `${id} (${coin(id).value})`, cx[k], top + 100, 34, '#f1efe6', 'center');
-      text(b, blank ? '?' : String(bs[k]), cx[k], top + 145, 44, '#f1efe6', 'center');
+      if (hl) { b.g.strokeStyle = '#9cff57'; b.g.lineWidth = 6; b.g.setLineDash([16, 10]); b.g.strokeRect(cx[k] - 85, top - 12, 170, 186); b.g.setLineDash([]); }
+      text(b, blank ? '?' : bs[k] ? '✔' : '·', cx[k], top, 72, bs[k] && !blank ? '#ffd34d' : '#f1efe6', 'center');
+      text(b, `${id} (${coin(id).value})`, cx[k], top + 84, 30, '#f1efe6', 'center');
+      text(b, blank ? '?' : String(bs[k]), cx[k], top + 120, 40, '#f1efe6', 'center');
     });
     const value = bs[0] * 4 + bs[1] * 2 + bs[2];
     const num = blank ? '= ? ? ?' : reveal ? `= ${bs.join(' ')} → ${value}` : `= ${bs.join(' ')}`;
-    text(b, num, b.w * 0.70, top + 40, 72, '#ffd34d');
-    if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.70, top + 130, 34, '#ffe08a', 'left', undefined, b.w * 0.28);
+    text(b, num, b.w * 0.62, top + 34, 64, '#ffd34d');
+    if (reveal && revealExtra) text(b, revealExtra.trim(), b.w * 0.62, top + 116, 30, '#ffe08a', 'left', undefined, b.w * 0.34);
     b.refresh();
   };
   const renderScore = () => score.textContent = phase === 'intro' ? 'Tutorial — not scored' : `Question ${Math.min(qi + 1, qs.length)} of ${qs.length} · misses ${misses} / ${mode.misses} allowed`;

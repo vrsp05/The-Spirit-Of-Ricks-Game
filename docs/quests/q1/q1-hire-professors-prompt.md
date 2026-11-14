@@ -54,8 +54,10 @@ Read these first; they win over this brief if they disagree:
 4. **The classroom:** each department building's entrance leads into its classroom interior. **Walking in starts the walk-in automatically**: no ring, no button. It's skippable with Esc, and only the last beat plays on later attempts.
    1. Students turn to the door and one whispers, for example "Is that the new math teacher?"
    2. The candidate walks up the side aisle to the front.
-   3. The chair stands and sets the problem in one line.
-   4. The demo's title is chalked onto the board, the banner says "You are now the … candidate", and the bottom strip slides up.
+   3. The chair stands, names the class's problem and asks the candidate to teach it (for example "Our computer science students keep tripping on binary. Sister Ames, could you explain it so it finally sticks?").
+   4. The candidate answers and frames the lesson (for example "Let's look at it through Nephite money: the gold coins in Alma 11."). This line (`intro.frame` in `classroom.json`) also plays on retries, so a demo never starts cold.
+   5. The demo's title is chalked onto the board, the banner says "You are now the … candidate", and the bottom strip slides up.
+   - **The bottom strip never scrolls:** one top row holds the class line (up to two lines), the Class meter, the view button and Hint/Skip/Leave; the demo's controls sit below it. Board text is laid out to stay fully visible from the default view (the lab's wall-board notes sit in the column the pegboard doesn't hide).
 5. **The demo** (§3). On a pass, a small result card appears, then the **ending**: the chair's verdict over the class, then the candidate's thanks. The candidate stays at the front of the room.
 6. **Next stop:** after the first pickup, every other candidate **waits outside their own building** (`waitAt`, a per-candidate offset in config). The objective names the next one ("the English candidate is waiting outside the Smith Building"), so there's no trip back to the Kimball between demos.
 7. **Order:** suggested route math → English → art → engineering. Math and English can be done in any order; **engineering stays locked until art is hired**.

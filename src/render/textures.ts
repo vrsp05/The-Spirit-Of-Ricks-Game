@@ -10,7 +10,13 @@ function toTexture(c: HTMLCanvasElement, srgb: boolean): THREE.CanvasTexture {
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t;
 }
 /** Tangent-space normal map from a greyscale height canvas (Sobel, wraps at the edges). */
-function normalFromHeight(h: HTMLCanvasElement, strength: number): THREE.CanvasTexture {
+function normalFromHeight(h: HTMLCanvasElement, strength: number, blur = 2): THREE.CanvasTexture {
+  // blur the height first (wrapping): sharp bump edges make tiny highlights that flicker as the camera moves
+  if (blur > 0) {
+    const b = canvas(h.width), bg = b.getContext('2d')!; bg.filter = `blur(${blur}px)`;
+    for (const dx of [-h.width, 0, h.width]) for (const dy of [-h.width, 0, h.width]) bg.drawImage(h, dx, dy);
+    h = b;
+  }
   const s = h.width, src = h.getContext('2d')!.getImageData(0, 0, s, s).data, out = canvas(s), og = out.getContext('2d')!, img = og.createImageData(s, s);
   const H = (x: number, y: number) => src[(((y + s) % s) * s + ((x + s) % s)) * 4] / 255;
   for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
@@ -40,7 +46,7 @@ export function brickSet(): SurfaceSet {
     hg.fillStyle = '#d8d8d8'; hg.fillRect(x + m, y + m, bw - 2 * m, bh - 2 * m);
     hg.fillStyle = '#f0f0f0'; hg.fillRect(x + m + 2, y + m + 2, bw - 2 * m - 4, bh - 2 * m - 4);
   }
-  return { map: toTexture(col, true), normalMap: normalFromHeight(hgt, 2.2) };
+  return { map: toTexture(col, true), normalMap: normalFromHeight(hgt, 1.6, 2.5) };
 }
 
 /** Flat-roof gravel / membrane with seams every metre. */
@@ -54,7 +60,7 @@ export function gravelSet(): SurfaceSet {
   }
   g.strokeStyle = 'rgba(0,0,0,0.09)'; hg.strokeStyle = '#404040'; g.lineWidth = hg.lineWidth = 2;
   for (let x = 0; x <= S; x += S / 4) { for (const c of [g, hg]) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, S); c.stroke(); } }
-  return { map: toTexture(col, true), normalMap: normalFromHeight(hgt, 1.4) };
+  return { map: toTexture(col, true), normalMap: normalFromHeight(hgt, 0.8, 1.5) };
 }
 
 /** One window per voxel cell (UV 0..1): dark frame, mullion + transom, pane with a soft sky reflection streak. */

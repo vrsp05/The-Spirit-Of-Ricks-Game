@@ -67,3 +67,9 @@ All Bednar-character lines, candidate lines, card notes and the English paraphra
 - **Heights:** OSM `building:levels` where available, otherwise registry guesses at 4 m per floor. Roof forms are stylized (flat with parapet; hip roof for Spori; single spire for the temple).
 - **Decoration:** trees are procedurally scattered on lawns, not surveyed.
 - **STC first floor:** an approximation, not based on a floor plan.
+
+## Music
+Three songs recorded by the team, in `public/music/`: "High on the Mountain Top", "I Need Thee Every Hour" and "The Spirit of God". They play as a looping playlist (random start) on the menus and while exploring, and pause during cutscenes, time-jump cards and the finale (`src/fx/music.ts`). Pause menu → Music: On/Off; Mute silences it too.
+
+## Sound effects
+Recorded CC0 sound effects from Kenney (RPG Audio, Interface Sounds, Impact Sounds) and a CC0 birds-and-wind ambience by spring-spring on OpenGameArt; see `public/sfx/CREDITS.md`. The engine, bike bell, whoosh and fireworks are synthesized (`src/fx/audio.ts`).

@@ -266,8 +266,12 @@ export function buildingsForEra(era: EraId, gateBuilt: (id: string) => boolean =
     out.push({ key: b.id, registryId: b.id, name, poly, style: b.style, state: st, landmark: !!b.landmark, context: false });
   }
   if (era === 'presentFinale' || GAME_CONFIG.world.contextBuildingsInHistoricalEras) {
+    const seen = new Set<string>();
     for (const b of RAW.buildings) {
       if (registeredOsm.has(b.osm) || ['roof', 'pavilion', 'carport'].includes(b.type)) continue;
+      // multi-part OSM buildings share one id and one compacted footprint: draw it once
+      // (duplicates sat in the same place with different heights → flickering, z-fighting walls/windows)
+      if (seen.has(b.osm)) continue; seen.add(b.osm);
       out.push({ key: b.osm, registryId: null, name: b.name, poly: compacted.get(b.osm)!, style: contextStyle(b), state: 'standing', landmark: false, context: true });
     }
   }

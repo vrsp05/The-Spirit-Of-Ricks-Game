@@ -83,7 +83,7 @@ export class PlayerController {
     this.position.y = this.space.groundY(this.position.x, this.position.z);
     this.speed = Math.abs(cart.speed);
     cart.root.position.copy(this.position); cart.root.rotation.y = this.yaw;
-    cart.animate(dt);
+    cart.animate(dt, steer);
     // rider in the vehicle's seat (vehicle-local x right, z forward)
     const s = cart.seat, cx = Math.cos(this.yaw), sn = Math.sin(this.yaw);
     this.avatar.root.position.set(this.position.x + cx * s.x + sn * s.z, this.position.y + s.y, this.position.z - sn * s.x + cx * s.z);

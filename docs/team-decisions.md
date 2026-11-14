@@ -38,3 +38,4 @@ Items marked **open** still need a team decision; until then the game uses a cle
 | 32 | Entrances | decided: no prop, tree, sign, vehicle or quest NPC within the clear zone in front of any entrance | `World.doorZones` | — |
 | 33 | Minigame presentation | decided: full-screen, voxel style; fully playable with 4 buttons + 2 sticks | `src/quests/shared/frame.ts`, `styles.css` | — |
 | 34 | Colour stages | decided: stage 0 = lightly coloured 90s photo → more saturated after each quest → fully saturated at the end | `colorStages`, `look` | Fine-tune after playtest |
+| — | Era looks (graphics pass) | Fall 1999 warm afternoon + autumn leaves · Spring 2001 clear morning · 2011 winter (snow roofs, snowfall) · present-day sunny summer afternoon (night removed) | `src/config/atmosphere.ts` | Team to confirm seasons and times of day |

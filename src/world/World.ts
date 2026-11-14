@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { addWorldDetail, brickSet, detailTexture, gravelSet, waterNormals, windowSet } from '../render/textures';
 import { GAME_CONFIG, type Anchor } from '../config/game.config';
+import { ATMOSPHERE, type Season } from '../config/atmosphere';
+import { SETTINGS } from '../core/settings';
 import { BUILDINGS, eraState } from './buildingRegistry';
 import {
   allFootprints, buildingsForEra, CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, streetDirAt, toReal, PATH_KINDS, pointInPoly, registryPoly,
@@ -106,12 +108,39 @@ let BMATS: THREE.Material[] | null = null;
 function buildingMaterials(): THREE.Material[] {
   if (BMATS) return BMATS;
   const brick = brickSet(), gravel = gravelSet(), win = windowSet();
+  // no normal map on glass + a little roughness: sharp frame bumps on a mirror-like surface shimmered while moving
+  const glass = new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(2.1, 2.2, 2.4), map: win.map, roughness: 0.3, metalness: 0.1, envMapIntensity: 1.4 });
   BMATS = [
-    new THREE.MeshStandardMaterial({ vertexColors: true, map: brick.map, normalMap: brick.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.88, metalness: 0 }),
-    new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(2.1, 2.2, 2.4), map: win.map, normalMap: win.normalMap, roughness: 0.1, metalness: 0.2, envMapIntensity: 2.2 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, map: brick.map, normalMap: brick.normalMap, normalScale: new THREE.Vector2(0.45, 0.45), roughness: 0.95, metalness: 0 }),
+    glass,
     new THREE.MeshStandardMaterial({ vertexColors: true, map: gravel.map, normalMap: gravel.normalMap, roughness: 0.95, metalness: 0 }),
   ];
+  const snow = new THREE.MeshStandardMaterial({ color: '#f1f5fa', map: gravel.map, normalMap: gravel.normalMap, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.8 });
+  // snow ignores the roof colour but keeps the baked corner shading (separate `ao` attribute)
+  snow.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float ao;\nvarying float vAO;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvAO = ao;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vAO;').replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= mix(0.6, 1.0, vAO);');
+  };
+  snow.customProgramCacheKey = () => 'snow-roof';
+  SNOW_ROOF = snow;
+  // smooth white stone (temple): no brick texture, soft sheen
+  BMATS.push(new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(1.05, 1.05, 1.05), roughness: 0.55, metalness: 0 }));
   return BMATS;
+}
+let SNOW_ROOF: THREE.Material | null = null;
+
+/** Small golden voxel statue: robed figure with a long trumpet raised to the east. */
+function moroni(tip: { x: number; y: number; z: number }): THREE.Group {
+  const g = new THREE.Group(), gold = new THREE.MeshStandardMaterial({ color: '#e8c04a', metalness: 0.85, roughness: 0.28, emissive: '#5a4210', emissiveIntensity: 0.25 });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, rz = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), gold); m.position.set(x, y, z); m.rotation.z = rz; m.castShadow = true; g.add(m); };
+  box(0.5, 0.25, 0.5, 0, 0.12, 0);            // ball / pedestal
+  box(0.42, 1.0, 0.36, 0, 0.75, 0);           // robe
+  box(0.3, 0.3, 0.3, 0, 1.4, 0);              // head
+  box(0.12, 0.5, 0.12, -0.1, 0.9, 0.18);      // arm holding the trumpet
+  box(0.9, 0.08, 0.08, 0.5, 1.32, 0, 0.35);   // trumpet, raised
+  box(0.14, 0.16, 0.16, 0.93, 1.48, 0, 0.35); // trumpet bell
+  g.position.set(tip.x, tip.y, tip.z);        // +x = east
+  return g;
 }
 
 function rng(seed: number) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
@@ -132,6 +161,8 @@ export class World {
   benches: { x: number; z: number; yaw: number }[] = [];
   private pathMask!: Uint8Array; private maskW = 0; private maskH = 0;
   readonly sun: THREE.DirectionalLight;
+  private hemi = new THREE.HemisphereLight('#dfefff', '#6b6150', 0.6);
+  private sunOffset = new THREE.Vector3(50, 100, 35);
   onEraChanged: ((era: EraId) => void)[] = [];
   /** Set by the game: has a quest-gated building been built? */
   gateBuilt: (buildingId: string) => boolean = () => false;
@@ -151,13 +182,14 @@ export class World {
       for (let t = -w / 2 + 1.2; t <= w / 2 - 1.2 + 1e-6; t += 1.6) this.obstacles.push({ x: x + ux * t, z: z + uz * t, r: 1.4 });
     }
     if (GAME_CONFIG.world.trees) this.exterior.add(this.makeTrees());
-    const hemi = new THREE.HemisphereLight('#dfefff', '#6b6150', 0.6);
+    const hemi = this.hemi;
     this.sun = new THREE.DirectionalLight('#fff1d6', 2.4);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 1; sc.far = 400;
     this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.4;
     scene.add(hemi, this.sun, this.sun.target);
+    this.exterior.add(this.makeWeather());
     this.setEra(this.era, true);
   }
 
@@ -441,6 +473,19 @@ export class World {
     tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 8; // crisp marks up close, smooth in the distance
     const gm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.96, metalness: 0 });
     addWorldDetail(gm, detailTexture(), 4, 0.45);                    // grass blades / asphalt grain up close
+    // season on the lawns: snow patches in winter, yellowed grass in autumn (only green-dominant pixels)
+    const detailHook = gm.onBeforeCompile;
+    gm.onBeforeCompile = (sh, r) => {
+      detailHook.call(gm, sh, r);
+      sh.uniforms.snowAmt = this.seasonU.snowAmt; sh.uniforms.autumnAmt = this.seasonU.autumnAmt;
+      sh.fragmentShader = sh.fragmentShader.replace('uniform sampler2D detailMap;', 'uniform sampler2D detailMap;\nuniform float snowAmt, autumnAmt;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float grassy = step(0.0, diffuseColor.g - diffuseColor.r * 1.08) * step(0.0, diffuseColor.g - diffuseColor.b * 1.35);
+          float sn = texture2D(detailMap, vWorldPosD.xz / 23.0).r;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.86, 0.9), grassy * snowAmt * smoothstep(0.34, 0.48, sn));
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.35, 1.05, 0.55), grassy * autumnAmt * 0.8);`);
+    };
+    gm.customProgramCacheKey = () => 'terrain-detail-season';
     const m = new THREE.Mesh(g, gm);
     m.receiveShadow = true; m.name = 'terrain';
     const skirt = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), lambert('#7f8f5c'));
@@ -567,12 +612,15 @@ export class World {
   /** Sky dome (gradient, sun disk + glow, hazy horizon matching the fog) and slow-drifting voxel clouds. */
   private clouds = new THREE.Group();
   private waterTex: THREE.Texture[] = [];
+  private skyU!: { top: { value: THREE.Color }; mid: { value: THREE.Color }; horizon: { value: THREE.Color }; sun: { value: THREE.Vector3 } };
+  private cloudMat!: THREE.MeshStandardMaterial;
+  private seasonU = { snowAmt: { value: 0 }, autumnAmt: { value: 0 } };
   private makeSky(): THREE.Object3D {
     const grp = new THREE.Group();
     const sunDir = new THREE.Vector3(50, 100, 35).normalize();
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 32, 16), new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color('#3f7fc4') }, mid: { value: new THREE.Color('#9cc3e6') }, horizon: { value: new THREE.Color('#c8d9e6') }, sun: { value: sunDir } },
+      uniforms: this.skyU = { top: { value: new THREE.Color('#3f7fc4') }, mid: { value: new THREE.Color('#9cc3e6') }, horizon: { value: new THREE.Color('#c8d9e6') }, sun: { value: sunDir } },
       vertexShader: 'varying vec3 vP; void main(){ vP = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = vec4(p.xy, p.w * 0.99999, p.w); }',
       fragmentShader: `uniform vec3 top, mid, horizon, sun; varying vec3 vP;
         void main(){ vec3 d = normalize(vP); float h = d.y;
@@ -595,7 +643,7 @@ export class World {
         cubes.push(m.clone());
       }
     }
-    const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#c9d6e3', emissiveIntensity: 0.55, roughness: 1, fog: false, transparent: true, opacity: 0.94 });
+    const cloudMat = this.cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#c9d6e3', emissiveIntensity: 0.55, roughness: 1, fog: false, transparent: true, opacity: 0.94 });
     const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cloudMat, cubes.length);
     cubes.forEach((mm, i) => im.setMatrixAt(i, mm)); im.frustumCulled = false;
     this.clouds.add(im); grp.add(this.clouds);
@@ -637,7 +685,8 @@ export class World {
       this.obstacles.push({ x: b.x, z: b.z, r: 0.7 });
     });
     const pole = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 4, 0.16), lambert('#2e3236'), lamps.length);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: '#fff3c8', emissive: '#6b5a2a' }), lamps.length);
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: '#fff3c8', emissive: '#ffd27a', emissiveIntensity: 0.15 }), lamps.length);
+
     lamps.forEach((l, i) => {
       const y = terrainHeight(l.x, l.z);
       m.makeTranslation(l.x, y + 2, l.z); pole.setMatrixAt(i, m);
@@ -726,6 +775,7 @@ export class World {
     trees.forEach(t => {
       const y = terrainHeight(t.x, t.z), s = 0.75 + rnd() * 0.5, r0 = rnd() * 1.5, kind = rnd();
       const L: number[] = [], Tk: number[] = [];
+      const sp: 'conifer' | 'aspen' | 'broad' = kind < 0.24 ? 'conifer' : kind < 0.42 ? 'aspen' : 'broad';
       if (kind < 0.24) {                                                  // conifer: stacked tiers
         box(trunk, ti, t.x, y + 1.2 * s, t.z, 0.55 * s, 2.4 * s, 0.55 * s, r0, '#5a4130'); Tk.push(ti++);
         const greens = ['#2c6236', '#336d3c', '#3b7744'];
@@ -745,10 +795,12 @@ export class World {
         }
         box(leaf, li, t.x, y + 6 * s, t.z, 2.2 * s, 1.4 * s, 2.2 * s, r0 + 0.7, greens[(rnd() * 4) | 0]); L.push(li++);
       }
+      L.forEach((idx, k) => { this.leafMeta[idx] = { tree: leafIdx.length, sp, tier: k, of: L.length }; });
       leafIdx.push(L); trunkIdx.push(Tk);
       this.obstacles.push({ x: t.x, z: t.z, r: 0.5 });
     });
     trunk.count = ti; leaf.count = li;
+    this.leafBase = Array.from({ length: li }, (_, i) => { const c = new THREE.Color(); leaf.getColorAt(i, c); return c; });
     trunk.castShadow = leaf.castShadow = true; leaf.receiveShadow = true;
     grp.add(trunk, leaf);
     this.treeData = { trees, trunk, leaf, leafIdx, trunkIdx };
@@ -756,6 +808,85 @@ export class World {
   }
   /** Wind: crowns sway a little (more at the top of each block), phase varies per tree position. */
   private windTime = { value: 0 };
+  private leafMeta: { tree: number; sp: 'conifer' | 'aspen' | 'broad'; tier: number; of: number }[] = [];
+  private leafBase: THREE.Color[] = [];
+  private season: Season | null = null;
+  /** Recolour tree crowns for the season (autumn reds/golds, spring blossom, winter snow-laden). */
+  private applySeason(season: Season) {
+    const td = this.treeData; if (!td || season === this.season) return;
+    this.season = season;
+    const pick = <T,>(a: T[], k: number) => a[Math.abs(Math.floor(k)) % a.length];
+    const autumn = ['#d9822b', '#c4501f', '#e3b23c', '#a8361c', '#b8a23a', '#d96a28'], gold = ['#e8c23a', '#f0d050', '#dcb02e'];
+    const c = new THREE.Color();
+    this.leafMeta.forEach((m, i) => {
+      if (!m) return;
+      const base = this.leafBase[i], h = (m.tree * 7919) % 100;
+      if (season === 'autumn') {
+        if (m.sp === 'broad') { if (h < 85) c.set(pick(autumn, m.tree * 3 + m.tier * (h % 3 === 0 ? 1 : 0))); else c.copy(base); }
+        else if (m.sp === 'aspen') c.set(pick(gold, m.tree + m.tier));
+        else c.copy(base);
+      } else if (season === 'spring') {
+        if (m.sp === 'broad' && h < 16) c.set(h < 8 ? '#f4c7d8' : '#f6f0f2'); else c.copy(base).multiplyScalar(1.08);
+      } else if (season === 'winter') {
+        if (m.sp === 'conifer') c.set(m.tier === m.of - 1 || (m.tier === m.of - 2 && h < 50) ? '#eef3f6' : '#2a5534');
+        else c.set(m.tier === 0 || h % 4 === 0 ? '#e9eff2' : '#c3ccce');
+      } else c.copy(base);
+      td.leaf.setColorAt(i, c);
+    });
+    if (td.leaf.instanceColor) td.leaf.instanceColor.needsUpdate = true;
+  }
+  /** Weather particles in a box around the player: snowflakes (winter) or tumbling leaves (autumn). */
+  private weather!: THREE.Points;
+  private weatherVel!: Float32Array;
+  private weatherKind: 'snow' | 'leaves' | null = null;
+  private lastT = 0;
+  private makeWeather(): THREE.Object3D {
+    const N = 1600, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), rnd = rng(8);
+    this.weatherVel = new Float32Array(N);
+    for (let i = 0; i < N; i++) { pos.set([(rnd() - 0.5) * 90, rnd() * 40, (rnd() - 0.5) * 90], i * 3); this.weatherVel[i] = 0.6 + rnd() * 0.8; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    this.weather = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false }));
+    this.weather.frustumCulled = false; this.weather.visible = false;
+    return this.weather;
+  }
+  private setWeather(kind: 'snow' | 'leaves' | null) {
+    this.weatherKind = kind; this.weather.visible = !!kind;
+    if (!kind) return;
+    const col = this.weather.geometry.getAttribute('color') as THREE.BufferAttribute, rnd = rng(12), c = new THREE.Color();
+    const leaves = ['#d9822b', '#c4501f', '#e3b23c', '#a8361c'];
+    for (let i = 0; i < col.count; i++) { c.set(kind === 'snow' ? '#ffffff' : leaves[(rnd() * 4) | 0]); col.setXYZ(i, c.r, c.g, c.b); }
+    col.needsUpdate = true;
+    const mat = this.weather.material as THREE.PointsMaterial; mat.size = kind === 'snow' ? 0.14 : 0.26;
+    this.weather.geometry.setDrawRange(0, kind === 'snow' ? 1600 : 260);
+  }
+  private updateWeather(dt: number, t: number, target: THREE.Vector3) {
+    if (!this.weatherKind) return;
+    this.weather.visible = !SETTINGS.reducedMotion;
+    const p = this.weather.geometry.getAttribute('position') as THREE.BufferAttribute, a = p.array as Float32Array;
+    const fall = this.weatherKind === 'snow' ? 1.3 : 0.9, n = this.weatherKind === 'snow' ? 1600 : 260;
+    for (let i = 0; i < n; i++) {
+      const k = i * 3, v = this.weatherVel[i];
+      a[k + 1] -= fall * v * dt;
+      a[k] += Math.sin(t * (this.weatherKind === 'snow' ? 0.6 : 1.7) + i) * dt * (this.weatherKind === 'snow' ? 0.4 : 1.1);
+      a[k + 2] += Math.cos(t * 0.5 + i * 1.3) * dt * 0.3;
+      if (a[k + 1] < 0) a[k + 1] += 40;
+    }
+    p.needsUpdate = true;
+    this.weather.position.set(target.x, target.y - 4, target.z);
+  }
+  /** Era look: sun, sky dome, clouds, season (renderer handles env light, haze, exposure, bloom). */
+  applyAtmosphere(era: EraId) {
+    const A = ATMOSPHERE[era];
+    this.sunOffset.set(...A.sun); this.sun.color.set(A.sunColor); this.sun.intensity = A.sunIntensity;
+    this.hemi.color.set(A.hemiSky); this.hemi.groundColor.set(A.hemiGround); this.hemi.intensity = A.hemiIntensity;
+    this.skyU.top.value.set(A.skyTop); this.skyU.mid.value.set(A.skyMid); this.skyU.horizon.value.set(A.horizon); this.skyU.sun.value.copy(this.sunOffset).normalize();
+    this.cloudMat.emissive.set(A.cloud);
+    this.seasonU.snowAmt.value = A.season === 'winter' ? 1 : 0; this.seasonU.autumnAmt.value = A.season === 'autumn' ? 1 : 0;
+    this.applySeason(A.season);
+    this.setWeather(A.season === 'winter' ? 'snow' : A.season === 'autumn' ? 'leaves' : null);
+    const mesh = this.cache.get(era)?.group.getObjectByName('buildings') as THREE.Mesh | undefined;
+    if (mesh && BMATS && SNOW_ROOF) mesh.material = [BMATS[0], BMATS[1], A.season === 'winter' ? SNOW_ROOF : BMATS[2], BMATS[3]];
+  }
   private swayLeaves(mat: THREE.MeshStandardMaterial) {
     mat.onBeforeCompile = sh => {
       sh.uniforms.windTime = this.windTime;
@@ -792,8 +923,16 @@ export class World {
     grid.extra.push(...this.obstacles);
     const meshes = new Map<string, BuiltMesh>();
     const group = new THREE.Group(); group.name = `era-${era}`;
-    for (const b of buildings) {
+    // landmarks first; a background (context) building that overlaps one already placed is skipped
+    // (coplanar walls from two buildings flicker / z-fight)
+    const claimed = new Set<string>();
+    const order = [...buildings].sort((x, y) => Number(x.context) - Number(y.context));
+    for (const b of order) {
       if (b.state === 'site') { group.add(this.constructionSite(b.poly, grid)); continue; }
+      const r = rasterize(b.poly), cells: string[] = [];
+      for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) if (r.cells[j * r.w + i]) cells.push(`${r.i0 + i},${r.j0 + j}`);
+      if (b.context && cells.some(c => claimed.has(c))) continue;
+      cells.forEach(c => claimed.add(c));
       const m = meshBuilding(b.poly, b.style, { construction: b.state === 'construction', detailed: !b.context });
       meshes.set(b.key, m); grid.addBuilding(m);
     }
@@ -801,6 +940,8 @@ export class World {
     mesh.castShadow = mesh.receiveShadow = true; mesh.name = 'buildings';
     group.add(mesh);
     for (const b of buildings) if (b.state === 'construction') group.add(this.fence(b.poly));
+    // golden Angel Moroni on top of the temple spire, facing east
+    for (const b of buildings) { const tip = meshes.get(b.key)?.spireTip; if (tip && b.registryId === 'temple' && b.state === 'standing') group.add(moroni(tip)); }
     for (const b of buildings) if (b.state === 'standing' && b.registryId) this.addFeatures(b, group, grid, meshes);
     for (const b of buildings) if (b.state !== 'site' && !b.context) {
       const doors = b.state === 'standing' ? this.addEntrances(b, group) : [];
@@ -996,6 +1137,7 @@ export class World {
     if (!c) { c = this.buildEra(era); this.cache.set(era, c); }
     this.exterior.add(c.group);
     this.era = era;
+    this.applyAtmosphere(era);
     this.refreshSigns();
     this.onEraChanged.forEach(f => f(era));
   }
@@ -1042,9 +1184,17 @@ export class World {
     this.clouds.rotation.y = (performance.now() / 1000) * 0.0025;                // slow drift
     this.clouds.position.set(target.x, 0, target.z);
     const t = performance.now() / 1000; this.windTime.value = t;
+    const dt = Math.min(0.1, this.lastT ? t - this.lastT : 0); this.lastT = t; this.updateWeather(dt, t, target);
     this.waterTex.forEach((tx, i) => tx.offset.set(t * (i ? -0.011 : 0.007), t * (i ? 0.006 : 0.009)));
-    this.sun.position.set(target.x + 50, target.y + 100, target.z + 35);
-    this.sun.target.position.copy(target);
+    // Snap the shadow camera to whole shadow-map texels in light space: otherwise shadow edges
+    // shimmer/swim on walls and windows every time the player moves.
+    const sc = this.sun.shadow.camera, texel = (sc.right - sc.left) / this.sun.shadow.mapSize.x;
+    const dir = this.sunOffset.clone().normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize(), up = dir.clone().cross(right).normalize();
+    const u = Math.round(target.dot(right) / texel) * texel, v = Math.round(target.dot(up) / texel) * texel, w = target.dot(dir);
+    const snapped = right.multiplyScalar(u).add(up.multiplyScalar(v)).add(dir.clone().multiplyScalar(w));
+    this.sun.position.copy(snapped).add(this.sunOffset);
+    this.sun.target.position.copy(snapped);
   }
 }
 

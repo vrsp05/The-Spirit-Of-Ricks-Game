@@ -113,8 +113,15 @@ export class UI {
   setBanner(text: string | null) { this.banner.classList.toggle('hidden', !text); if (text) this.banner.textContent = text; }
   setReticle(visible: boolean, active = false) { this.reticle.classList.toggle('hidden', !visible); this.reticle.classList.toggle('active', active); }
   setHudButton(label: string | null, action: (() => void) | null) { this.hudBtn.classList.toggle('hidden', !label); if (label) this.hudBtn.textContent = label; this.hudBtnAction = action; }
+  /** Called when a spoken line starts (or with null when the conversation/scene ends) — drives the voices. */
+  onLine: ((line: { speaker: string; text: string } | null) => void) | null = null;
+  private lastSub = '';
   subtitle(line: { speaker: string; text: string } | null, hint: string) {
     this.currentSpeaker = line?.speaker || null;
+    const key = line ? `${line.speaker}|${line.text}` : '';
+    if (line && key !== this.lastSub) this.onLine?.(line);
+    if (!line && !hint) this.onLine?.(null);          // scene finished / skipped
+    this.lastSub = key;
     this.subEl.classList.toggle('hidden', !line && !hint);
     (this.subEl.querySelector('.sub-speaker') as HTMLElement).textContent = line?.speaker ?? '';
     (this.subEl.querySelector('.sub-text') as HTMLElement).textContent = line?.text ?? '';
@@ -215,8 +222,9 @@ export class UI {
         this.currentSpeaker = l.speaker;
         el.querySelector('.dlg-speaker')!.innerHTML = esc(l.speaker) + (l.placeholder ? ' <span class="badge">PLACEHOLDER DIALOGUE</span>' : '');
         el.querySelector('.dlg-text')!.textContent = l.text;
+        this.onLine?.(l);
       };
-      const next = () => { i++; if (i >= lines.length) { this.currentSpeaker = null; this.pop(s); resolve(); } else render(); };
+      const next = () => { i++; if (i >= lines.length) { this.currentSpeaker = null; this.onLine?.(null); this.pop(s); resolve(); } else render(); };
       el.addEventListener('click', next);
       render();
       const s = this.push(el, { onConfirmEmpty: next, onBack: next });
@@ -264,12 +272,15 @@ export class UI {
     });
   }
 
+  /** True while a full-screen story card (time jump) is showing — background music pauses. */
+  cardShowing = false;
   card(title: string, subtitle: string, ms = 2600): Promise<void> {
+    this.cardShowing = true;
     return new Promise(resolve => {
       const el = document.createElement('div'); el.className = 'screen card';
       el.innerHTML = `<div><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>`;
       let done = false;
-      const finish = () => { if (done) return; done = true; this.pop(s); resolve(); };
+      const finish = () => { if (done) return; done = true; this.cardShowing = false; this.pop(s); resolve(); };
       const s = this.push(el, { onConfirmEmpty: finish, onBack: finish });
       setTimeout(finish, ms);
     });

@@ -15,6 +15,10 @@ export type RoofType = 'flat' | 'hip' | 'spire' | 'dome' | 'peak';
 export interface BuildingStyle {
   wall: string; trim: string; roof: string; glass: string;
   roofType: RoofType; levels: number; floorHeight?: number;
+  /** Spire roofs: 'center' (default) or 'east' (at the east end of the long axis, like the Rexburg temple). */
+  spireAt?: 'center' | 'east';
+  /** Wall finish: 'brick' (default) or smooth 'stone' (e.g. the temple's white stone). */
+  finish?: 'brick' | 'stone';
 }
 export interface BuildingEntry {
   id: string;
@@ -90,7 +94,7 @@ export const BUILDINGS: BuildingEntry[] = [
     approximation: 'Construction start inferred from the HOB "Multi-Use" entry.' },
   { id: 'ricks-building', osm: 'w299952009', names: { byui: 'Thomas E. Ricks Building' }, built: 2005, style: pale(3), landmark: true, sources: ['HOB p.3 (planned 2005)', 'OSM'], approximation: 'HOB (2003) gives a planned year; completion not independently verified.' },
   { id: 'temple', osm: 'w289415710', names: { byui: 'Rexburg Idaho Temple' }, built: 2008.11,
-    style: { wall: '#f4f1ea', trim: '#ffffff', roof: '#e9e4d8', glass: '#6c7f8e', roofType: 'spire', levels: 2, floorHeight: 6 },
+    style: { wall: '#f4f1ea', trim: '#ffffff', roof: '#e9e4d8', glass: '#6c7f8e', roofType: 'spire', spireAt: 'east', finish: 'stone', levels: 2, floorHeight: 6 },   // the Rexburg temple's spire rises from its east end
     landmark: true, sources: ['NEWS: Church News 2008-02-16 (dedicated Feb 10 2008)', 'OSM'], approximation: 'Stylized silhouette; single spire.' },
   { id: 'icenter', osm: 'w299928003', names: { ricks: 'Campus Center', byui: 'BYU–Idaho Center' }, built: 2010.96, landmark: true, features: ['portico'],
     style: { wall: '#d8c3a0', trim: '#f4ede0', roof: '#8e9a95', glass: '#5d7d93', roofType: 'dome', levels: 3, floorHeight: 4.5 }, sources: ['NEWS: Church News 2010-12-17 (dedicated)', 'OSM'] },

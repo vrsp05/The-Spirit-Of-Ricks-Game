@@ -98,3 +98,13 @@ Each device is an `InputSource`:
 | Tune colours | `GAME_CONFIG.look`, `GAME_CONFIG.colorStages` |
 | Add a building's dates or style | `src/world/buildingRegistry.ts` |
 | Add a room | `GAME_CONFIG.interiors` + `LAYOUTS` in `src/interiors/interiors.ts` |
+
+## Rendering and atmosphere
+- **Renderer** (`src/render/Renderer.ts`): render → tone mapping (Khronos PBR Neutral) + colour-stage grade → output. Screen-space AO and bloom were removed after profiling (they cut the frame rate by about 3×); the voxel AO is baked into the meshes instead. Pixel ratio is capped at 1.5. The pause menu's *Graphics: High / Low* switch drops to pixel ratio 1 and 1024 shadows on weaker laptops (`SETTINGS.graphics`).
+- **Materials** are physically based (`MeshStandardMaterial`) lit by the sun, a hemisphere light and an environment map generated from each era's sky.
+- **Procedural textures** (`src/render/textures.ts`): brick with mortar relief, roof gravel, framed windows, ripple normals for water, and a world-space detail layer for the ground. No image files.
+- **Voxel ambient occlusion** is baked per vertex in `voxelMesher.ts` (stored in the vertex colours and in a separate `ao` attribute that the snow-roof material uses).
+- **Per-era atmosphere** (`src/config/atmosphere.ts`): sun angle and colour, sky, haze, exposure and `season` (tree and grass colours, snow roofs, falling snow or leaves). Edit that file to change an era's look.
+- **Characters** (`src/player/Avatar.ts`): knees and elbows, walk/run bob and lean, idle breathing, blinking and glances, hairstyles, hats, coats, scarves, backpacks and shirt patterns. NPCs re-dress per era (`eraLook` in `src/world/Npcs.ts`), and the player wears a coat and scarf in winter.
+- **Vehicles** (`src/player/Vehicle.ts`): spinning wheels with hub caps, steering front wheels, body roll and pitch, brake lights.
+- **No duplicate geometry:** multi-part OSM buildings are drawn once, and a background building that overlaps another is skipped (`World.buildEra`). Overlapping copies caused flickering walls and windows.

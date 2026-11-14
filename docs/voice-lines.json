@@ -240,6 +240,190 @@
   "live": true
  },
  {
+  "id": "story-greeting-1-noname",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "First talk with Bednar (played with the player's name shown)",
+  "text": "Ah, there you are. Come in, please.",
+  "live": false
+ },
+ {
+  "id": "story-done-1-noname",
+  "voice": "Bednar",
+  "speaker": "President David A. Bednar",
+  "when": "After all quests (played with the player's name shown)",
+  "text": "Look at what we’ve done together. Teachers hired, buildings raised, and a new name on the sign.",
+  "live": false
+ },
+ {
+  "id": "q3-assign-1-noname",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3 (played with the player's name shown)",
+  "text": "It’s good to see you. The years have flown by, haven’t they? Look how much this campus has grown.",
+  "live": false
+ },
+ {
+  "id": "q3-reminder-noname",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 3 reminder (played with the player's name shown)",
+  "text": "Keep those cards handy. Check your journal whenever you need a clue, and bring each letter to the sign by the roundabout.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-english",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-english-art",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Art (Spori Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-english-art-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-english-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-art",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), Art (Spori Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-art-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-math-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Math (Romney Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-english",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: English (Smith Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-english-art",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: English (Smith Building), Art (Spori Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-english-art-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: English (Smith Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-english-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: English (Smith Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-art",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Art (Spori Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-art-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q1-reminder-engineering",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 1 reminder",
+  "text": "Candidates still to hire: Engineering (Austin Building). They wait in Personnel Services, down the hall.",
+  "live": false
+ },
+ {
+  "id": "q2-reminder-taylor",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2 reminder",
+  "text": "Blueprints still to solve: John Taylor Building.",
+  "live": false
+ },
+ {
+  "id": "q2-reminder-taylor-icenter",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2 reminder",
+  "text": "Blueprints still to solve: John Taylor Building, Campus Center.",
+  "live": false
+ },
+ {
+  "id": "q2-reminder-icenter",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2 reminder",
+  "text": "Blueprints still to solve: Campus Center.",
+  "live": false
+ },
+ {
+  "id": "q2-ready",
+  "voice": "Bednar",
+  "speaker": "President Bednar",
+  "when": "Quest 2 report prompt",
+  "text": "Both blueprints are solved? Tell me what you found.",
+  "live": false
+ },
+ {
   "id": "q1-greetings-math-1",
   "voice": "Candidate math",
   "speaker": "Sister Ames",

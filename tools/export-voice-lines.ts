@@ -11,6 +11,7 @@ import q3 from '../src/quests/q3/data/cards.json';
 import q2 from '../src/quests/q2/data/dialogue.json';
 import { OPENING } from '../src/opening_cutscene/opening.script';
 import { ENDING } from '../src/ending_cutscene/ending.script';
+import q2dlg from '../src/quests/q2/data/dialogue.json';
 
 export interface VoiceLine { id: string; voice: string; speaker: string; when: string; text: string; live: boolean }
 const out: VoiceLine[] = [];
@@ -41,6 +42,20 @@ OPENING.cues.forEach((c, i) => { if (!c.text.startsWith('[')) add(`opening-${i +
 ENDING.cues.forEach((c, i) => add(`ending-${i + 1}`, 'Bednar', 'Elder David A. Bednar', 'Ending movie', c.text));
 add('q1-ready', 'Bednar', 'President Bednar', 'Quest 1 report prompt', q1.readyReminder);
 add('q3-reminder', 'Bednar', 'President Bednar', 'Quest 3 reminder', q3.dialogue.reminder);
+
+// lines that address the player by name: record them without the name (the game plays that recording
+// when the line is shown with the player's name), so Bednar never switches to the browser voice
+for (const l of [...out]) if (/\{player\}/.test(l.text) && !/\{(?!player\})[a-z]+\}/i.test(l.text)) {
+  const t = l.text.replace(/,\s*\{player\}\s*,/g, ',').replace(/^\{player\},?\s*/, '').replace(/,?\s*\{player\}/g, '').replace(/\s+/g, ' ').trim();
+  add(`${l.id}-noname`, l.voice, l.speaker, `${l.when} (played with the player's name shown)`, t.charAt(0).toUpperCase() + t.slice(1));
+}
+// reminders built during play: one recording for every possible "still to do" list
+const subsets = <T,>(xs: T[]) => { const r: T[][] = []; const go = (start: number, acc: T[]) => { for (let j = start; j < xs.length; j++) { const n = [...acc, xs[j]]; r.push(n); go(j + 1, n); } }; go(0, []); return r; };   // in list order
+const pcands = GAME_CONFIG.quests.professors.candidates as { id: string; label: string; building: string }[];
+for (const set of subsets(pcands)) add(`q1-reminder-${set.map(c => c.id).join('-')}`, 'Bednar', 'President Bednar', 'Quest 1 reminder', (q1 as Record<string, string>).reminder.replace('{list}', set.map(c => `${c.label.replace(' candidate', '')} (${c.building})`).join(', ')));
+const blds = (GAME_CONFIG.quests as unknown as { construction: { buildings: { id: string; label: string }[] } }).construction.buildings;
+for (const set of subsets(blds)) add(`q2-reminder-${set.map(b => b.id).join('-')}`, 'Bednar', 'President Bednar', 'Quest 2 reminder', q2dlg.reminder.replace('{list}', set.map(b => b.label).join(', ')));
+add('q2-ready', 'Bednar', 'President Bednar', 'Quest 2 report prompt', q2dlg.readyReminder);
 
 // Quest 1 candidates (one voice each) and the classroom department chairs
 const cands = GAME_CONFIG.quests.professors.candidates as { id: string; name?: string; label: string }[];

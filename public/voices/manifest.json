@@ -513,5 +513,60 @@
   "file": "student-present-10.mp3",
   "voice": "Student D",
   "text": "I love the new sign by the roundabout."
+ },
+ "a46a3e6e252b": {
+  "file": "story-greeting-1-noname.mp3",
+  "voice": "Bednar",
+  "text": "Ah, there you are. Come in, please."
+ },
+ "3a96ea0efd5a": {
+  "file": "story-done-1-noname.mp3",
+  "voice": "Bednar",
+  "text": "Look at what we’ve done together. Teachers hired, buildings raised, and a new name on the sign."
+ },
+ "9b7a1c215aab": {
+  "file": "q3-assign-1-noname.mp3",
+  "voice": "Bednar",
+  "text": "It’s good to see you. The years have flown by, haven’t they? Look how much this campus has grown."
+ },
+ "46c02c37896f": {
+  "file": "q3-reminder-noname.mp3",
+  "voice": "Bednar",
+  "text": "Keep those cards handy. Check your journal whenever you need a clue, and bring each letter to the sign by the roundabout."
+ },
+ "179a3a207631": {
+  "file": "q1-reminder-math.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building). They wait in Personnel Services, down the hall."
+ },
+ "6b1c5cae936a": {
+  "file": "q1-reminder-math-english.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building). They wait in Personnel Services, down the hall."
+ },
+ "6323dce7bfd8": {
+  "file": "q1-reminder-math-english-art.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Art (Spori Building). They wait in Personnel Services, down the hall."
+ },
+ "a732c7a7e47a": {
+  "file": "q1-reminder-math-english-art-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "08bbcde9a1b4": {
+  "file": "q1-reminder-math-english-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), English (Smith Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
+ },
+ "5db5736d9fbd": {
+  "file": "q1-reminder-math-art.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), Art (Spori Building). They wait in Personnel Services, down the hall."
+ },
+ "5ca4421a5653": {
+  "file": "q1-reminder-math-art-engineering.mp3",
+  "voice": "Bednar",
+  "text": "Candidates still to hire: Math (Romney Building), Art (Spori Building), Engineering (Austin Building). They wait in Personnel Services, down the hall."
  }
 }

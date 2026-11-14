@@ -734,7 +734,7 @@ export class Game {
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     void this.ui.askName(this.playerName || 'Alex', SETTINGS.season).then(({ name, season }) => { this.setPlayerName(name); if (season !== SETTINGS.season) { SETTINGS.season = season; saveSettings(); this.applySeason(); } this.beginPlay(true); });
   }
-  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; }
+  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; this.voice.playerName = n; }
   continueGame(d: SaveData) {
     this.finale.stop();
     this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = d.finaleReached;

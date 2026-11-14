@@ -13,6 +13,18 @@ export class VoiceActor {
   private recorded = new Map<string, string>();
   private clip: HTMLAudioElement | null = null;
   private static norm(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+  /** The player's name: lines that address you by name play the recording made without the name. */
+  playerName = '';
+  private findRecording(text: string) {
+    const exact = this.recorded.get(VoiceActor.norm(text)); if (exact) return exact;
+    for (const n of [this.playerName, 'friend']) {
+      if (!n) continue;
+      const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const without = text.replace(new RegExp(`(^|[\\s,])${esc}(?=[\\s,.!?]|$)`, 'g'), ' ');
+      const f = this.recorded.get(VoiceActor.norm(without)); if (f) return f;
+    }
+    return null;
+  }
 
   constructor() {
     fetch(`${import.meta.env.BASE_URL}voices/manifest.json`).then(r => (r.ok ? r.json() : {})).then((m: Record<string, { file: string; text: string }>) => {
@@ -42,7 +54,7 @@ export class VoiceActor {
   speak(speaker: string, text: string) {
     this.stop();
     if (!SETTINGS.voices || SETTINGS.muted || SETTINGS.voiceVolume <= 0 || !text.trim()) return;
-    const file = this.recorded.get(VoiceActor.norm(text));
+    const file = this.findRecording(text);
     if (file) { this.clip = new Audio(`${import.meta.env.BASE_URL}voices/${file}`); this.clip.volume = Math.min(1, SETTINGS.voiceVolume); void this.clip.play().catch(() => {}); return; }
     if (!this.synth) return;
     const name = VoiceActor.character(speaker), h = hash(name);

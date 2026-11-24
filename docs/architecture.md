@@ -39,7 +39,7 @@ TypeScript + Vite + Three.js. There is no backend; saves go to `localStorage`. `
   - Builds terrain, curbs, the boundary hedge, sky, props, trees, the stadium and fields.
   - Builds per-era building meshes (cached), signs, decorative entrances and special features (Taylor steeple, I-Center dome and portico).
   - `refreshBuildings()` rebuilds after a gated building is constructed.
-- **`Npcs.ts`:** ambient walkers on campus paths. They avoid buildings, face the player, and say a line from `GAME_CONFIG.npcs`.
+- **`Npcs.ts`:** ambient walkers on campus paths. They avoid buildings, face the player, and say a line from `GAME_CONFIG.npcs`. They also chat with each other in speech bubbles (`npcChatter.ts` holds the era-aware conversations, greetings and join-in lines), sit on benches, check phones and greet the player.
 
 ## Player and camera (`src/player/`)
 - **`PlayerController`:** camera-relative movement, sprint, jump/gravity, collision stepping, and golf-cart driving (`vehicle`).
@@ -71,10 +71,16 @@ Each device is an `InputSource`:
   3. Completing it advances the colour stage, may move to the next era, and saves.
   4. After all three are done (letters placed on the sign), the game moves to the present day and the STC finale.
 
+## Side quests (`src/sidequests/`)
+- **`SideQuests.ts`:** optional errands, separate from the story chain in `src/quests/`. Each has a giver avatar placed beside a building (`SideHost.spotBy`), a floating status icon, and its own runtime (pickups, a follower, a timer, flyers). It talks to the game only through the `SideHost` interface that `game.ts` implements.
+- State is saved as `SaveData.sideQuests` (optional field, no save-version bump). Timed quests return to their giver after a reload.
+- **`trivia.ts`:** pure question generator over `world/presidents.ts` and the building registry; era-aware and never names BYU–Idaho before the present day (tested in `tests/sidequests.test.ts`).
+
 ## Interiors (`src/interiors/`)
 - Each room is built at its own far-away origin. The exterior is hidden while you're inside.
 - Doors snap to their building's wall from a named anchor. The exterior door is green-framed and labelled ENTRANCE, and shows as a green icon on the maps.
 - Room layouts are in `LAYOUTS`; sizes and eras are in `GAME_CONFIG.interiors`.
+- **`decor.ts`:** the decoration kit. Every room gets a floor material (`floorStyle`: wood, tile, carpet, court or checker) and a dressing pass (baseboards, chair rail, windows on the north/east/west walls unless `windows: false`, wall lights). Furniture builders (lockers, plants, sofas, computers, notice boards…) register blocking furniture with `solid()`; `InteriorManager.space()` also treats seated/standing people as solid.
 
 ## UI (`src/ui/`)
 - **Screens:** a stack of focus-navigable screens (menus, dialogue, panels, custom quest UI, map), all driven by actions.

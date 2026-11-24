@@ -1,6 +1,8 @@
 // Game orchestrator: wires world, player, input, UI, quests, interiors, save and finale.
 import * as THREE from 'three';
 import './interiors/campusInteriors';   // registers campus building interiors + their doors (before the world is built)
+import { HOME_ID, HOME_SPOTS } from './interiors/apartment';   // the player's apartment (same: registers before the world)
+import { OUTFITS, outfitById, outfitLook } from './player/outfits';
 import { ATMOSPHERE } from './config/atmosphere';
 import { MusicPlayer } from './fx/music';
 import { Ambience } from './fx/ambience';
@@ -27,10 +29,12 @@ import { clearSave, loadSave, writeSave, type SaveData } from './save/save';
 import { STORY } from './story/story';
 import { esc, UI } from './ui/ui';
 import { CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, PATH_KINDS, pointInPoly, terrainHeight, toGame } from './world/campusData';
-import { Vehicle, type CarStyle } from './player/Vehicle';
+import { isAircraft, Vehicle, type CarStyle } from './player/Vehicle';
 import { ERAS, type EraId } from './world/eras';
 import { makeDoor, World, type BuildingSign } from './world/World';
 import { LineBag, NpcCrowd } from './world/Npcs';
+import { JOIN_LINES } from './world/npcChatter';
+import { SideQuests } from './sidequests/SideQuests';
 import { Finale } from './finale/finale';
 import { CutsceneRunner, type CutsceneSpec } from './cutscene/Cutscene';
 import { Effects } from './fx/fireworks';
@@ -73,6 +77,8 @@ export class Game {
   traffic!: Traffic;
   balls!: BallGames;
   playerName = '';
+  /** Wardrobe choice (saved). */
+  outfit = 'assistant';
   /** Re-apply the chosen season everywhere (set up in the constructor). */
   applySeason: () => void = () => {};
   private stepDist = 0;
@@ -91,6 +97,8 @@ export class Game {
   overhead: { x: number; z: number; span: number } | null = null;
   readonly carts: { cart: Vehicle; id: string }[] = [];   // all drivable vehicles (carts, cars, bikes)
   npcs!: NpcCrowd;
+  /** Optional errands from characters around campus (src/sidequests/). */
+  sideQuests!: SideQuests;
   /** Enterable doors (shown on the minimap / map). */
   readonly entrances: { id: string; x: number; z: number; eras: EraId[] | null; label: string }[] = [];
   private coins: { id: string; mesh: THREE.Object3D; x: number; z: number }[] = [];
@@ -122,6 +130,7 @@ export class Game {
     if (WebBluetoothController.supported()) for (let i = 0; i < 2; i++) this.ble.push(new WebBluetoothController(i, this.input));
     this.exteriorSpace = {
       id: 'exterior', interior: false,
+      solid: (x, z, r) => this.world.blockedByBuildings(x, z, r),
       blocked: (x, z, r) => this.world.blocked(x, z, r) || (!this.player.noclip && (!!this.npcs?.hit(x, z, r) || !!this.traffic?.hit(x, z, r))),
       groundY: (x, z) => this.world.groundY(x, z),
       occluderTop: (x, z) => this.world.grid.topAt(x, z),
@@ -186,9 +195,8 @@ export class Game {
       const A = ATMOSPHERE[era]; this.renderer.setAtmosphere(A);
       this.npcs?.setEra(era, SETTINGS.season);
       this.traffic?.setEra(era, SETTINGS.season);
-      // the player dresses for the weather too (coat + scarf in winter)
-      const base = this.player.avatar.look, winter = SETTINGS.season === 'winter';
-      if (!!base.coat !== winter) this.player.avatar.rebuild({ ...base, coat: winter ? '#2b3a4f' : undefined, scarf: winter ? '#8d3b2f' : undefined });
+      // the player wears the chosen outfit, dressed for the weather (coat + scarf in winter)
+      this.applyOutfit();
     };
     this.world.onEraChanged.push(atmos); atmos(this.world.era); this.applySeason = () => { this.world.applyAtmosphere(this.world.era); atmos(this.world.era); };
     this.world.gateBuilt = id => this.gateBuilt(id);
@@ -196,14 +204,16 @@ export class Game {
     this.player.place(this.exteriorSpace, sp.x, sp.z, this.location('spawn').yaw ?? 0);
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     this.setupCoreInteractables();
+    this.setupHome();
     this.setupBuildingDoors();
     this.setupVehicles();
     this.setupBenches();
-    this.npcs = new NpcCrowd(this.renderer.scene, GAME_CONFIG.npcs.count, () => this.world.activeDoors());
+    this.npcs = new NpcCrowd(this.renderer.scene, GAME_CONFIG.npcs.count, () => this.world.activeDoors(), () => this.world.benches);
     this.npcs.setEra(this.world.era, SETTINGS.season);
     this.traffic = new Traffic(this.renderer.scene, () => this.world.activeDoors());
     this.traffic.setEra(this.world.era, SETTINGS.season);
     this.balls = new BallGames(this.renderer.scene);
+    this.setupSideQuests();
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -367,9 +377,9 @@ export class Game {
   private standUp() {
     const p = this.player.position, y = this.player.yaw;
     this.player.seated = false; this.player.avatar.sit(false);
-    this.player.place(this.exteriorSpace, p.x + Math.sin(y) * 1.1, p.z + Math.cos(y) * 1.1, y); this.unstick();
+    this.player.place(this.space, p.x + Math.sin(y) * 1.1, p.z + Math.cos(y) * 1.1, y); if (this.spaceId === 'exterior') this.unstick();
   }
-  private vehicleLabel(v: Vehicle) { return v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'scooter' ? 'Ride the electric scooter' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
+  private vehicleLabel(v: Vehicle) { return v.kind === 'heli' ? 'Fly the helicopter' : v.kind === 'plane' ? 'Fly the plane' : v.kind === 'bike' ? 'Ride the bicycle' : v.kind === 'scooter' ? 'Ride the electric scooter' : v.kind === 'car' ? 'Drive the car' : 'Drive the golf cart'; }
   private addVehicleInteract(v: Vehicle) {
     this.interactions.add({
       id: `core:${v.id}`, kind: 'generic', at: { x: v.root.position.x, z: v.root.position.z }, radius: v.kind === 'car' ? 3.4 : 2.6,
@@ -378,20 +388,33 @@ export class Game {
     });
   }
   private enterCart(cart: Vehicle, id: string) {
+    if (this.player.handstand) this.player.setHandstand(false);
     this.player.vehicle = cart; this.player.yaw = cart.root.rotation.y;
     this.player.position.copy(cart.root.position);
     if (cart.pose === 'sit') this.player.avatar.sit(true);
     this.interactions.remove(`core:${id}`);
-    this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = cart.kind === 'car' ? 15 : 12;
+    this.cameraRig.reset(this.player.yaw); this.cameraRig.distance = isAircraft(cart.kind) ? 22 : cart.kind === 'car' ? 15 : 12;
     playSound(cart.kind === 'bike' ? 'bell' : cart.kind === 'scooter' ? 'tick' : 'carDoor'); if (cart.kind === 'car' || cart.kind === 'cart') setTimeout(() => playSound('engineStart'), 250);
+    if (cart.kind === 'heli') { this.ui.toast('Helicopter: hold Space / B to climb · F / L to descend · stick or WASD to fly · Shift / ZR faster · E / A: land, then get out', 7000); return; }
+    if (cart.kind === 'plane') { this.ui.toast('Plane: W / stick up = throttle · A/D turn · hold Space / B to climb (from 16 m/s) · F / L to dive · S to slow down · E / A: auto-land, then get out', 8000); return; }
     this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : cart.kind === 'scooter' ? 'W/S go/brake · A/D steer · E to step off' : 'W/S drive · A/D steer · E to get out');
   }
-  exitCart() {
+  exitCart(force = false) {
     const cart = this.player.vehicle; if (!cart) return;
-    this.player.vehicle = null; cart.speed = 0; this.player.avatar.sit(false); this.player.avatar.root.visible = true;
+    if (isAircraft(cart.kind) && !force) {
+      const p = this.player.position, high = this.player.altitude() > 0.05 || p.y - this.world.groundY(p.x, p.z) > 0.6;
+      if (high) {
+        this.player.autoLand = !this.player.autoLand;
+        this.ui.toast(this.player.autoLand ? `Landing… press E / A again once you’re on the ground.${cart.kind === 'plane' ? ' Then slow down with S.' : ''}` : 'Auto-landing cancelled.');
+        playSound('tick'); return;
+      }
+      if (Math.abs(cart.speed) > 4) { this.ui.toast('Slow down first (S / stick down).'); playSound('error'); return; }
+    }
+    this.player.vehicle = null; this.player.autoLand = false; cart.speed = 0; this.player.avatar.sit(false); this.player.avatar.root.visible = true;
+    if (isAircraft(cart.kind)) { cart.root.position.y = this.world.groundY(cart.root.position.x, cart.root.position.z); cart.fly(1, 0, 0, 0); cart.body.rotation.set(0, 0, 0); this.cameraRig.distance = GAME_CONFIG.camera.distance; }
     if (cart.kind === 'car' || cart.kind === 'cart') playSound('carDoor');
     // step out to the side
-    const side = cart.kind === 'car' ? 2.4 : 1.8;
+    const side = cart.kind === 'car' ? 2.4 : cart.kind === 'plane' ? 2.2 : cart.kind === 'heli' ? 2.0 : 1.8;
     const sx = Math.cos(this.player.yaw) * side, sz = -Math.sin(this.player.yaw) * side;
     const p = this.player.position, dir = !this.exteriorSpace.blocked(p.x - sx, p.z - sz, 0.45) ? -1 : 1;
     this.player.place(this.exteriorSpace, p.x + sx * dir, p.z + sz * dir, this.player.yaw);
@@ -522,7 +545,7 @@ export class Game {
   }
   private updateMouths(dt: number) {
     const sp = this.ui.currentSpeaker;
-    for (const [name, a] of this.speakers) { a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }
+    for (const [name, a] of this.speakers) { if (this.npcs?.speaking(a)) continue; a.talking = !!sp && sp.includes(name); a.updateMouth(dt); }   // students chatting in bubbles move their own mouths
   }
   /**
    * Face-to-face conversation: both characters turn toward each other and the camera frames
@@ -562,14 +585,131 @@ export class Game {
 
   private npcTalking = false;
   private lineBag = new LineBag();
+  /** Talk to a student: a hello, then a small menu (chat, directions, goodbye). Walking up to two people
+   *  who are chatting lets you join their conversation. */
   private async talkToNpc(w: NpcCrowd['walkers'][number]) {
     if (this.npcTalking) return;
-    this.npcTalking = true; this.busy = true; w.talking = 6;
+    this.npcTalking = true; this.busy = true; w.talking = 999;
     const key = this.world.era === 'presentFinale' ? 'present' : this.world.era;
     const pool = GAME_CONFIG.npcs.lines[key] ?? GAME_CONFIG.npcs.lines.ricks1999;
-    const line = this.lineBag.next(key, pool);
-    w.heard++;
-    try { await this.faceToFace(w.avatar.root, () => this.ui.dialogue([{ speaker: `${w.name} · ${GAME_CONFIG.npcs.title}`, text: line }])); } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; }
+    const who = `${w.name} · ${GAME_CONFIG.npcs.title}`, me = this.playerName || 'friend';
+    const joined = this.npcs.chatInfo(w);
+    if (joined) { this.npcs.endChat(w); joined.partner.talking = 999; }
+    const pick = <T,>(a: T[]) => a[(Math.random() * a.length) | 0];
+    try {
+      await this.faceToFace(w.avatar.root, async () => {
+        const open: Parameters<UI['dialogue']>[0] = [];
+        if (joined) {
+          open.push({ speaker: who, text: pick(JOIN_LINES).replace('{topic}', joined.topic) });
+          open.push({ speaker: `${joined.partner.name} · ${GAME_CONFIG.npcs.title}`, text: w.met ? `Oh, you know ${w.name}? Hi, I’m ${joined.partner.name}!` : `I’m ${joined.partner.name}, by the way. Nice to meet you!` });
+          this.npcs.meet(joined.partner);
+        } else if (!w.met) open.push({ speaker: who, text: `Hi! I’m ${w.name}. ${this.lineBag.next(key, pool)}` });
+        else open.push({ speaker: who, text: `Hey, ${me}! ${this.lineBag.next(key, pool)}` });
+        this.npcs.meet(w); w.heard++;
+        await this.ui.dialogue(open);
+        for (let turn = 0; turn < 8; turn++) {
+          const choice = await this.ui.panel({ title: `Talking with ${w.name}`, buttons: [
+            { id: 'chat', label: '💬 Chat a little more' },
+            { id: 'dir', label: '🧭 Ask for directions' },
+            ...(this.sideQuests.hintFor() ? [{ id: 'hint', label: '❓ Anyone need help around here?' }] : []),
+            { id: 'bye', label: '👋 Goodbye' },
+          ] });
+          if (choice === 'chat') await this.ui.dialogue([{ speaker: who, text: this.lineBag.next(key, pool) }]);
+          else if (choice === 'dir') { if (await this.askDirections(w.name, who)) break; }
+          else if (choice === 'hint') await this.ui.dialogue([{ speaker: who, text: this.sideQuests.hintFor()! }]);
+          else { await this.ui.dialogue([{ speaker: who, text: pick([`See you around, ${me}!`, 'Bye! Have a good one.', 'Catch you later!', 'Good luck with everything!']) }]); break; }
+        }
+      });
+    } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; if (joined) joined.partner.talking = 1.5; }
+  }
+
+  // ---------------- side quests ----------------
+  private setupSideQuests() {
+    const outward: Record<string, number> = { n: Math.PI, s: 0, e: Math.PI / 2, w: -Math.PI / 2 };
+    this.sideQuests = new SideQuests({
+      scene: this.renderer.scene,
+      era: () => this.world.era,
+      difficulty: () => this.difficulty,
+      player: () => ({ x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw, space: this.spaceId, driving: !!this.player.vehicle }),
+      playerName: () => this.playerName,
+      groundY: (x, z) => this.world.groundY(x, z),
+      blocked: (x, z, r) => this.world.blocked(x, z, r),
+      spotBy: (building, side, out = 4.5) => {
+        const poly = registryPoly(building); if (!poly) return null;
+        const xs = poly.map(q => q[0]), zs = poly.map(q => q[1]);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+        const ns = side === 'n' || side === 's', len = ns ? x1 - x0 : z1 - z0;
+        // walk outwards from the wall's midpoint, sliding along it, until a free spot clear of doors and roads
+        for (let o = out; o < out + 14; o += 1.5) for (const t of [0, 0.15, -0.15, 0.3, -0.3, 0.42, -0.42]) {
+          const x = ns ? cx + t * len : side === 'e' ? x1 + o : x0 - o, z = ns ? (side === 's' ? z1 + o : z0 - o) : cz + t * len;
+          if (pointInPoly(x, z, poly) || this.world.blocked(x, z, 0.9) || this.world.nearDoor(x, z, 3.5) || onVehicleRoad(x, z)) continue;
+          return { x, z, yaw: outward[side] };
+        }
+        return null;
+      },
+      court: () => { const b = this.balls?.balls.find(q => q.kind === 'basketball'); return b ? { x: b.home.x, z: b.home.z } : null; },
+      addInteractable: d => this.interactions.add({ id: d.id, kind: d.npc ? 'npc' : 'generic', at: d.at, radius: d.radius, prompt: d.prompt, visual: d.visual, objective: d.objective, enabled: d.enabled, onInteract: d.onInteract }),
+      removeInteractable: id => this.interactions.remove(id),
+      talk: (npc, lines) => this.faceToFace(npc, () => this.ui.dialogue(lines)),
+      choose: (title, body, buttons) => this.ui.panel({ title, body, buttons }),
+      toast: (t, ms) => this.ui.toast(t, ms),
+      sound: n => playSound(n),
+      holdItem: c => this.player.avatar.holdItem(c, 0.32),
+      registerSpeaker: (n, a) => this.registerSpeaker(n, a),
+      save: () => this.save(),
+    });
+    this.sideQuests.setup();
+    this.world.onEraChanged.push(() => this.sideQuests.setEra());
+  }
+  /** Pause menu: the side-quest journal. */
+  showSideJournal() {
+    const rows = this.sideQuests.journal(), mark = { available: '❗', active: '▶', ready: '❓', done: '✓' } as const;
+    const html = `<table class="side-journal">${rows.map(r => `<tr class="${r.status}"><td>${mark[r.status]}</td><td><b>${esc(r.title)}</b><br><span>${esc(r.text)}</span></td></tr>`).join('')}</table>`;
+    const s = this.ui.menu(`Side quests (${this.sideQuests.doneCount()}/${rows.length} done)`, [{ label: 'Back', action: () => this.ui.pop(s) }],
+      { subtitle: 'Look for people with a yellow “!” over their heads. Students can point you to them, too.', html, onBack: () => this.ui.pop(s) });
+  }
+
+  // ---------------- directions (ask a student; a waypoint leads you there) ----------------
+  guide: { x: number; z: number; label: string; building?: string } | null = null;
+  /** Places a student can point you to, standing in the current era (closest entrance of each). */
+  private destinations(): { label: string; x: number; z: number; building?: string }[] {
+    const inst = ERAS[this.world.era].institution, p = this.player.position;
+    const out: { label: string; x: number; z: number; building?: string }[] = [];
+    const want = ['mckay', 'manwaring', 'hart', 'kimball', 'snow', 'taylor', 'romney', 'smith', 'austin', 'clarke', 'benson', 'hinckley', 'icenter', 'temple', 'stc', 'ricks-building'];
+    for (const id of want) {
+      const b = BUILDINGS.find(x => x.id === id); if (!b || !this.world.buildingStanding(id)) continue;
+      const name = (inst === 'byui' ? b.names.byui ?? b.names.ricks : b.names.ricks ?? b.names.byui); if (!name) continue;
+      const doors = this.world.buildingDoors().filter(d => d.id === id);
+      const poly = registryPoly(id); if (!poly && !doors.length) continue;
+      const at = doors.length ? doors.reduce((a, d) => (Math.hypot(d.x - p.x, d.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? d : a))
+        : { x: poly!.reduce((s2, q) => s2 + q[0], 0) / poly!.length, z: poly!.reduce((s2, q) => s2 + q[1], 0) / poly!.length };
+      out.push({ label: name, x: at.x, z: at.z, building: id });
+    }
+    const home = this.world.doorPlacement(this.location('door.home'));
+    out.push({ label: 'My apartment', x: home.x, z: home.z });
+    return out;
+  }
+  private compass(dx: number, dz: number) {
+    const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+    return names[((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8];
+  }
+  /** Returns true when a destination was chosen (ends the conversation). */
+  private async askDirections(name: string, who: string): Promise<boolean> {
+    const list = this.destinations();
+    const id = await this.ui.panel({ title: `Where do you want to go?`, body: `${name} knows campus well.`, buttons: [...list.map((d, i) => ({ id: String(i), label: d.label })), { id: 'back', label: 'Never mind' }] });
+    const d = id && id !== 'back' ? list[Number(id)] : null; if (!d) return false;
+    const p = this.player.position, dist = Math.hypot(d.x - p.x, d.z - p.z);
+    const nm = d.label === 'My apartment' ? 'Your apartment' : `The ${d.label}`;
+    const text = dist < 15 ? `${nm}? It’s right here!` : `${nm}? Head ${this.compass(d.x - p.x, d.z - p.z)}, about ${Math.round(dist / 10) * 10} metres. I’ll point you — follow the marker!`;
+    await this.ui.dialogue([{ speaker: who, text }]);
+    if (dist >= 15) { this.guide = d; playSound('chime'); }
+    return true;
+  }
+  private updateGuide() {
+    const g = this.guide; if (!g) return;
+    const p = this.player.position;
+    if (this.spaceId === 'exterior' && Math.hypot(g.x - p.x, g.z - p.z) < 9) { this.guide = null; this.ui.toast(`You made it: ${g.label}!`, 2500); playSound('success'); }
+    else if (this.spaceId !== 'exterior' && g.building && this.spaceId === `bldg-${g.building}`) this.guide = null;
   }
 
   async talkToQuestGiver() {
@@ -640,7 +780,7 @@ export class Game {
   }
 
   async timeTransition(era: EraId, subtitle?: string) {
-    if (this.player.vehicle) this.exitCart();
+    if (this.player.vehicle) this.exitCart(true);
     await this.ui.card(ERAS[era].cardTitle, subtitle ?? ERAS[era].label, 2600);
     this.setEra(era);
   }
@@ -661,7 +801,7 @@ export class Game {
 
   // ---------------- interiors ----------------
   async enterInterior(id: string) {
-    if (this.player.vehicle) this.exitCart();
+    if (this.player.vehicle) this.exitCart(true);
     playSound('door');
     await this.ui.fade(() => {
       this.spaceId = id; this.world.exterior.visible = false; this.interiors.show(id, this.world.era);
@@ -714,7 +854,8 @@ export class Game {
       quests: this.quests.state.quests, targets: this.quests.state.targets, rewards: this.quests.state.rewards,
       player: { space: this.spaceId, x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw },
       coins: [...this.collectedCoins],
-      introSeen: this.introSeen, finaleReached: this.finaleReached, playerName: this.playerName,
+      introSeen: this.introSeen, finaleReached: this.finaleReached, playerName: this.playerName, outfit: this.outfit,
+      sideQuests: this.sideQuests.snapshot(),
     };
   }
   save() { if (!this.finale.previewing && (this.mode === 'playing' || this.mode === 'finale')) writeSave(this.snapshot()); }
@@ -722,8 +863,10 @@ export class Game {
   newGame(difficulty: DifficultyId) {
     this.finale.stop(); this.mode = 'title';
     this.difficulty = difficulty; this.colorStage = 0; this.introSeen = false; this.finaleReached = false;
-    this.collectedCoins.clear(); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
+    this.outfit = 'assistant'; this.applyOutfit(); this.clearPowers();
+    this.collectedCoins.clear(); if (this.player.vehicle) this.exitCart(true); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init(freshQuestState());
+    this.sideQuests.load(undefined); this.guide = null;
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(GAME_CONFIG.story.startEra);
@@ -734,13 +877,15 @@ export class Game {
     this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
     void this.ui.askName(this.playerName || 'Alex', SETTINGS.season).then(({ name, season }) => { this.setPlayerName(name); if (season !== SETTINGS.season) { SETTINGS.season = season; saveSettings(); this.applySeason(); } this.beginPlay(true); });
   }
-  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; this.voice.playerName = n; }
+  setPlayerName(n: string) { this.playerName = n; this.ui.playerName = n; this.voice.playerName = n; if (this.npcs) this.npcs.playerName = n; }
   continueGame(d: SaveData) {
     this.finale.stop();
     this.difficulty = d.difficulty; this.colorStage = d.colorStage; this.introSeen = d.introSeen; this.finaleReached = d.finaleReached;
     this.setPlayerName(d.playerName ?? 'Alex');
-    this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(); this.player.seated = false; this.player.avatar.sit(false);
+    this.outfit = outfitById(d.outfit).id; this.applyOutfit(); this.clearPowers();
+    this.collectedCoins = new Set(d.coins ?? []); if (this.player.vehicle) this.exitCart(true); this.player.seated = false; this.player.avatar.sit(false);
     this.quests.init({ quests: d.quests, targets: d.targets ?? {}, rewards: d.rewards ?? {} });
+    this.sideQuests.load(d.sideQuests); this.guide = null;
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(d.era);
@@ -852,6 +997,9 @@ export class Game {
     const rows = [
       ['Move', 'W A S D / arrows', 'Left stick', 'Left stick'], ['Sprint', 'Hold Shift', 'Left stick click (toggle)', 'Hold ZR / R'], ['Jump', 'Space', 'Button 2', 'B'],
       ['Golf cart', 'E to get in/out · W/S drive · A/D steer', 'Button 1 · left stick', 'A · left stick'],
+      ['Helicopter', 'WASD fly · hold Space climb · hold F descend · E land / get out', 'Left stick · hold Button 2 climb · Button 1 land', 'Left stick · hold B climb · hold L/ZL descend · A land'],
+      ['Plane', 'W throttle · S slow · A/D turn · hold Space climb · F dive · E land / get out', 'Left stick · hold Button 2 climb · Button 1 land', 'Left stick · hold B climb · hold L/ZL dive · A land'],
+      ['Superpowers', 'Pause → Superpowers (or type a code)', 'Pause → Superpowers', '+ → Superpowers'],
       ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick'],
       ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
       ['Map / objective', 'M', 'Button 3', 'X'], ['Journal (Quest 3 cards)', 'J', 'Pause menu', 'Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
@@ -888,8 +1036,12 @@ export class Game {
         this.difficulty = other; this.save(); this.ui.toast(`Difficulty set to ${other === 'easy' ? 'Easy' : 'Hard'} — applies to your next challenge attempt.`); close(); this.showPause();
       } },
       ...(this.player.jetpack ? [{ label: 'Take off the jetpack', action: () => { this.player.jetpack = false; this.player.avatar.setJetpack(false); this.ui.toast('Jetpack off.'); close(); } }] : []),
+      ...(this.player.handstand ? [{ label: 'Back on your feet', action: () => { this.player.setHandstand(false); close(); } }] : []),
+      ...(this.player.superSpeed || this.player.superJump ? [{ label: 'Turn off superpowers', action: () => { this.player.superSpeed = this.player.superJump = false; this.ui.toast('Superpowers off.'); close(); } }] : []),
+      { label: `📋 Side quests (${this.sideQuests.doneCount()}/${this.sideQuests.journal().length} done)`, action: () => this.showSideJournal() },
+      { label: `👕 Change outfit (${outfitById(this.outfit).name})`, action: () => this.showWardrobe() },
+      { label: '⚡ Superpowers & cheat codes', action: () => this.showCheats() },
       { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
-      { label: '⌨ Cheat codes', action: () => this.showCheats() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
       { label: 'Controls', action: () => this.showControls() },
       ...(this.devMode ? [{ label: 'Skip current quest (dev — no reward)', disabled: this.quests.allComplete(), action: () => this.confirmSkip() }] : []),
@@ -908,24 +1060,151 @@ export class Game {
       { label: 'Cancel', action: () => this.ui.pop(s) },
     ], { subtitle: 'Developer skip: the story advances, but no coins are awarded.', onBack: () => this.ui.pop(s) });
   }
-  /** Cheat codes. "jetpack" toggles a jetpack: hold jump to fly. */
+  // ---------------- superpowers (cheat codes) ----------------
+  /** Every superpower: typed code(s), a menu toggle (so controllers can use them too) and what it does. */
+  private powers(): { codes: string[]; label: () => string; run: () => string | null }[] {
+    const P = this.player;
+    return [
+      { codes: ['flash', 'superspeed', 'speed'], label: () => `⚡ Super speed: ${P.superSpeed ? 'ON' : 'off'}`,
+        run: () => { P.superSpeed = !P.superSpeed; return P.superSpeed ? 'Super speed on! Everything is three times faster.' : 'Super speed off.'; } },
+      { codes: ['moonjump', 'superjump', 'kangaroo'], label: () => `🦘 Super jump: ${P.superJump ? 'ON' : 'off'}`,
+        run: () => { P.superJump = !P.superJump; return P.superJump ? 'Super jump on! Jump onto the roofs (outdoors).' : 'Super jump off.'; } },
+      { codes: ['jetpack'], label: () => `🚀 Jetpack: ${P.jetpack ? 'ON' : 'off'}`,
+        run: () => { P.jetpack = !P.jetpack; P.avatar.setJetpack(P.jetpack); return P.jetpack ? 'Jetpack on! Hold Space / B to fly; let go to glide down.' : 'Jetpack off.'; } },
+      { codes: ['handstand', 'hands', 'parado de manos'], label: () => `🤸 Walk on your hands: ${P.handstand ? 'ON' : 'off'}`,
+        run: () => { if (P.vehicle) return 'Get out of the vehicle first.'; P.setHandstand(!P.handstand); return P.handstand ? 'Handstand! Walk around on your hands (no jumping).' : 'Back on your feet.'; } },
+      { codes: ['helicopter', 'heli', 'chopper'], label: () => '🚁 Call a helicopter', run: () => this.spawnAircraft('heli') },
+      { codes: ['plane', 'airplane', 'avion', 'avión'], label: () => '✈️ Call a small plane', run: () => this.spawnAircraft('plane') },
+    ];
+  }
+  private clearPowers() {
+    const P = this.player; P.superSpeed = P.superJump = false; P.jetpack = false; P.avatar.setJetpack(false);
+    if (P.handstand) P.setHandstand(false);
+    P.lying = null; P.emote = null; P.avatar.lie(false); P.avatar.holdItem(null);
+  }
+  /** Superpowers menu: a toggle for each power, plus a box to type cheat codes. */
   showCheats() {
-    void this.ui.custom('Cheat codes', (root, panel) => {
-      root.innerHTML = `<input class="name-input cheat-input" data-focus maxlength="24" autocomplete="off" spellcheck="false" placeholder="Type a code"><p class="sub cheat-msg">Try a code, then press Enter.</p>`;
-      const input = root.querySelector('.cheat-input') as HTMLInputElement, msg = root.querySelector('.cheat-msg') as HTMLElement;
+    void this.ui.custom('Superpowers & cheat codes', (root, panel) => {
+      root.innerHTML = `<p class="sub">Pick a power, or type a secret code and press Enter.</p><div class="items power-list"></div>
+        <input class="name-input cheat-input" data-focus maxlength="24" autocomplete="off" spellcheck="false" placeholder="Type a code"><p class="sub cheat-msg"></p>`;
+      const list = root.querySelector('.power-list') as HTMLElement, input = root.querySelector('.cheat-input') as HTMLInputElement, msg = root.querySelector('.cheat-msg') as HTMLElement;
+      const apply = (p: ReturnType<typeof this.powers>[number]) => {
+        const out = p.run(); msg.textContent = out ?? '';
+        playSound(out && !/first|outside/i.test(out) ? 'success' : 'error');
+        paint();
+        if (p.codes[0] === 'helicopter' || p.codes[0] === 'plane') { if (this.player.vehicle && isAircraft(this.player.vehicle.kind)) setTimeout(() => panel.close(null), 700); }
+      };
+      const paint = () => list.querySelectorAll<HTMLButtonElement>('button').forEach((b, i) => { b.textContent = this.powers()[i].label(); });
+      for (const p of this.powers()) {
+        const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-focus', ''); b.textContent = p.label();
+        b.addEventListener('click', () => apply(p)); list.append(b);
+      }
       const back = document.createElement('button'); back.type = 'button'; back.setAttribute('data-focus', ''); back.textContent = 'Back'; back.addEventListener('click', () => panel.close(null)); root.append(back);
       const run = () => {
-        const code = input.value.trim().toLowerCase();
-        if (code === 'jetpack') {
-          this.player.jetpack = !this.player.jetpack; this.player.avatar.setJetpack(this.player.jetpack);
-          msg.textContent = this.player.jetpack ? 'Jetpack on! Hold Space (or jump) to fly; let go to glide down.' : 'Jetpack off.';
-          playSound('success'); setTimeout(() => panel.close(null), 900);
-        } else { msg.textContent = code ? 'Nothing happened…' : 'Type a code first.'; playSound('error'); }
-        input.value = '';
+        const code = input.value.trim().toLowerCase(); input.value = '';
+        const p = this.powers().find(x => x.codes.includes(code));
+        if (p) apply(p); else { msg.textContent = code ? 'Nothing happened…' : 'Type a code first.'; playSound('error'); }
       };
       input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') run(); else if (e.key === 'Escape') panel.close(null); });
-      setTimeout(() => input.focus(), 50);
-    });
+    }, { className: 'cheats-screen' });
+  }
+  /** Bring the helicopter / plane next to you (one of each; it stays where you land it) and climb in. */
+  private spawnAircraft(kind: 'heli' | 'plane'): string | null {
+    if (this.spaceId !== 'exterior') return 'Go outside first — it won’t fit in here!';
+    if (this.player.vehicle) { if (isAircraft(this.player.vehicle.kind)) return 'You’re already flying!'; this.exitCart(true); }
+    if (this.player.handstand) this.player.setHandstand(false);
+    this.standUpIfSeated();
+    const id = `aircraft-${kind}`;
+    let entry = this.carts.find(c => c.id === id);
+    if (!entry) { const v = new Vehicle(id, kind); this.renderer.scene.add(v.root); entry = { cart: v, id }; this.carts.push(entry); }
+    else this.interactions.remove(`core:${id}`);
+    const p = this.player.position, [x, z] = nudgeFree(p.x + Math.sin(this.player.yaw) * 6, p.z + Math.cos(this.player.yaw) * 6, kind === 'plane' ? 6 : 4);
+    entry.cart.root.position.set(x, this.world.groundY(x, z), z); entry.cart.root.rotation.y = this.player.yaw; entry.cart.speed = 0;
+    this.enterCart(entry.cart, id);
+    return kind === 'heli' ? 'Helicopter ready — you’re in the pilot seat!' : 'Plane ready — throttle up with W to take off!';
+  }
+  private standUpIfSeated() { if (this.player.seated) { this.player.seated = false; this.player.avatar.sit(false); } }
+
+  // ---------------- outfits ----------------
+  private applyOutfit() {
+    const P = this.player; P.avatar.rebuild(outfitLook(this.outfit, SETTINGS.season === 'winter'));
+    if (P.jetpack) P.avatar.setJetpack(true);
+  }
+  /** Wardrobe: pick an outfit (shown on the character right away). */
+  showWardrobe() {
+    const s = this.ui.menu('Wardrobe', [
+      ...OUTFITS.map(o => ({ label: `${o.id === this.outfit ? '✓ ' : ''}${o.name} — ${o.note}`, action: () => {
+        this.outfit = o.id; this.applyOutfit(); this.save(); playSound('pop'); this.ui.toast(`Changed into: ${o.name}.`); this.ui.pop(s);
+      } })),
+      { label: 'Back', action: () => this.ui.pop(s) },
+    ], { subtitle: 'Choose what to wear. (In winter a coat goes on top when you’re outside.)', onBack: () => this.ui.pop(s) });
+  }
+
+  // ---------------- the apartment ----------------
+  private setupHome() {
+    const at = (p: { x: number; z: number }) => ({ x: p.x, z: p.z, space: HOME_ID });
+    const free = () => !this.busy && !this.player.seated && !this.player.lying;
+    this.interactions.add({ id: 'home:bed', kind: 'generic', at: at(HOME_SPOTS.bed), radius: 1.7, enabled: free, prompt: HOME_SPOTS.bed.label, onInteract: () => { void this.sleep(); } });
+    this.interactions.add({ id: 'home:fridge', kind: 'generic', at: at(HOME_SPOTS.fridge), radius: 1.6, enabled: free, prompt: HOME_SPOTS.fridge.label, onInteract: () => this.showFridge() });
+    this.interactions.add({ id: 'home:wardrobe', kind: 'generic', at: at(HOME_SPOTS.wardrobe), radius: 1.6, enabled: free, prompt: HOME_SPOTS.wardrobe.label, onInteract: () => this.showWardrobe() });
+    this.interactions.add({ id: 'home:tv', kind: 'generic', at: at(HOME_SPOTS.tv), radius: 1.6, enabled: free, prompt: HOME_SPOTS.tv.label, onInteract: () => { void this.watchTv(); } });
+  }
+  private wait(ms: number) { return new Promise<void>(r => setTimeout(r, ms)); }
+  /** Lie down, fade to black, wake up rested (and the game is saved). */
+  private async sleep() {
+    if (this.busy) return; this.busy = true;
+    const P = this.player, L = HOME_SPOTS.bedLie, w = this.interiors.toWorld(HOME_ID, L.x, L.z);
+    try {
+      if (P.handstand) P.setHandstand(false);
+      P.lying = { x: w.x, y: 0, z: w.z, yaw: L.yaw }; P.avatar.lie(true, L.y); playSound('sit');
+      this.ui.toast(`Good night, ${this.playerName || 'friend'}…`, 2500);
+      await this.wait(1600);
+      await this.ui.blackout('Z z z …', 2600);
+      P.lying = null; P.avatar.lie(false);
+      const b = this.interiors.toWorld(HOME_ID, HOME_SPOTS.bed.x, HOME_SPOTS.bed.z);
+      P.place(this.space, b.x, b.z, -Math.PI / 2);
+      playSound('chime'); this.ui.toast('Good morning! You feel well rested. (Game saved.)', 4000);
+      this.save();
+    } finally { P.lying = null; this.busy = false; }
+  }
+  private readonly FOODS = [
+    { name: 'Funeral potatoes', color: '#e8c25a', line: 'Cheesy, crunchy, perfect. A Rexburg classic.' },
+    { name: 'A baked Idaho potato', color: '#9a6b3e', line: 'It’s Idaho. Of course there were potatoes in the fridge.' },
+    { name: 'Cereal with milk', color: '#f4f1e8', line: 'Crunchy. Cereal is a perfectly good dinner.' },
+    { name: 'PB&J sandwich', color: '#c98b4a', line: 'Peanut butter and jelly — the student’s best friend.' },
+    { name: 'Chocolate chip cookies', color: '#7a4a28', line: 'Fresh from a neighbour’s plate. Very kind of them.' },
+    { name: 'Chocolate milk', color: '#6b4a30', line: 'Ice cold. Tastes like the creamery down the road.' },
+  ];
+  /** The fridge: pick something and eat it (not needed — just nice). */
+  private showFridge() {
+    const s = this.ui.menu('What do you want to eat?', [
+      ...this.FOODS.map(f => ({ label: f.name, action: () => { this.ui.pop(s); void this.eat(f); } })),
+      { label: 'Close the fridge', action: () => this.ui.pop(s) },
+    ], { subtitle: 'You don’t need to eat in this game… but it’s nice.', onBack: () => this.ui.pop(s) });
+  }
+  private async eat(f: { name: string; color: string; line: string }) {
+    if (this.busy) return; this.busy = true;
+    const P = this.player; let t = 0;
+    try {
+      P.avatar.holdItem(f.color);
+      P.emote = dt => { t += dt; P.avatar.eatPose(t, t / 3); if (Math.floor(t * 3.2 / (Math.PI * 2) + 0.5) !== Math.floor((t - dt) * 3.2 / (Math.PI * 2) + 0.5)) playSound('pop'); };
+      await this.wait(3000);
+      this.ui.toast(`Mmm… ${f.name.toLowerCase()}. ${f.line}`, 4500);
+    } finally { P.emote = null; P.avatar.holdItem(null); this.busy = false; }
+  }
+  /** Sit on the sofa and catch the local news (it follows the era). Move to stand up. */
+  private async watchTv() {
+    const P = this.player, S = HOME_SPOTS.sofaSeat, w = this.interiors.toWorld(HOME_ID, S.x, S.z);
+    if (P.handstand) P.setHandstand(false);
+    P.place(this.space, w.x, w.z, S.yaw); P.seated = true; P.avatar.sit(true); P.avatar.root.rotation.y = S.yaw; playSound('sit');
+    const news: Record<string, string[]> = {
+      ricks: ['…and up at Ricks College, the new Kimball Building has been dedicated. Students say the view of the quad is wonderful.', 'Weather: a cold front is on the way. Rexburg, find your real coats.'],
+      ricksTransition: ['…big news from Rexburg: Ricks College is going to become a four-year university, BYU–Idaho.', 'Sports: this is the last season for Viking athletics. Fans are filling the stands.'],
+      byui: ['…BYU–Idaho keeps growing. The new Center can seat thousands of people at once.', 'The Rexburg Idaho Temple looks beautiful tonight on the hill above campus.'],
+    };
+    const lines = news[ERAS[this.world.era].institution] ?? news.byui;
+    await this.ui.dialogue(lines.map(text => ({ speaker: 'TV · Channel 8 News', text })));
+    this.ui.toast('Move (or press E) to get up from the sofa.', 3000);
   }
 
   /** Settings: sound (volumes, mute, voices), brightness, season, graphics, reduced motion. Up/down to move, left/right to change. */
@@ -1097,7 +1376,7 @@ export class Game {
     this.music.update(dt, !cinematic, !!this.ui.currentSpeaker);   // ducked under dialogue
     this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.spaceId });
     const veh = this.player.vehicle;
-    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
+    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', isAircraft(veh?.kind ?? 'car') ? Math.max(14, veh!.speed) : veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
     this.updateTraffic(dt);
     if (this.spaceId !== 'exterior') this.interiors.update(dt);
@@ -1105,7 +1384,7 @@ export class Game {
       const out = this.spaceId === 'exterior';
       this.balls.setVisible(out);
       if (out && !this.pauseOpen) for (const e of this.balls.update(dt, { p: this.player.position, yaw: this.player.yaw, speed: this.player.speed, active: this.mode === 'playing' && !this.player.vehicle && !this.cutscenes.active })) {
-        if (e.type === 'score' || e.type === 'goal') { this.ui.toast(e.text!, 1800); playSound(e.type === 'goal' ? 'cheer' : 'success'); }
+        if (e.type === 'score' || e.type === 'goal') { this.ui.toast(e.text!, 1800); playSound(e.type === 'goal' ? 'cheer' : 'success'); this.sideQuests.onBallEvent(e.type); }
         else if (e.type === 'bounce') playSound('bounce');
       }
     }
@@ -1134,12 +1413,12 @@ export class Game {
       c.lookAt(center.x, 20, center.z);
       this.world.updateSun(center);
     } else if (this.mode === 'cutscene') {
-      this.markers.forEach(m => m.visible = false);
+      this.markers.forEach(m => m.visible = false); this.sideQuests.hideBubbles();
       this.opening.update(elapsed, a);
     } else if (this.mode === 'finale') {
       this.finale.update(elapsed, a);
       this.markers.forEach(m => m.visible = false);
-      this.npcs.setVisible(false);
+      this.npcs.setVisible(false); this.sideQuests.hideBubbles();
       this.interactions.update(this.player.position.x, this.player.position.z, this.spaceId, this.world.era); // refresh marker visibility
     } else if (this.cutscenes.active) {
       // a story scene owns the camera; the world keeps animating, the player waits
@@ -1148,7 +1427,7 @@ export class Game {
       this.cutscenes.update(dt, next, skip);
       this.player.update(dt, a, this.cameraRig.yaw, false);
       if (this.spaceId === 'exterior') { this.npcs.setVisible(true); this.npcs.update(dt, this.player.position, (x, z, r) => this.world.blocked(x, z, r)); }
-      this.quests.update(dt); this.updateMarkers(dt); this.markers.forEach(m => m.visible = false);
+      this.quests.update(dt); this.updateMarkers(dt); this.markers.forEach(m => m.visible = false); this.sideQuests.hideBubbles();
       this.world.updateSun(this.player.position);
       this.ui.showHud(false);
     } else {
@@ -1173,6 +1452,7 @@ export class Game {
       const npc = !focus && !insp && !this.player.vehicle && this.spaceId === 'exterior' ? this.npcs.nearest(this.player.position.x, this.player.position.z, 2.4) : null;
       const nearbySign = canAct ? this.nearbyBuildingSign() : null;
       this.updateCoins(dt); this.updateMarkers(dt);
+      this.sideQuests.update(dt, !uiBlocking && !this.pauseOpen && !this.controllerLost && !this.buildingInfoOpen); this.updateGuide();
       this.watchControllers();
       if (canAct) {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
@@ -1187,17 +1467,19 @@ export class Game {
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;
-      const coinTotal = this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin;
+      const coinTotal = this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin + this.sideQuests.coins();
+      const guidePt = this.guide ? this.targetPoint({ x: this.guide.x, z: this.guide.z }) : null;
+      const sideLine = [this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
       this.ui.updateHud({
         objective: obj.text, era: ERAS[this.world.era].label,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
-        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (isAircraft(this.player.vehicle.kind) && this.player.altitude() > 0.05 ? (this.player.autoLand ? 'Landing… (press again to cancel)' : 'Land here') : this.player.vehicle.kind === 'heli' ? 'Get out of the helicopter' : this.player.vehicle.kind === 'plane' ? 'Get out of the plane (stop first)' : this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
-        map: this.world.mapCanvas, eraId: this.world.era, target: this.targetPoint(obj.target), interior: interiorLabel,
-        markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[]],
-        targetLabel: this.targetLabel(obj.target),
+        map: this.world.mapCanvas, eraId: this.world.era, target: guidePt ?? this.targetPoint(obj.target), interior: interiorLabel,
+        markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[], ...(guidePt ? [guidePt] : [])], side: sideLine,
+        targetLabel: this.guide ? this.guide.label : this.targetLabel(obj.target),   // asked for directions: the pointer leads there until you arrive
         doors: this.spaceId === 'exterior' ? this.entrances.filter(e => !e.eras || e.eras.includes(this.world.era)) : [],
-        coins: `● ${coinTotal} coins`, driving: !!this.player.vehicle,
+        coins: `● ${coinTotal} coins`, driving: this.player.vehicle?.kind ?? false,
       });
       this.autosaveT += dt; if (this.autosaveT > 20) { this.autosaveT = 0; this.save(); }
     }

@@ -39,7 +39,10 @@ export interface HudData {
   doors: { x: number; z: number; label: string }[]; // enterable entrances
   targetLabel: string | null;            // where the pointer leads ("Romney Building")
   coins: string;
-  driving: boolean;
+  /** Side quest in progress / directions being followed (shown under the objective; may hold two lines). */
+  side?: string | null;
+  /** Kind of vehicle being driven / flown (false = on foot). */
+  driving: false | string;
 }
 
 export class UI {
@@ -60,7 +63,7 @@ export class UI {
     this.root = root;
     root.innerHTML = `
       <div class="hud hidden">
-        <div class="hud-top"><div class="hud-era"></div><div class="hud-objective"></div></div>
+        <div class="hud-top"><div class="hud-era"></div><div class="hud-objective"></div><div class="hud-side"></div></div>
         <div class="hud-pointer hidden"><span class="hud-arrow">▲</span><span class="hud-ptext"></span></div>
         <div class="hud-mini"><canvas width="180" height="180"></canvas><div class="hud-dist"></div>
           <div class="hud-c n">N</div><div class="hud-c e">E</div><div class="hud-c s">S</div><div class="hud-c w">W</div></div>
@@ -332,6 +335,13 @@ export class UI {
     this.toastEl.appendChild(t); setTimeout(() => t.classList.add('out'), ms); setTimeout(() => t.remove(), ms + 600);
   }
 
+  /** Fade to black, show a line of text for a while (sleeping), then fade back in. */
+  async blackout(text: string, ms: number) {
+    await this.fade(async () => {
+      const el = document.createElement('div'); el.className = 'blackout-text'; el.textContent = text; this.root.append(el);
+      await new Promise(r => setTimeout(r, ms)); el.remove();
+    });
+  }
   async fade(fn: () => void | Promise<void>) {
     const f = this.root.querySelector('.fade') as HTMLElement;
     f.classList.add('on'); await new Promise(r => setTimeout(r, 350));
@@ -342,6 +352,7 @@ export class UI {
   updateHud(d: HudData) {
     this.lastHud = d;
     this.objectiveEl.textContent = d.objective;
+    const side = this.root.querySelector('.hud-side') as HTMLElement; if (side.textContent !== (d.side ?? '')) side.textContent = d.side ?? '';
     this.eraEl.textContent = d.era + (d.interior ? ` · ${d.interior}` : '');
     this.promptEl.classList.toggle('hidden', !d.prompt && !d.buildingHint);
     this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
@@ -382,7 +393,7 @@ export class UI {
       this.ptext.textContent = `${d.targetLabel ? d.targetLabel + ' · ' : ''}${dist} m`;
     }
     this.coinsEl.textContent = d.coins;
-    this.helpEl.textContent = d.driving ? 'Golf cart: W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause';
+    this.helpEl.textContent = d.driving === 'heli' ? 'Helicopter: WASD fly · Space climb · F descend · Shift faster · E land / get out' : d.driving === 'plane' ? 'Plane: W throttle · S slow / reverse · A/D turn · Space climb · F dive · E land / get out' : d.driving ? 'W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause';
     if (d.interior) {   // indoors: the campus map stays visible, centred on the building you're in
       g.fillStyle = 'rgba(20,16,12,0.72)'; g.fillRect(0, S - 22, S, 22);
       g.fillStyle = '#ffd34d'; g.font = 'bold 11px system-ui'; g.textAlign = 'center'; g.fillText(`Inside: ${d.interior.split('—')[0].trim()}`.slice(0, 30), S / 2, S - 8); g.textAlign = 'start';

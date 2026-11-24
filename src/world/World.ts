@@ -6,7 +6,7 @@ import { ATMOSPHERE, type Season } from '../config/atmosphere';
 import { SETTINGS } from '../core/settings';
 import { BUILDINGS, eraState } from './buildingRegistry';
 import {
-  allFootprints, buildingsForEra, CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, streetDirAt, toReal, PATH_KINDS, pointInPoly, registryPoly,
+  allFootprints, buildingsForEra, CAMPUS, HOME_LOT, everOccupied, nudgeFree, obb, onVehicleRoad, streetDirAt, toReal, PATH_KINDS, pointInPoly, registryPoly,
   terrainHeight, toGame, type EraBuilding, type Vec2,
 } from './campusData';
 import { CollisionGrid } from './collision';
@@ -950,6 +950,9 @@ export class World {
       const m = meshBuilding(b.poly, b.style, { construction: b.state === 'construction', detailed: !b.context });
       meshes.set(b.key, m); grid.addBuilding(m);
     }
+    // the player's apartment: a two-storey residential block (same voxel style as the town's houses)
+    { const L = HOME_LOT, home = meshBuilding([[L.x0, L.z0], [L.x1, L.z0], [L.x1, L.z1], [L.x0, L.z1]], { wall: '#c8b597', trim: '#f2ece0', roof: '#5b4a42', glass: '#55687a', roofType: 'hip', levels: 2, floorHeight: 3.2, finish: 'stone' }, { detailed: true });
+      meshes.set('player-home', home); grid.addBuilding(home); }
     const mesh = new THREE.Mesh(mergeToGeometry([...meshes.values()]), buildingMaterials());
     mesh.castShadow = mesh.receiveShadow = true; mesh.name = 'buildings';
     group.add(mesh);
@@ -1149,7 +1152,9 @@ export class World {
       g.fillStyle = b.state === 'site' ? 'rgba(217,163,95,0.5)' : b.context ? '#b8ab98' : b.state === 'construction' ? '#d9a35f' : '#a8573d'; g.fill();
       g.strokeStyle = '#3b2a20'; g.lineWidth = 1; if (b.state === 'site') g.setLineDash([4, 3]); g.stroke(); g.setLineDash([]);
     }
+    { const L = HOME_LOT; g.fillStyle = '#4f7fb8'; g.fillRect((L.x0 - B.minX) * s, (L.z0 - B.minZ) * s, (L.x1 - L.x0) * s, (L.z1 - L.z0) * s); g.strokeStyle = '#1d2f45'; g.strokeRect((L.x0 - B.minX) * s, (L.z0 - B.minZ) * s, (L.x1 - L.x0) * s, (L.z1 - L.z0) * s); }
     g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
+    { const L = HOME_LOT, x = ((L.x0 + L.x1) / 2 - B.minX) * s, y = ((L.z0 + L.z1) / 2 - B.minZ) * s; g.fillStyle = 'rgba(255,255,255,0.9)'; g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 3; g.strokeText('Home', x, y); g.fillText('Home', x, y); }
     for (const b of buildings) if (b.landmark && b.name) {
       const [x, z] = polyAvg(b.poly);
       const short = b.name.replace(/ (Building|Center|Performing Arts Center|Student Center)$/, '').replace(/^(Spencer W\.|John W\.|John L\.|George S\.|Joseph Fielding|Hyrum|Eliza R\.|David O\.|Ezra Taft|Mark|Jacob|Oscar A\.|Gordon B\.|Thomas E\.|John) /, '') + (b.state === 'site' ? ' (site)' : '');
@@ -1197,6 +1202,8 @@ export class World {
   get buildingSigns(): readonly BuildingSign[] { return this.cache.get(this.era)?.buildingSigns ?? []; }
   get buildingOccluder() { return this.cache.get(this.era)?.group.getObjectByName('buildings'); }
   blocked(x: number, z: number, r: number) { return this.grid.blocked(x, z, r); }
+  /** Buildings and the boundary only (aircraft roll and fly over lamps, benches and trees). */
+  blockedByBuildings(x: number, z: number, r: number) { return this.grid.blocked(x, z, r, false); }
   groundY(x: number, z: number) { return terrainHeight(x, z); }
 
   /** Resolve an anchor with `building` to a point on that building's wall + outward normal (game metres). */

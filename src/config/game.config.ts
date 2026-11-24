@@ -249,6 +249,8 @@ export const GAME_CONFIG = {
     // OPEN: show modern, undated OSM buildings in historical eras as neutral massing?
     contextBuildingsInHistoricalEras: false,
     trees: true,
+    // The player's apartment is built on the nearest free lot to this point (real metres; east of the Kimball quad).
+    homeNear: { x: 230, z: -60 },
   },
 
   input: {

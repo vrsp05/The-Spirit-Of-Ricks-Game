@@ -65,9 +65,17 @@ Two custom ESP32 controllers can play at the same time; either one moves the sam
   - Bednar hands over four illustrated clue cards, which you can reread any time in the Journal (J).
   - Letters are camouflaged in the architecture at the library, temple approach, Hart Building and Snow Building. Find them by looking and pressing Interact.
   - Placing the 4th letter on the sign by the roundabout sets off the celebration: full colour, fireworks, a cheering crowd.
+- **Side quests (optional):** six errands from people around campus with a yellow **!** over their heads (**?** = come back to them). Progress is saved; each pays coins once. The pause menu's **Side quests** page lists them and where to find each person.
+  - **The Lost Student ID** (Megan, Manwaring Center): find her dropped ID card and bring it back.
+  - **Freshman Tour** (Tyler, Kimball Building): he follows you to the library, the student center and the gym.
+  - **Campus Courier** (Brother Jensen, Smith Building): deliver a package across campus before time runs out (carts and bikes allowed).
+  - **Campus Trivia** (Kenzie, Taylor Building): five questions built from the game's own history data (presidents, building dates), matched to the current era. Four right to pass; replayable for fun.
+  - **Hoops Challenge** (Coach Dana, outdoor court): sink 3 baskets in 90 s (Hard: 5 in 75 s).
+  - **Gone with the Wind** (Priya, Romney Building): catch the scattered activity flyers against the clock.
+- **Campus life:** students stop to chat with each other in speech bubbles, make small talk while walking in groups, sit on benches, check their phones, and wave or say hi as you pass — by name once you've met. Talk to one (E) to chat, **ask for directions** (the pointer and minimap lead you there), or ask who needs help. Walk up to two people talking and they'll pull you into the conversation.
 - **Rewards:** each quest pays once: base 100, plus up to 50 for quality and 50 for speed, plus 25 on Hard. Quest timers pause during menus and cutscenes.
 - **Cutscenes:** short, skippable, subtitled in-engine scenes. Reduced-motion and mute settings are in the pause menu.
-- **Places:** enterable Kimball Building (President Bednar's office), a quest room, and the STC first floor (finale). Viking Stadium and the upper fields. Benches, lamps, a fountain and street signs.
+- **Places:** enterable Kimball Building (President Bednar's office), a quest room, the STC first floor (finale), and furnished interiors for the classroom buildings, library, food court, gym, auditorium, offices and residence halls (wood, tile and carpet floors, windows, lockers, notice boards, plants, sofas, computers, a hardwood basketball court…). Viking Stadium and the upper fields. Benches, lamps, a fountain and street signs.
 - **Getting around:** golf carts, collectible coins, walking students you can talk to, an objective pointer, minimap and full map markers, and green entrance icons.
 - **Menus and saves:** title, difficulty, pause, controls, controller status, local save/continue (versioned), and "skip quest".
 

@@ -25,8 +25,8 @@ export class CollisionGrid {
     if (gi < 0 || gj < 0 || gi >= this.w || gj >= this.h) return 0;
     return this.top[gj * this.w + gi];
   }
-  /** True if a circle at x,z with radius r overlaps a building cell or obstacle. */
-  blocked(x: number, z: number, r: number): boolean {
+  /** True if a circle at x,z with radius r overlaps a building cell or (unless `props` is false) a round obstacle. */
+  blocked(x: number, z: number, r: number, props = true): boolean {
     const { minX, maxX, minZ, maxZ } = CAMPUS.bounds;
     if (x < minX + 7.5 || x > maxX - 7.5 || z < minZ + 7.5 || z > maxZ - 7.5) return true; // inside the boundary hedge
     const ia = Math.floor((x - r) / VOXEL), ib = Math.floor((x + r) / VOXEL);
@@ -39,7 +39,7 @@ export class CollisionGrid {
       const cz = Math.max(j * VOXEL, Math.min(z, (j + 1) * VOXEL));
       if ((cx - x) ** 2 + (cz - z) ** 2 < r * r) return true;
     }
-    for (const o of this.extra) if ((o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + r) ** 2) return true;
+    if (props) for (const o of this.extra) if ((o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + r) ** 2) return true;
     return false;
   }
 }

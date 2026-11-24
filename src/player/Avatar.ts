@@ -60,7 +60,7 @@ export class Avatar {
   rebuild(look: AvatarLook) {
     this.look = look;
     this.hips.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
-    this.hips.clear(); this.eyes = [];
+    this.hips.clear(); this.eyes = []; this.jet = null; this.held = null;
     this.build(look);
     if (this.seated) this.sit(true);
   }
@@ -142,6 +142,8 @@ export class Avatar {
     this.time += dt;
     this.idleFace(dt);
     if (this.seated) return;
+    if (this.lying) { for (const e of this.eyes) e.scale.y = 0.15; return; }   // asleep
+    if (this.handstand) { this.handWalk(dt, speed); return; }
     this.spd += (speed - this.spd) * Math.min(1, dt * 8);
     const s = this.spd, moving = s > 0.15;
     if (moving) this.phase += dt * (4.2 + s * 1.05); else this.phase *= Math.max(0, 1 - dt * 6);
@@ -200,6 +202,54 @@ export class Avatar {
     this.legL.rotation.x = 0.08; this.legR.rotation.x = -0.25; this.shinL.rotation.x = 0.05; this.shinR.rotation.x = 0.25;
     this.armL.rotation.x = this.armR.rotation.x = -1.15; this.foreL.rotation.x = this.foreR.rotation.x = -0.2;
     this.hips.position.y = 0; this.body.rotation.x = Math.min(0.12, Math.abs(speed) * 0.012); this.torso.rotation.y = 0;
+  }
+  // ---------------------------------------------------------------- handstand, sleeping, eating
+  private handstand = false;
+  /** Walk on your hands: the whole body flips over the hands (arms straight "up" = down to the ground). */
+  setHandstand(on: boolean) {
+    this.handstand = on;
+    if (!on) { this.body.rotation.z = 0; this.body.position.y = 0; this.armL.rotation.set(0, 0, 0); this.armR.rotation.set(0, 0, 0); }
+  }
+  private handWalk(dt: number, speed: number) {
+    this.spd += (speed - this.spd) * Math.min(1, dt * 8);
+    const s = this.spd, moving = s > 0.15;
+    if (moving) this.phase += dt * (5 + s * 1.6); else this.phase *= Math.max(0, 1 - dt * 6);
+    const amp = moving ? Math.min(0.42, 0.18 + s * 0.08) : 0, sw = Math.sin(this.phase) * amp;
+    const reach = 0.8, k = this.scaleF;           // shoulder → fingertips
+    this.body.rotation.set(Math.sin(this.time * 2.6) * 0.035, 0, Math.PI);   // upside down, a little wobble for balance
+    this.body.position.y = (1.5 + reach * Math.cos(Math.abs(sw))) * k;
+    this.hips.position.y = 0; this.torso.rotation.y = 0; this.torso.scale.y = 1;
+    this.armL.rotation.set(Math.PI + sw, 0, 0); this.armR.rotation.set(Math.PI - sw, 0, 0);
+    this.foreL.rotation.x = this.foreR.rotation.x = 0;
+    // legs up in the air, knees bent back and swaying
+    this.legL.rotation.x = 0.3 + sw * 0.5; this.legR.rotation.x = -0.15 - sw * 0.5;
+    this.shinL.rotation.x = 0.7 + Math.max(0, sw) * 0.4; this.shinR.rotation.x = 0.5 + Math.max(0, -sw) * 0.4;
+  }
+  private lying = false;
+  /** Lie on your back (feet at the root, head towards the root's −z), at `height` above the root. */
+  lie(on: boolean, height = 0.62) {
+    this.lying = on;
+    this.body.rotation.set(on ? -Math.PI / 2 : 0, 0, 0); this.body.position.y = on ? height : 0;
+    this.legL.rotation.x = this.legR.rotation.x = this.shinL.rotation.x = this.shinR.rotation.x = 0;
+    this.armL.rotation.set(0, 0, on ? 0.12 : 0); this.armR.rotation.set(0, 0, on ? -0.12 : 0); this.foreL.rotation.x = this.foreR.rotation.x = 0;
+    this.hips.position.y = 0; this.torso.rotation.y = 0; this.torso.scale.y = 1; this.head.rotation.set(0, 0, 0);
+    if (!on) for (const e of this.eyes) e.scale.y = 1;
+  }
+  private held: THREE.Mesh | null = null;
+  /** Something in the right hand (food); null drops it. */
+  holdItem(color: string | null, size = 0.2) {
+    if (this.held) { this.held.removeFromParent(); this.held.geometry.dispose(); (this.held.material as THREE.Material).dispose(); this.held = null; }
+    if (!color) return;
+    this.held = new THREE.Mesh(new THREE.BoxGeometry(size, size * 0.8, size), new THREE.MeshStandardMaterial({ color, roughness: 0.7 }));
+    this.held.position.set(0, -0.5, 0.12); this.foreR.add(this.held);
+  }
+  /** Eating: the right hand goes to the mouth and back, the mouth chews; the food gets smaller (bite = 0..1). */
+  eatPose(t: number, bite: number) {
+    const lift = (Math.sin(t * 3.2) + 1) / 2;
+    this.armR.rotation.set(-1.0 - lift * 1.2, 0, 0.25); this.foreR.rotation.x = -1.2 - lift * 0.5;
+    this.mouth.scale.y = 1 + Math.abs(Math.sin(t * 11)) * 2.2 * lift;
+    if (this.held) this.held.scale.setScalar(Math.max(0.15, 1 - bite));
+    this.head.rotation.x = -0.08 * lift;
   }
   private jet: { group: THREE.Group; flames: THREE.Mesh[] } | null = null;
   /** Show/hide the jetpack (two tanks on the back). */

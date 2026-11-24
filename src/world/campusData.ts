@@ -190,6 +190,54 @@ function presenceMask(id: string | null, b?: BuildingEntry): number {
   }
 })();
 
+// ---------------------------------------------------------------- the player's apartment lot
+/** The player's home: a small apartment building on a free lot (game metres, axis-aligned, door on the south side, +z). */
+export interface HomeLot { x0: number; z0: number; x1: number; z1: number; door: Vec2 }
+export const HOME_LOT: HomeLot = (function findHomeLot(): HomeLot {
+  const W = 12, D = 9, M = 3;   // footprint and clear margin (game metres)
+  // footpaths, parking lots, water and sports fields are not building land
+  const busy = new Uint8Array(GW * GH);
+  const mark = (x: number, z: number) => { const i = x - gi0, j = z - gj0; if (i >= 0 && j >= 0 && i < GW && j < GH) busy[j * GW + i] = 1; };
+  for (const r of CAMPUS.roads) {
+    if (!PATH_KINDS.has(r.kind)) continue;
+    const hw = r.width / 2 + 1;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+      for (let z = Math.floor(Math.min(az, bz) - hw); z <= Math.max(az, bz) + hw; z++) for (let x = Math.floor(Math.min(ax, bx) - hw); x <= Math.max(ax, bx) + hw; x++) {
+        const t = Math.max(0, Math.min(1, ((x + 0.5 - ax) * dx + (z + 0.5 - az) * dz) / L2));
+        if ((ax + t * dx - x - 0.5) ** 2 + (az + t * dz - z - 0.5) ** 2 <= hw * hw) mark(x, z);
+      }
+    }
+  }
+  for (const a of CAMPUS.areas) {
+    if (a.kind === 'park') continue;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const [x, z] of a.poly) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
+    for (let z = Math.floor(minZ) - 2; z <= maxZ + 2; z++) for (let x = Math.floor(minX) - 2; x <= maxX + 2; x++) if (pointInPoly(x + 0.5, z + 0.5, a.poly)) mark(x, z);
+  }
+  const free = (x0: number, z0: number) => {
+    for (let z = z0 - M; z < z0 + D + M + 3; z++) for (let x = x0 - M; x < x0 + W + M; x++) {   // +3 m clear in front of the door
+      const i = x - gi0, j = z - gj0; if (i < 20 || j < 20 || i >= GW - 20 || j >= GH - 20) return false;
+      const k = j * GW + i; if (roadGrid[k] || busy[k]) return false;
+      for (const g of eraGrids) if (g[k]) return false;
+    }
+    return true;
+  };
+  // a short walk east of the Kimball Building / the spawn quad, like an off-campus apartment
+  const [sx, sz] = toGame(GAME_CONFIG.world.homeNear.x, GAME_CONFIG.world.homeNear.z);
+  let best: Vec2 = [Math.round(sx), Math.round(sz)];
+  search: for (let r = 0; r < 220; r += 2) for (let k = 0; k < Math.max(1, r * 2); k++) {
+    const a = (k / Math.max(1, r * 2)) * Math.PI * 2, x = Math.round(sx + Math.cos(a) * r - W / 2), z = Math.round(sz + Math.sin(a) * r - D / 2);
+    if (free(x, z)) { best = [x, z]; break search; }
+  }
+  const [x0, z0] = best, lot: HomeLot = { x0, z0, x1: x0 + W, z1: z0 + D, door: [x0 + W / 2, z0 + D] };
+  // reserve it in every era so trees, props, coins and carts keep off it
+  for (let z = z0 - 1; z < lot.z1 + 1; z++) for (let x = x0 - 1; x < lot.x1 + 1; x++) {
+    const i = x - gi0, j = z - gj0; if (i >= 0 && j >= 0 && i < GW && j < GH) for (const g of eraGrids) g[j * GW + i] = 1;
+  }
+  return lot;
+})();
+
 /** True if any building occupies this game-space point in any era (for placing props/anchors). */
 export function everOccupied(x: number, z: number, margin = 0): boolean {
   for (let dz = -margin; dz <= margin; dz++) for (let dx = -margin; dx <= margin; dx++) {

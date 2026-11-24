@@ -20,6 +20,8 @@ export interface SaveData {
   introSeen: boolean;
   finaleReached: boolean;
   playerName?: string;                // asked when a new game starts
+  outfit?: string;                    // wardrobe choice (player/outfits.ts)
+  sideQuests?: Record<string, { status: 'available' | 'active' | 'ready' | 'done'; earned: number; data: Record<string, unknown> }>; // optional errands (sidequests/)
 }
 
 type Migration = (old: any) => any;

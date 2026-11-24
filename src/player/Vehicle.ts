@@ -1,7 +1,9 @@
-// Drivable vehicles: golf carts, era-styled parked cars, and bicycles.
+// Drivable vehicles: golf carts, era-styled parked cars, bicycles, scooters, and the cheat-code aircraft
+// (a helicopter and a small propeller plane — see PlayerController.fly).
 import * as THREE from 'three';
 
-export type VehicleKind = 'cart' | 'car' | 'bike' | 'scooter';
+export type VehicleKind = 'cart' | 'car' | 'bike' | 'scooter' | 'heli' | 'plane';
+export const isAircraft = (k: VehicleKind) => k === 'heli' || k === 'plane';
 export type CarStyle = 'boxy90s' | 'pickup90s' | 'rounded2010s' | 'modern';
 export interface VehicleParams { maxSpeed: number; reverseSpeed: number; accel: number; turnRate: number; radius: number }
 
@@ -10,6 +12,8 @@ export const PARAMS: Record<VehicleKind, VehicleParams> = {
   car: { maxSpeed: 22, reverseSpeed: 7, accel: 10, turnRate: 1.7, radius: 1.25 },
   bike: { maxSpeed: 10, reverseSpeed: 2, accel: 7, turnRate: 2.6, radius: 0.5 },
   scooter: { maxSpeed: 8.5, reverseSpeed: 1.5, accel: 6, turnRate: 2.8, radius: 0.45 },
+  heli: { maxSpeed: 22, reverseSpeed: 0, accel: 1.6, turnRate: 2.5, radius: 1.4 },     // run = 34 m/s
+  plane: { maxSpeed: 42, reverseSpeed: 0, accel: 9, turnRate: 1.1, radius: 1.6 },     // run = 60 m/s; lifts off from 16 m/s
 };
 
 export class Vehicle {
@@ -23,6 +27,9 @@ export class Vehicle {
   private tails: THREE.MeshStandardMaterial[] = [];
   private steerS = 0; private lastSpeed = 0; private pitch = 0;
   private pedals: THREE.Object3D | null = null;
+  /** Aircraft: spinning rotors / propeller (axis + relative rate) and the engine's spin-up (0..1). */
+  private rotors: { o: THREE.Object3D; axis: 'x' | 'y' | 'z'; rate: number }[] = [];
+  private spin = 0;
   /** Rider placement in vehicle-local space (x right, y up, z forward). */
   seat = { x: 0, y: 0.42, z: 0 };
   hideRider = false;
@@ -78,6 +85,44 @@ export class Vehicle {
       box(0.06, 0.95, 0.06, body, 0, 0.66, 0.4); box(0.5, 0.05, 0.05, '#1f2328', 0, 1.13, 0.4);             // stem + bar
       box(0.12, 0.06, 0.16, body, 0, 0.2, -0.42); lamp(box(0.08, 0.05, 0.03, '#fff6c8', 0, 0.95, 0.44));   // rear fender + light
       this.pose = 'stand'; this.seat = { x: 0, y: 0.2, z: -0.05 };
+    } else if (kind === 'heli') {
+      // small helicopter: glass cabin (you can see the pilot), tail boom + rotor, skids, a big two-blade main rotor
+      const glass = new THREE.MeshStandardMaterial({ color: '#a9d2e6', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.38 });
+      const body = color === '#f4f1e8' ? '#c0392b' : color, dark = '#2a2d31';
+      box(1.9, 0.3, 2.8, body, 0, 0.62, 0.3); box(1.9, 0.25, 2.5, body, 0, 2.4, 0.2); box(1.9, 1.75, 0.3, body, 0, 1.5, -1.0);
+      box(1.7, 0.55, 0.7, body, 0, 0.95, 1.5); box(0.6, 0.3, 0.5, dark, 0, 0.92, 0.1);                       // nose + seat
+      for (const [w, h, d, x, y, z] of [[0.04, 1.5, 2.2, -0.93, 1.5, 0.4], [0.04, 1.5, 2.2, 0.93, 1.5, 0.4], [1.8, 1.2, 0.04, 0, 1.65, 1.82]] as const) {
+        const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), glass); g.position.set(x, y, z); this.body.add(g);
+      }
+      box(0.45, 0.45, 3.6, body, 0, 1.75, -2.8); box(0.1, 1.1, 0.7, body, 0, 2.25, -4.45); box(1.3, 0.08, 0.5, body, 0, 1.85, -4.3);
+      box(1.9, 0.1, 0.16, '#f4f1e8', 0, 1.25, 1.6);                                                          // stripe
+      for (const x of [-0.85, 0.85]) { box(0.12, 0.1, 3.2, dark, x, 0.06, 0.2); box(0.08, 0.6, 0.08, dark, x, 0.35, 1.0); box(0.08, 0.6, 0.08, dark, x, 0.35, -0.6); }
+      box(0.18, 0.45, 0.18, dark, 0, 2.7, 0.2);
+      const main = new THREE.Group(); main.position.set(0, 2.95, 0.2); this.body.add(main);
+      box(8.4, 0.06, 0.34, dark, 0, 0, 0, main); box(0.34, 0.06, 8.4, dark, 0, 0, 0, main); box(0.4, 0.16, 0.4, '#8a8f94', 0, 0, 0, main);
+      const tail = new THREE.Group(); tail.position.set(0.12, 2.25, -4.45); this.body.add(tail);
+      box(0.04, 1.3, 0.16, dark, 0, 0, 0, tail);
+      this.rotors.push({ o: main, axis: 'y', rate: 26 }, { o: tail, axis: 'x', rate: 40 });
+      lamp(box(0.3, 0.12, 0.05, '#fff6c8', 0, 0.85, 1.86)); lamp(box(0.1, 0.1, 0.1, '#ff2a1a', 0, 2.85, -4.45), true);
+      this.pose = 'sit'; this.seat = { x: 0, y: 0.02, z: 0.15 };
+    } else if (kind === 'plane') {
+      // small high-wing propeller plane: fuselage, glass cockpit, wing, tail, three wheels, a spinning propeller
+      const glass = new THREE.MeshStandardMaterial({ color: '#a9d2e6', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.38 });
+      const body = color === '#f4f1e8' ? '#f2efe8' : color, trim = '#2f5f9e', dark = '#2a2d31';
+      box(1.3, 1.4, 3.6, body, 0, 1.3, 0.4); box(1.0, 1.0, 1.0, trim, 0, 1.3, 2.7);                       // fuselage + cowl
+      box(0.9, 0.9, 2.4, body, 0, 1.5, -2.5); box(0.55, 0.55, 0.8, body, 0, 1.6, -4.0);                    // tail cone
+      const cg = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.75, 1.7), glass); cg.position.set(0, 2.38, 0.9); this.body.add(cg);
+      box(1.3, 0.12, 0.5, body, 0, 2.7, -0.1);                                                              // cabin roof behind the glass
+      box(10, 0.14, 1.5, body, 0, 2.82, 0.6); box(0.6, 0.15, 1.52, trim, -4.7, 2.83, 0.6); box(0.6, 0.15, 1.52, trim, 4.7, 2.83, 0.6);   // wing + tips
+      for (const x of [-1.6, 1.6]) box(0.08, 1.3, 0.08, '#c9c9c9', x, 2.15, 0.8);                           // wing struts
+      box(3.4, 0.1, 0.8, body, 0, 1.75, -4.1); box(0.1, 1.3, 0.9, trim, 0, 2.4, -4.2);                       // tail planes
+      box(1.32, 0.18, 3.62, trim, 0, 1.05, 0.4);                                                             // stripe
+      for (const [x, z] of [[-0.9, 0.7], [0.9, 0.7], [0, 2.4]]) { box(0.08, 0.5, 0.08, dark, x, 0.45, z); wheel(0.16, 0.44, x, 0.22, z); }
+      const prop = new THREE.Group(); prop.position.set(0, 1.3, 3.25); this.body.add(prop);
+      box(0.16, 2.3, 0.06, dark, 0, 0, 0, prop); box(0.3, 0.3, 0.3, '#c9c9c9', 0, 0, 0, prop);
+      this.rotors.push({ o: prop, axis: 'z', rate: 45 });
+      lamp(box(0.2, 0.1, 0.05, '#fff6c8', -4.7, 2.75, 1.37)); lamp(box(0.12, 0.12, 0.12, '#ff2a1a', 0, 3.1, -4.2), true);
+      this.pose = 'sit'; this.seat = { x: 0, y: 0.22, z: 0.75 };
     } else {
       // bicycle: frame, two wheels, handlebar, seat, pedals
       const frame = '#c0392b';
@@ -88,6 +133,14 @@ export class Vehicle {
       box(0.4, 0.05, 0.05, '#555', 0, 0.15, 0, this.pedals); box(0.4, 0.05, 0.05, '#555', 0, -0.15, 0, this.pedals);
       this.pose = 'bike'; this.seat = { x: 0, y: 0.15, z: -0.25 };
     }
+  }
+  /** Aircraft attitude + rotors. power 0..1 (engine), pitch/bank in radians. */
+  fly(dt: number, power: number, pitch: number, bank: number) {
+    this.spin += (power - this.spin) * Math.min(1, dt * 1.5);
+    for (const r of this.rotors) r.o.rotation[r.axis] += this.spin * r.rate * dt;
+    this.body.rotation.x += (pitch - this.body.rotation.x) * Math.min(1, dt * 4);
+    this.body.rotation.z += (bank - this.body.rotation.z) * Math.min(1, dt * 4);
+    if (this.kind === 'plane') for (const w of this.wheels) w.rotation.x += this.speed * dt * 4;
   }
   /** steer: −1..1 (A/D). Wheels spin with speed, front wheels steer, the body leans and pitches. */
   animate(dt: number, steer = 0) {

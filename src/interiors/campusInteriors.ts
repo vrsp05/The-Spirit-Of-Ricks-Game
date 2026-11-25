@@ -516,7 +516,7 @@ function fitness(g: THREE.Object3D) {
     }
   }
   // free weights on black rubber mats: racks, benches, a squat cage, dumbbells
-  floorZone(g, 14, 9, 22, 8, 'carpet', '#1c1c1e');
+  floorZone(g, 14, 9, 22, 8, 'carpet', '#1c1c1e').position.y = 0.03;   // above the sport floor (same height = flicker)
   for (const x of [6, 12, 18]) { box(g, 1.6, 2.4, 0.12, '#3a3f45', x, 1.2, 6.2); box(g, 0.12, 2.4, 1.4, '#3a3f45', x - 0.8, 1.2, 6.9); box(g, 0.12, 2.4, 1.4, '#3a3f45', x + 0.8, 1.2, 6.9); box(g, 1.9, 0.05, 0.05, '#c9c9c9', x, 1.5, 6.9); solid(g, { x0: x - 0.9, x1: x + 0.9, z0: 6.1, z1: 7.7 }); }
   for (const x of [8.5, 14.5, 20.5]) { box(g, 0.4, 0.45, 1.3, '#1c1c1c', x, 0.22, 10.5); solid(g, { x0: x - 0.25, x1: x + 0.25, z0: 9.8, z1: 11.2 }); }
   box(g, 6, 0.5, 0.6, '#2a2d31', 14, 0.25, 12.9); for (let i = 0; i < 10; i++) box(g, 0.35, 0.18, 0.18, '#1c1c1c', 11.4 + i * 0.58, 0.6, 12.9, false); solid(g, { x0: 11, x1: 17, z0: 12.6, z1: 13.2 });

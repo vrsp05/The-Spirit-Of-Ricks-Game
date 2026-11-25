@@ -20,8 +20,11 @@ function systemReducedMotion() {
 }
 
 function load(): Settings {
-  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true, season: 'autumn', brightness: 1, dayNight: true };
-  try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(d, JSON.parse(raw)); } catch { /* ignore */ }
+  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true, season: 'autumn', brightness: 1, dayNight: true, music: false };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const saved = JSON.parse(raw); Object.assign(d, saved); if (!saved.musicOff1) { d.music = false; (d as Settings & { musicOff1?: boolean }).musicOff1 = true; } }   // music now starts off (turn it on in Settings)
+  } catch { /* ignore */ }
   return d;
 }
 

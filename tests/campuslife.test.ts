@@ -137,3 +137,72 @@ describe('real basketball', () => {
   });
   it('threes from beyond the arc', () => { expect(shotPoints(-13, 10)).toBe(2); expect(shotPoints(-13, 5)).toBe(3); });
 });
+
+// ---------------------------------------------------------------- new campus systems
+import { Progress } from '../src/campuslife/progress';
+import { LEAGUE_TEAMS, RACKS, COURT as HOOP_COURT, leagueTable, recordLeagueGame, threesValue } from '../src/campuslife/hoops';
+import { Bulletin, DAILY_TASKS, tasksForDay } from '../src/campuslife/bulletin';
+import { Orientation, TOUR_STEPS } from '../src/campuslife/orientation';
+import { legacyCards } from '../src/campuslife/legacy';
+
+describe('Hart league & three-point contest', () => {
+  it('racks sit just behind the arc, five balls worth 6 points a rack', () => {
+    for (const r of RACKS) expect(Math.hypot(r.x - HOOP_COURT.hoop.x, r.z - HOOP_COURT.hoop.z)).toBeGreaterThan(HOOP_COURT.threeR);
+    expect([0, 1, 2, 3, 4].reduce((a, b) => a + threesValue(b), 0)).toBe(6);
+  });
+  it('a three-round season: everyone plays everyone, and winning all three is a title', () => {
+    const p = new Progress(); let rng = 0; const r = () => ((rng = (rng * 9301 + 49297) % 233280) / 233280);
+    expect(recordLeagueGame(p, true, r).round).toBe(1);
+    expect(leagueTable(p).reduce((a, t) => a + t.w + t.l, 0)).toBe(4);
+    recordLeagueGame(p, true, r); const end = recordLeagueGame(p, true, r);
+    expect(end.round).toBe(3); expect(end.champion).toBe(true); expect(p.stat('leagueTitles')).toBe(1);
+    expect(p.stat('lgRound')).toBe(0); expect(LEAGUE_TEAMS.every((_, i) => p.stat(`lg:w:${i}`) === 0)).toBe(true);
+  });
+  it('losing every game is never a title', () => {
+    const p = new Progress(); for (let i = 0; i < 3; i++) recordLeagueGame(p, false, () => 0.5);
+    expect(p.stat('leagueTitles')).toBe(0);
+  });
+});
+
+describe('bulletin board', () => {
+  it('three different tasks a day, the same every time for that day', () => {
+    for (let d = 0; d < 30; d++) { const t = tasksForDay(d); expect(new Set(t.map(x => x.id)).size).toBe(3); expect(tasksForDay(d).map(x => x.id)).toEqual(t.map(x => x.id)); }
+    expect(new Set(Array.from({ length: 14 }, (_, d) => tasksForDay(d).map(x => x.id).join())).size).toBeGreaterThan(5);
+  });
+  it('tasks count only from when you read the board, and pay once', () => {
+    const STAT: Record<string, string> = { photos: 'photosTaken', books: 'booksFound', bowl: 'bowlGames', class: 'classes', baskets: 'shootaroundMakes', threes: 'threesGames', tread: 'treadRuns', bench: 'benchSessions', cars: 'carsFixed', shift: 'jobShifts', board: 'boardMeters', happening: 'events', shop: 'purchases', pong: 'pongWins', shuttle: 'shuttleRides', planets: 'planetariumDone' };
+    const bump = (id: string, n: number) => { if (id === 'chat') p.friends.Sam = (p.friends.Sam ?? 0) + n; else p.add(STAT[id], n); };
+    const p = new Progress(); let said = 0; const b = new Bulletin(p, () => 4, () => { said++; });
+    const tasks = b.today();
+    for (const t of tasks) bump(t.id, t.n);          // before reading the board: doesn't count
+    b.accept(); b.update(); expect([0, 1, 2].some(i => b.isDone(i))).toBe(false);
+    const before = p.coins;
+    for (const t of tasks) bump(t.id, t.n);
+    b.update(); b.update();
+    expect([0, 1, 2].every(i => b.isDone(i))).toBe(true);
+    expect(p.coins - before).toBe(tasks.reduce((a, t) => a + t.coins, 0) + 15);
+    expect(p.stat('dailyDone')).toBe(3); expect(said).toBe(3);
+    expect(Object.keys(STAT).length + 1).toBe(DAILY_TASKS.length);
+  });
+});
+
+describe('orientation', () => {
+  it('pays per step, then a bonus and the achievement', () => {
+    const p = new Progress(), flags = new Set<string>(), checks = Object.fromEntries(TOUR_STEPS.map(s => [s.id, () => flags.has(s.id)]));
+    const o = new Orientation(p, checks, () => {}); o.start(); expect(o.on).toBe(true);
+    flags.add('map'); o.update(); expect(o.count()).toBe(1); expect(p.coins).toBe(5);
+    TOUR_STEPS.forEach(s => flags.add(s.id)); o.update();
+    expect(p.stat('tourDone')).toBe(1); expect(o.on).toBe(false); expect(p.coins).toBe(5 * TOUR_STEPS.length + 25);
+    expect(p.achievements.has('oriented')).toBe(true);
+  });
+});
+
+describe('legacy epilogue', () => {
+  it('one card per finished mission, using what you chose', () => {
+    const data: Record<string, Record<string, unknown>> = { capsule: { items: { a: { item: 'A pager' }, b: { item: 'A library card' } } }, y2k: { wrong: 0 } };
+    const cards = legacyCards(id => ['y2k', 'capsule'].includes(id), id => data[id] ?? {});
+    expect(cards.map(c => c.title)).toEqual(['Y2K Rescue', 'The Time Capsule']);
+    expect(cards[1].text).toMatch(/a pager and a library card/);
+    expect(legacyCards(() => true, () => ({ __devSkipped: true }))).toHaveLength(7);
+  });
+});

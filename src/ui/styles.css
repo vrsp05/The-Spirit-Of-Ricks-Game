@@ -272,7 +272,7 @@ html, body { overscroll-behavior: none; }
    transform: scale() (not CSS zoom, whose semantics changed between Chrome versions).
    Each element scales from the corner/edge it is anchored to, so it can never be pushed
    off-screen; layout sizes are divided by the zoom so the scaled result fills exactly. */
-:root { --z: var(--ui-zoom, 1); }
+:root { --z: calc(var(--ui-zoom, 1) * var(--text-zoom, 1)); }
 .hud-top { transform: scale(var(--z)); transform-origin: top left; max-width: calc((100vw - 240px) / var(--z)); }
 .hud-mini { transform: scale(var(--z)); transform-origin: top right; }
 .hud-coins { transform: scale(var(--z)); transform-origin: top right; top: calc(14px + 192px * var(--z)); }
@@ -743,3 +743,56 @@ body.booted .title-screen .now-playing { animation: titleIn 1s 1.6s both; }
 .hoop-meter .hm-zone { position: absolute; left: 0; right: 0; height: 22%; background: rgba(90,220,120,.55); }
 .hoop-meter .hm-fill { position: absolute; left: 4px; right: 4px; bottom: 0; background: #ff7a1a; border-radius: 9px; }
 .hoop-meter span { position: absolute; left: 32px; bottom: 60px; white-space: nowrap; color: #fff; font: bold 13px system-ui; text-shadow: 0 1px 3px #000; }
+
+/* ---------- accessibility: bigger text (Settings → Text size) ---------- */
+:root { --text-zoom: 1; }
+/* (it multiplies the proportional UI scale --z below, so every panel and HUD element grows and still fits) */
+/* colour-blind mode: the on-screen objective pointer turns orange */
+body.colorblind .hud-arrow { filter: hue-rotate(-25deg) saturate(1.4); }
+
+/* ---------- Hart league, bulletin board, legacy ---------- */
+table.league { border-collapse: collapse; margin: 6px auto 10px; min-width: 280px; }
+table.league th, table.league td { padding: 5px 12px; text-align: left; border-bottom: 1px solid rgba(0,0,0,.12); }
+table.league tr.me td { color: #8a5a00; font-weight: 700; background: rgba(232,194,90,.18); }
+ul.daily { list-style: none; padding: 0; margin: 6px 0 10px; text-align: left; }
+ul.daily li { padding: 8px 10px; margin: 4px 0; background: rgba(232,194,90,.14); border-left: 4px solid #e8c25a; border-radius: 4px; }
+ul.daily li b { float: right; color: #8a5a00; }
+ul.daily li i { opacity: .75; font-style: normal; }
+ul.daily li.done { opacity: .6; text-decoration: line-through; border-left-color: #5fbf6a; }
+.legacy { text-align: left; max-width: 760px; }
+.legacy-lead { font-size: 1.1em; margin: 0 0 12px; }
+.legacy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.legacy-grid section { background: rgba(0,0,0,.05); border-radius: 8px; padding: 10px 12px; }
+.legacy-grid h3 { margin: 0 0 6px; font-size: 1em; }
+.legacy-grid p { margin: 0; line-height: 1.5; }
+.legacy-grid table td { padding: 2px 10px 2px 0; }
+.map-shuttle { background: #2d5f9a !important; color: #fff !important; }
+
+/* ---------- on-screen touch controls (phones / tablets) ---------- */
+.touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 5; user-select: none; -webkit-user-select: none; }
+.touch-ui.hidden { display: none; }
+.touch-stick { position: absolute; left: 22px; bottom: 26px; width: 132px; height: 132px; border-radius: 50%; background: rgba(20,16,12,.35); border: 2px solid rgba(255,255,255,.35); pointer-events: auto; touch-action: none; }
+.touch-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,255,255,.55); }
+.touch-btns { position: absolute; right: 16px; bottom: 22px; display: grid; grid-template-columns: repeat(3, 62px); gap: 10px; pointer-events: none; }
+.touch-btns button, .touch-top button { pointer-events: auto; touch-action: none; width: 62px; height: 62px; border-radius: 50%; border: 2px solid rgba(255,255,255,.45); background: rgba(20,16,12,.5); color: #fff; font: 700 15px system-ui, sans-serif; }
+.touch-btns button.big { background: rgba(232,194,90,.75); color: #1c1814; }
+.touch-btns button.on { background: rgba(95,191,106,.75); }
+.touch-top { position: absolute; top: 64px; right: 12px; display: flex; gap: 8px; pointer-events: none; }
+.touch-top button { width: 46px; height: 46px; font-size: 18px; }
+body.touch .hud-help { display: none; }
+/* with touch controls, lift the prompt / toasts / pointer above the buttons, and keep the top buttons off the minimap */
+body.touch .hud-prompt { bottom: 196px; }
+body.touch .hud-toasts { bottom: 250px; }
+body.touch .hud-pointer { top: auto; bottom: 160px; }
+.touch-top { top: auto; bottom: 182px; right: 14px; }
+@media (max-width: 700px) {
+  .touch-stick { width: 116px; height: 116px; left: 14px; bottom: 18px; }
+  .touch-btns { grid-template-columns: repeat(3, 52px); gap: 8px; right: 10px; bottom: 18px; }
+  .touch-btns button { width: 52px; height: 52px; font-size: 14px; }
+  .touch-top { bottom: 148px; right: 10px; gap: 6px; }
+  .touch-top button { width: 40px; height: 40px; font-size: 16px; }
+  body.touch .hud-prompt { bottom: 260px; }
+  body.touch .hud-toasts { bottom: 312px; }
+  body.touch .hud-pointer { bottom: 210px; }
+}
+.legacy-screen .panel { width: min(780px, calc((100vw - 24px) / var(--z))); }

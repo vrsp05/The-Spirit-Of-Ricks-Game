@@ -4,10 +4,13 @@ import './interiors/campusInteriors';   // registers campus building interiors +
 import { HOME_ID, HOME_SPOTS } from './interiors/apartment';
 import { HART, MC_SPOTS, STRIKE_ZONE } from './interiors/campusInteriors';
 import { benchPress, kg, treadmill, type HartHost } from './campuslife/hartGames';
-import { Hoops } from './campuslife/hoops';
+import { Hoops, LEAGUE_TEAMS, leagueOpponent, leagueTable } from './campuslife/hoops';
 import { bookHunt, cafeteria, carRepair, intramurals, pingPong, planetarium, recordsHtml, rhythm, tourGuide } from './campuslife/minigames';
 import { Apartment, Celebrations, PETS, petHunger, scheduleHtml, nextClass } from './campuslife/studentLife';
 import { openPhone } from './campuslife/phone';
+import { Orientation } from './campuslife/orientation';
+import { Bulletin } from './campuslife/bulletin';
+import { legacyCards, legacyHtml } from './campuslife/legacy';
 import { accessoryLook, bowl, openStore, ownsOutfit, storeNameFor } from './campuslife/mcFun';   // the player's apartment (same: registers before the world)
 import { OUTFITS, outfitById, outfitLook } from './player/outfits';
 import { ATMOSPHERE } from './config/atmosphere';
@@ -20,7 +23,8 @@ import { CLOSED, textCanvas } from './world/World';
 import { BallGames } from './world/ballGames';
 import { GAME_CONFIG, type Anchor, type DifficultyId } from './config/game.config';
 import { InputManager } from './input/actions';
-import { KeyboardMouseSource } from './input/keyboardMouse';
+import { KeyboardMouseSource, REMAPPABLE, keyFor, keyName } from './input/keyboardMouse';
+import { TouchSource, isTouchDevice } from './input/touch';
 import { GamepadHub, WebBluetoothController } from './input/transports';
 import { MockController } from './input/mockController';
 import { InteractionSystem, type InteractableDef } from './interact/interactables';
@@ -32,9 +36,9 @@ import { QuestManager, QUEST_ERA, QUEST_ORDER, freshQuestState, voxelBox } from 
 import type { QuestId } from './quests/contract';
 import { createQuestModules } from './quests';
 import { Renderer } from './render/Renderer';
-import { clearSave, loadSave, SAVE_VERSION, writeSave, type SaveData } from './save/save';
+import { clearSave, loadSave, SAVE_VERSION, SLOT_COUNT, slotSummary, writeSave, type SaveData } from './save/save';
 import { STORY } from './story/story';
-import { esc, UI } from './ui/ui';
+import { esc, UI, type MapPoi } from './ui/ui';
 import { CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, PATH_KINDS, pointInPoly, terrainHeight, toGame } from './world/campusData';
 import { isAircraft, isRide, Vehicle, type CarStyle } from './player/Vehicle';
 import { ERAS, type EraId } from './world/eras';
@@ -71,6 +75,7 @@ export class Game {
   readonly player: PlayerController;
   readonly cameraRig: CameraRig;
   readonly input = new InputManager();
+  touch!: TouchSource;
   readonly gamepads: GamepadHub;
   readonly ble: WebBluetoothController[] = [];
   readonly mocks: MockController[] = [];
@@ -140,6 +145,8 @@ export class Game {
     this.cameraRig = new CameraRig(this.renderer.camera);
     this.ui = new UI(uiRoot);
     this.input.add(new KeyboardMouseSource(this.renderer.canvas));
+    this.touch = this.input.add(new TouchSource(uiRoot, this.renderer.canvas)) as TouchSource;
+    this.applyAccessibility();
     this.gamepads = new GamepadHub(this.input);
     if (WebBluetoothController.supported()) for (let i = 0; i < 2; i++) this.ble.push(new WebBluetoothController(i, this.input));
     this.exteriorSpace = {
@@ -229,6 +236,7 @@ export class Game {
     this.balls = new BallGames(this.renderer.scene);
     this.setupSideQuests();
     this.setupLife();
+    this.setupOrientation();
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -732,6 +740,17 @@ export class Game {
     this.interactions.add({ id: 'mc:up', kind: 'door', at: at(STRIKE_ZONE, MC_SPOTS.stairsUp), radius: 2.4, enabled: free, prompt: 'Go upstairs: the Crossroads', onInteract: () => goTo(MC, { x: MC_SPOTS.stairsDown.x + 2.5, z: MC_SPOTS.stairsDown.z - 1 }, Math.PI) });
     this.interactions.add({ id: 'mc:bowl', kind: 'generic', at: at(STRIKE_ZONE, MC_SPOTS.bowl), radius: 2.2, enabled: free, prompt: () => `Bowl a game${this.life.progress.stat('bowlBest') ? ` (best ${this.life.progress.stat('bowlBest')})` : ''}`, onInteract: () => bowl(this.lifeHost, this.life.progress) });
     this.interactions.add({ id: 'mc:grill', kind: 'generic', at: at(STRIKE_ZONE, MC_SPOTS.grill), radius: 2.4, enabled: free, prompt: 'Order at the Strike Zone Grill', onInteract: () => openStore(this.lifeHost, this.life.progress, hooks, 'food') });
+    // the bulletin board: three daily tasks
+    const board = new THREE.Group();
+    const cork = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 0.08), new THREE.MeshStandardMaterial({ color: '#b08455', roughness: 0.95 })); cork.position.y = 1.55; board.add(cork);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.36, 1.56, 0.06), new THREE.MeshStandardMaterial({ color: '#4a3524' })); frame.position.set(0, 1.55, -0.03); board.add(frame);
+    for (const [x, y, c] of [[-0.7, 1.8, '#fff6a8'], [-0.1, 1.85, '#ffd1dc'], [0.55, 1.75, '#cfe9ff'], [-0.45, 1.25, '#d8ffd1'], [0.3, 1.25, '#ffffff'], [0.8, 1.35, '#ffe0b0']] as [number, number, string][]) {
+      const n = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.34), new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })); n.position.set(x, y, 0.045); n.rotation.z = (Math.random() - 0.5) * 0.2; board.add(n);
+    }
+    for (const lx of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), new THREE.MeshStandardMaterial({ color: '#4a3524' })); leg.position.set(lx, 0.45, 0); board.add(leg); }
+    this.interactions.add({ id: 'mc:board', kind: 'generic', at: at(MC, { x: 18.6, z: 12.6 }), radius: 2.4, visual: board, enabled: free,
+      prompt: () => (this.bulletin.live ? 'Bulletin board — today’s tasks' : '📌 Read the bulletin board (3 new daily tasks)'),
+      onInteract: () => { this.bulletin.accept(); playSound('tick'); const sc = this.ui.menu('📌 Bulletin board', [{ label: 'Got it', action: () => this.ui.pop(sc) }], { html: this.bulletin.html(), onBack: () => this.ui.pop(sc) }); this.save(); } });
     this.interactions.add({ id: 'mc:store', kind: 'generic', at: at(MC, MC_SPOTS.store), radius: 2.6, enabled: free, prompt: () => `Shop at the ${storeNameFor(ERAS[this.world.era].institution)} (clothes, accessories, snacks)`, onInteract: () => openStore(this.lifeHost, this.life.progress, hooks) });
   }
   /** Hart Building: the treadmill sprint and the 60-second shooting challenge (records saved). */
@@ -767,6 +786,34 @@ export class Game {
     this.interactions.add({ id: 'hart:1on1', kind: 'npc', at: { x: -24.8, z: 8.5, space: H }, radius: 2.4, visual: jace.root, enabled: notPlaying,
       prompt: () => `Play 1-on-1 vs Jace — first to 11${P.stat('oneOnOneWins') ? ` (${P.stat('oneOnOneWins')} wins)` : ''}`,
       onInteract: async () => { await this.ui.dialogue([{ speaker: 'Jace · Student', text: this.life.progress.stat('oneOnOneWins') ? 'Back for more? Let’s go — make it, take it… no, just kidding. Check ball!' : 'You want to run one? First to eleven. Twos and threes. Don’t foul me!' }]); hoops.startOneOnOne(); } });
+    // three-point contest (racks appear around the arc)
+    this.interactions.add({ id: 'hart:threes', kind: 'generic', at: { x: -4.6, z: 15.2, space: H }, radius: 1.8, enabled: notPlaying,
+      prompt: () => `Three-point contest — 5 racks${P.stat('threesBest') ? ` (record ${P.stat('threesBest')}/30)` : ''}`, onInteract: () => hoops.startThrees() });
+    // the Hart 2-on-2 League: Kenzie is your teammate; three rounds, a table, a title
+    const kenzie = new Avatar({ ...eraLook('presentFinale', 2207), shirt: LEAGUE_TEAMS[0].shirt, shorts: true }); kenzie.setLabel('Kenzie', '2-on-2 League');
+    this.hartKenzie = kenzie;
+    hoops.onLeagueResult = (r, won, score) => {
+      const T = LEAGUE_TEAMS, lines = [won ? `🏆 You and Kenzie win ${score}! +20 coins` : `You lose ${score}. Shake it off.`, `Elsewhere: ${r.otherResult}.`];
+      if (r.round === 3) { lines.push(r.champion ? '🏆 LEAGUE CHAMPIONS! +40 coins — your names go up on the Hart banner.' : 'The season is over — not this time. A new season starts now.'); if (r.champion) P.earn(40); }
+      else lines.push(`Next up: ${T[leagueOpponent(r.round)].name}. Talk to Kenzie when you’re ready.`);
+      void this.ui.dialogue(lines.map(text => ({ speaker: 'Kenzie · Teammate', text }))); this.save();
+    };
+    this.interactions.add({ id: 'hart:league', kind: 'npc', at: { x: -24.8, z: 4.2, space: H }, radius: 2.4, visual: kenzie.root, enabled: notPlaying,
+      prompt: () => `Hart 2-on-2 League with Kenzie — game ${P.stat('lgRound') + 1} of 3${P.stat('leagueTitles') ? ` (${P.stat('leagueTitles')} 🏆)` : ''}`,
+      onInteract: () => this.showLeague() });
+  }
+  private hartKenzie: Avatar | null = null;
+  /** League table + start the next league game (or a friendly). */
+  private showLeague() {
+    const P = this.life.progress, hoops = this.hoops; if (!hoops) return;
+    const opp = leagueOpponent(P.stat('lgRound')), T = LEAGUE_TEAMS[opp];
+    const rows = leagueTable(P).map((r, k) => `<tr${r.i === 0 ? ' class="me"' : ''}><td>${k + 1}</td><td>${esc(r.name)}</td><td>${r.w}</td><td>${r.l}</td></tr>`).join('');
+    const body = `<table class="league"><tr><th>#</th><th>Team</th><th>W</th><th>L</th></tr>${rows}</table><p class="sub">Round ${P.stat('lgRound') + 1} of 3 · next: <b>${esc(T.name)}</b> (${esc(T.players.join(' & '))}) · titles won: ${P.stat('leagueTitles')}</p>`;
+    const sc = this.ui.menu('🏀 Hart 2-on-2 League', [
+      { label: `Play ${T.name} (league game)`, action: () => { this.ui.pop(sc); hoops.startTwoOnTwo(opp, true); } },
+      { label: 'Friendly vs Hart Attack', action: () => { this.ui.pop(sc); hoops.startTwoOnTwo(1, false); } },
+      { label: 'Not now', action: () => this.ui.pop(sc) },
+    ], { html: body, onBack: () => this.ui.pop(sc) });
   }
   /** Building minigames, part-time jobs, the stadium race, intramurals, celebrations, the pet and decor. */
   private setupActivities() {
@@ -824,6 +871,7 @@ export class Game {
   private friendNames(n: number) { const f = Object.entries(this.life.progress.friends).sort((a, b) => b[1] - a[1]).map(x => x[0]); return [...f, 'Dallin', 'Kenzie', 'Jace'].slice(0, n); }
   /** The phone (Q): a pager in 1999–2001, a smartphone later. */
   showPhone() {
+    this.tourFlags.add('phone');
     const L = this.life, P = L.progress, era = this.world.era, msgs: { from: string; text: string }[] = [];
     const n = nextClass(L.clock, era); if (n) { const mins = Math.round(n.at - L.clock.minutes), when = mins <= 90 ? (mins > 0 ? `in ${mins} min` : 'now!') : `${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][Math.floor(n.at / 1440) % 7]} ${String(n.slot.hour).padStart(2, '0')}:00`; msgs.push({ from: 'Next class', text: `${n.slot.subject} — ${when}` }); }
     const f = this.friendNames(3).filter(x => P.friends[x]);
@@ -835,7 +883,7 @@ export class Game {
     openPhone(this.lifeHost, {
       era, time: L.clock.label(), weather: this.world.raining ? '🌧️' : SETTINGS.season === 'winter' ? '❄️' : this.world.daylight < 0.2 ? '🌙' : '☀️', messages: msgs,
       apps: [
-        { id: 'map', icon: '🗺️', name: 'Map', open: () => this.ui.bigMap(() => {}) },
+        { id: 'map', icon: '🗺️', name: 'Map', open: () => this.openMap() },
         { id: 'sched', icon: '📚', name: 'Classes', open: () => sub('Class schedule', scheduleHtml(L.clock, era, P)) },
         { id: 'records', icon: '🏆', name: 'Records', open: () => sub('Campus records', recordsHtml(P)) },
         { id: 'friends', icon: '🤝', name: 'Friends', open: () => sub('Friends', L.friendsHtml()) },
@@ -932,6 +980,80 @@ export class Game {
     const home = this.world.doorPlacement(this.location('door.home'));
     out.push({ label: 'My apartment', x: home.x, z: home.z });
     return out;
+  }
+  /** First-minutes checklist (campuslife/orientation.ts). */
+  orientation!: Orientation;
+  /** MC bulletin board daily tasks (campuslife/bulletin.ts). */
+  bulletin!: Bulletin;
+  private tourFlags = new Set<string>(); private tourT = 0;
+  private setupOrientation() {
+    const P = this.life.progress, k = () => this.player.vehicle?.kind;
+    this.orientation = new Orientation(P, {
+      map: () => this.tourFlags.has('map'), phone: () => this.tourFlags.has('phone'),
+      talk: () => Object.keys(P.friends).length > 0, ride: () => k() === 'board' || k() === 'sled',
+      photo: () => P.stat('photosTaken') > 0, mc: () => P.visited.has('bldg-manwaring'), hart: () => P.visited.has('bldg-hart'),
+      shuttle: () => P.stat('shuttleRides') > 0,
+    }, (text, big) => { this.ui.toast(text, big ? 6500 : 3000); playSound(big ? 'success' : 'chime'); });
+    this.bulletin = new Bulletin(P, () => Math.floor(this.life.clock.minutes / 1440), t => { this.ui.toast(t, 4000); playSound('chime'); });
+  }
+  /** Epilogue: one card per mission saying what you did, then the look-back screen. */
+  async showLegacy() {
+    this.voice.stop();
+    const cards = legacyCards(id => this.quests.status(id as QuestId) === 'completed', id => this.quests.data(id as QuestId) as Record<string, unknown>);
+    await this.ui.card('Your legacy', `${this.playerName}, looking back…`, 2600);
+    for (const c of cards) await this.ui.card(`${c.year} — ${c.title}`, c.text, 3600);
+    playSound('cheer');
+    await new Promise<void>(res => { const sc = this.ui.menu('🎓 Your legacy', [{ label: 'Continue', action: () => { this.ui.pop(sc); res(); } }], { html: legacyHtml(this.life.progress, this.playerName, this.coinTotal(), esc), className: 'legacy-screen', onBack: () => { this.ui.pop(sc); res(); } }); });
+  }
+  /** Map icons for places to do things (current era). */
+  private static POI_ICONS: Record<string, [string, string]> = {
+    hart: ['🏀', 'Hart · basketball, gym'], manwaring: ['🍔', 'MC · food, bowling, store, bulletin board'], mckay: ['📚', 'Library · book hunt'],
+    romney: ['🔭', 'Romney · planetarium'], snow: ['🎻', 'Snow · concert hall'], austin: ['🔧', 'Austin · car shop'], kimball: ['🎓', 'Kimball · President'],
+    taylor: ['⛪', 'Taylor · chapel, piano'], stc: ['💻', 'STC · computers'], benson: ['🌱', 'Benson · greenhouse'], icenter: ['🎤', 'I-Center'], temple: ['🛕', 'Temple'],
+  };
+  private mapPois(): MapPoi[] {
+    const out: MapPoi[] = [];
+    for (const d of this.destinations()) {
+      if (d.label === 'My apartment') { out.push({ x: d.x, z: d.z, icon: '🏠', label: 'Home' }); continue; }
+      const k = d.building && Game.POI_ICONS[d.building]; if (k) out.push({ x: d.x, z: d.z, icon: k[0], label: k[1] });
+    }
+    return out;
+  }
+  private tourMarker(): { x: number; z: number }[] {
+    const b = this.orientation.place(); if (!b || this.spaceId !== 'exterior') return [];
+    if (this.tourCache?.b !== b) { const d = this.destinations().find(q => q.building === b); this.tourCache = { b, pts: d ? [{ x: d.x, z: d.z }] : [] }; }
+    return this.tourCache.pts;
+  }
+  private tourCache: { b: string; pts: { x: number; z: number }[] } | null = null;
+  openMap() { this.tourFlags.add('map'); this.ui.mapExtras = { pois: this.mapPois(), shuttle: () => this.fastTravel() }; this.ui.bigMap(() => {}); }
+  /** Why fast travel isn't possible right now (null = it is). */
+  private travelBlocked(): string | null {
+    if (this.mode !== 'playing' || this.busy || this.cutscenes.active) return 'Not right now.';
+    if (this.life.race.target() || this.life.jobs?.target()) return 'Finish (or quit) your race or job first.';
+    if (this.sideQuests.tracker()) return 'You’re in the middle of a timed errand.';
+    if (this.hoops && this.hoops.mode !== 'free') return 'Finish your basketball game first.';
+    return null;
+  }
+  /** The campus shuttle: pick a building, ride there (fade), step off by its entrance. */
+  async fastTravel() {
+    const why = this.travelBlocked(); if (why) { this.ui.toast(`🚌 ${why}`); return; }
+    const list = this.destinations(), bus = ERAS[this.world.era].institution === 'byui' ? 'BYU–Idaho shuttle' : 'Ricks College shuttle';
+    const id = await this.ui.panel({ title: `🚌 ${bus}`, body: 'Where to? The shuttle drops you at the entrance.', buttons: [...list.map((d, i) => ({ id: String(i), label: `${(d.building && Game.POI_ICONS[d.building]?.[0]) || (d.label === 'My apartment' ? '🏠' : '🏛️')} ${d.label}` })), { id: 'back', label: 'Cancel' }] });
+    const d = id && id !== 'back' ? list[Number(id)] : null; if (!d) return;
+    if (this.player.vehicle) this.exitCart(true);
+    this.standUpIfSeated();
+    playSound('chime');
+    await this.ui.fade(async () => {
+      if (this.spaceId !== 'exterior') { this.entryDoor = null; this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true; if (this.hoops) this.hoops.end(); }
+      const door = d.building ? this.world.buildingDoors().filter(q => q.id === d.building).sort((a, b) => Math.hypot(a.x - d.x, a.z - d.z) - Math.hypot(b.x - d.x, b.z - d.z))[0] : null;
+      const pl = door ?? (d.label === 'My apartment' ? this.world.doorPlacement(this.location('door.home')) : { x: d.x, z: d.z, nx: 0, nz: 1 });
+      this.player.place(this.exteriorSpace, pl.x + pl.nx * 4, pl.z + pl.nz * 4, Math.atan2(-pl.nx, -pl.nz));
+      this.unstick(); this.cameraRig.reset(this.player.yaw); this.cameraRig.snap(this.player.position);
+      this.guide = null;
+      await this.wait(400);
+    });
+    this.ui.toast(`🚌 ${d.label}. Thanks for riding!`, 2500);
+    this.life.progress.add('shuttleRides'); this.save();
   }
   private compass(dx: number, dz: number) {
     const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
@@ -1167,6 +1289,7 @@ export class Game {
         this.introSeen = true;
       } finally { this.mode = 'playing'; this.busy = false; this.ui.showHud(true); }
     }
+    if (intro && !this.life.progress.stat('tourDone')) setTimeout(() => { if (this.mode === 'playing') this.orientation.start(); }, 2500);
     if (!intro && this.quests.allComplete() && !this.finaleReached) { this.finale.start(); return; }
     this.save();
   }
@@ -1188,6 +1311,7 @@ export class Game {
     const s = this.ui.menu(GAME_CONFIG.title, [
       { label: save ? `Continue (${ERAS[save.era]?.label ?? save.era})` : 'Continue', disabled: !save, action: () => save && this.continueGame(save) },
       { label: 'New game', action: () => this.chooseDifficulty() },
+      { label: `💾 Save slot ${SETTINGS.slot}${save ? ` — ${save.playerName ?? 'Alex'}` : ' — empty'} (switch player)`, action: () => this.chooseSlot() },
       { label: 'Settings', action: () => this.showSettings() },
       { label: 'Controls', action: () => this.showControls() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
@@ -1196,8 +1320,18 @@ export class Game {
     // modern title: tagline under the logo + "now playing" chip for the team's music
     s.el.querySelector('h1')?.insertAdjacentHTML('afterend', '<div class="title-tag">Ricks College · BYU–Idaho · 25 years of legacy</div>');
     const chip = document.createElement('div'); chip.className = 'now-playing'; s.el.appendChild(chip);
-    const paint = () => { chip.innerHTML = `<span class="np-note">♪</span> <span class="np-label">Now playing</span> <b>${esc(this.music.title)}</b>`; };
+    const paint = () => { chip.innerHTML = SETTINGS.music ? `<span class="np-note">♪</span> <span class="np-label">Now playing</span> <b>${esc(this.music.title)}</b>` : '<span class="np-note">♪</span> <span class="np-label">Music off</span> <b>Settings → Background music</b>'; };
     paint(); const t = setInterval(paint, 1000); s.cleanup = () => clearInterval(t);
+  }
+  /** Three save slots (brothers, sisters, roommates…): pick whose game Continue / New game uses. */
+  private chooseSlot() {
+    const when = (iso: string) => { try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return ''; } };
+    const items = Array.from({ length: SLOT_COUNT }, (_, i) => {
+      const n = i + 1, sm = slotSummary(n);
+      return { label: `${n === SETTINGS.slot ? '▶ ' : ''}Slot ${n}: ${sm ? `${sm.name} · ${ERAS[sm.era]?.label ?? sm.era} · ${sm.done}/${QUEST_ORDER.length} missions · ${when(sm.savedAt)}` : 'empty — start a new game here'}`,
+        action: () => { SETTINGS.slot = n; saveSettings(); this.ui.pop(sc); this.showTitle(); } };
+    });
+    const sc = this.ui.menu('Save slots', [...items, { label: 'Back', action: () => this.ui.pop(sc) }], { subtitle: 'Each slot is a separate game saved in this browser. Choose one, then Continue or New game.', onBack: () => this.ui.pop(sc) });
   }
   /** Testing only: start at any quest with the earlier ones marked complete (no coins). */
   private showQuestJump() {
@@ -1237,7 +1371,7 @@ export class Game {
   }
   private confirmReset() {
     const s = this.ui.menu('Reset saved game?', [
-      { label: 'Yes, delete my local save', action: () => { clearSave(); this.ui.pop(s); this.mode === 'title' ? this.showTitle() : this.quitToTitle(false); } },
+      { label: `Yes, delete save slot ${SETTINGS.slot}`, action: () => { clearSave(); this.ui.pop(s); this.mode === 'title' ? this.showTitle() : this.quitToTitle(false); } },
       { label: 'Cancel', action: () => this.ui.pop(s) },
     ], { onBack: () => this.ui.pop(s) });
   }
@@ -1256,6 +1390,9 @@ export class Game {
       ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
       ['Map / objective', 'M', 'Button 3', 'X'], ['Journal (Quest 3 cards)', 'J', 'Pause menu', 'Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
       ['One Joy-Con (sideways)', '', '', 'Stick moves · SL / SR turn the camera'],
+      ['Campus shuttle (fast travel)', 'M → 🚌 Campus shuttle, or Pause', 'Pause menu', '+ → Campus shuttle'],
+      ['Touch screen', 'Left stick on screen moves · E / jump / board buttons on the right · drag the view to look · pinch to zoom', '', ''],
+      ['Rebind keys', 'Settings → Accessibility → Rebind keys', '', ''],
     ];
     const html = `<table><tr><th>Action</th><th>Keyboard / mouse</th><th>Controller</th><th>Joy-Con</th></tr>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
     const s = this.ui.menu('Controls', [{ label: 'Back', action: () => this.ui.pop(s) }], { html, onBack: () => this.ui.pop(s) });
@@ -1278,7 +1415,7 @@ export class Game {
   allControllers() { return [...this.gamepads.list(), ...this.ble.map(b => b.device), ...this.mocks.map(m => m.device)]; }
 
   showPause() {
-    this.quests.suspendAll(); this.pauseOpen = true;
+    this.quests.suspendAll(); this.pauseOpen = true; this.ui.mapExtras = { pois: this.mapPois(), shuttle: () => this.fastTravel() };
     const close = () => { this.ui.pop(s); this.pauseOpen = false; this.quests.resumeAll(); };
     const other = this.difficulty === 'easy' ? 'hard' : 'easy';
     const items = [
@@ -1290,9 +1427,12 @@ export class Game {
       ...(this.player.jetpack ? [{ label: 'Take off the jetpack', action: () => { this.player.jetpack = false; this.player.avatar.setJetpack(false); this.ui.toast('Jetpack off.'); close(); } }] : []),
       ...(this.player.handstand ? [{ label: 'Back on your feet', action: () => { this.player.setHandstand(false); close(); } }] : []),
       ...(this.player.superSpeed || this.player.superJump ? [{ label: 'Turn off superpowers', action: () => { this.player.superSpeed = this.player.superJump = false; this.ui.toast('Superpowers off.'); close(); } }] : []),
+      ...(!this.life.progress.stat('tourDone') ? [{ label: this.orientation.on ? `🧭 Skip the campus orientation (${this.orientation.count()}/8)` : '🧭 Start the campus orientation (coins for learning the ropes)', action: () => { close(); if (this.orientation.on) { this.orientation.skip(); this.ui.toast('Orientation skipped. You can start it again from the pause menu.'); } else this.orientation.start(); } }] : []),
+      { label: '🚌 Campus shuttle (fast travel)', action: () => { close(); void this.fastTravel(); } },
       { label: `📋 Side quests (${this.sideQuests.doneCount()}/${this.sideQuests.journal().length} done)`, action: () => this.showSideJournal() },
       { label: `🌟 Campus life — photos, friends, collection, achievements (${this.life.progress.achievements.size}/${ACHIEVEMENT_COUNT} 🏆)`, action: () => this.showLifeMenu() },
       { label: `👕 Change outfit (${outfitById(this.outfit).name})`, action: () => this.showWardrobe() },
+      ...(this.finaleReached ? [{ label: '🎓 Your legacy (look back)', action: () => { close(); void this.showLegacy(); } }] : []),
       { label: '⚡ Superpowers & cheat codes', action: () => this.showCheats() },
       { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
       { label: 'Jump to a quest (testing)', action: () => this.showQuestJump() },
@@ -1494,8 +1634,16 @@ export class Game {
       const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
       button(() => `Season: ${SETTINGS.season[0].toUpperCase()}${SETTINGS.season.slice(1)} (whole game)`, () => { SETTINGS.season = SEASONS[(SEASONS.indexOf(SETTINGS.season) + 1) % 4]; this.applySeason(); });
       button(() => `Day & night cycle: ${SETTINGS.dayNight ? 'On (1 minute = 1 hour)' : 'Off (fixed time per era)'}`, () => { SETTINGS.dayNight = !SETTINGS.dayNight; this.life.clock.running = SETTINGS.dayNight; if (!SETTINGS.dayNight) this.applySeason(); });
-      button(() => `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
+      const GQ = ['high', 'medium', 'low'] as const;
+      button(() => `Graphics quality: ${SETTINGS.graphics === 'high' ? 'High (sharpest)' : SETTINGS.graphics === 'medium' ? 'Medium (balanced)' : 'Low (fastest — older laptops, phones)'}`, () => { SETTINGS.graphics = GQ[(GQ.indexOf(SETTINGS.graphics) + 1) % 3]; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
+      head('Accessibility');
+      const TS = [1, 1.15, 1.3, 1.5];
+      button(() => `Text size: ${Math.round(SETTINGS.textScale * 100)}%`, () => { SETTINGS.textScale = TS[(TS.indexOf(SETTINGS.textScale) + 1) % TS.length] ?? 1; this.applyAccessibility(); });
+      button(() => `Colour-blind friendly markers: ${SETTINGS.colorblind ? 'On (orange objectives, blue doors)' : 'Off'}`, () => { SETTINGS.colorblind = !SETTINGS.colorblind; this.applyAccessibility(); });
       button(() => `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; });
+      const TC = ['auto', 'on', 'off'] as const;
+      button(() => `Touch controls: ${SETTINGS.touch === 'auto' ? `Automatic (${isTouchDevice() ? 'on — touch screen found' : 'off — no touch screen'})` : SETTINGS.touch === 'on' ? 'Always on' : 'Off'}`, () => { SETTINGS.touch = TC[(TC.indexOf(SETTINGS.touch) + 1) % 3]; });
+      button(() => 'Rebind keys (keyboard)', () => this.showKeymap());
       head('Controllers');
       button(() => 'Controllers (pair, calibrate, status)', () => this.showControllers());
       if (this.mode === 'title') {   // the movies play from the title screen
@@ -1515,6 +1663,36 @@ export class Game {
     }, { className: 'settings-screen' });
   }
 
+  /** Text size and colour-blind mode (Settings → Accessibility). */
+  applyAccessibility() {
+    document.documentElement.style.setProperty('--text-zoom', String(SETTINGS.textScale || 1));
+    this.ui.colorblind = !!SETTINGS.colorblind;
+  }
+  private touchOn() { return SETTINGS.touch === 'on' || (SETTINGS.touch === 'auto' && isTouchDevice()); }
+  /** Rebind keyboard keys: pick an action, press the new key (a key already in use swaps with it). */
+  showKeymap() {
+    let waiting: string | null = null;
+    const render = () => {
+      const items = REMAPPABLE.map(r => ({ label: `${r.label}: ${waiting === r.id ? '… press a key (Esc cancels)' : keyName(keyFor(r.id))}`, action: () => { waiting = r.id; render(); } }));
+      const sc = this.ui.menu('Rebind keys', [...items, { label: 'Reset all to defaults', action: () => { SETTINGS.keymap = {}; saveSettings(); render(); } }, { label: 'Back', action: () => { window.removeEventListener('keydown', onKey, true); this.ui.pop(sc); } }],
+        { subtitle: 'Arrow keys always move and Esc always pauses. Choose an action, then press its new key.', onBack: () => { window.removeEventListener('keydown', onKey, true); this.ui.pop(sc); } });
+      if (cur) this.ui.pop(cur); cur = sc;
+    };
+    let cur: ReturnType<UI['menu']> | null = null;
+    const onKey = (e: KeyboardEvent) => {
+      if (!waiting) return;
+      e.preventDefault(); e.stopPropagation();
+      const id = waiting; waiting = null;
+      if (e.code !== 'Escape' && !e.code.startsWith('Arrow')) {
+        const clash = REMAPPABLE.find(r => r.id !== id && keyFor(r.id) === e.code);
+        if (clash) SETTINGS.keymap[clash.id] = keyFor(id);   // swap
+        SETTINGS.keymap[id] = e.code; saveSettings(); playSound('tick');
+      }
+      render();
+    };
+    window.addEventListener('keydown', onKey, true);
+    render();
+  }
   quitToTitle(save: boolean) { if (save) this.save(); this.finale.stop(); this.showTitle(); }
 
   // ---------------- inspectables (look-and-press discovery) ----------------
@@ -1622,6 +1800,15 @@ export class Game {
     const d = this.entryDoor?.space === this.spaceId ? this.entryDoor : this.world.doorPlacement(this.location(def.exteriorDoor)); return { mapX: d.x, mapZ: d.z };
   }
 
+  /** How many students are around you outdoors (0–1), for the crowd murmur. Checked twice a second. */
+  private crowdT = 0; private crowdV = 0;
+  private crowdLevel(dt: number) {
+    this.crowdT -= dt; if (this.crowdT > 0 || !this.npcs) return this.crowdV; this.crowdT = 0.5;
+    if (this.mode !== 'playing' || this.spaceId !== 'exterior') return (this.crowdV = 0);
+    const p = this.player.position; let n = 0;
+    for (const w of this.npcs.walkers) if (w.avatar.root.visible && Math.hypot(w.avatar.root.position.x - p.x, w.avatar.root.position.z - p.z) < 22) n++;
+    return (this.crowdV = Math.min(1, n / 10));
+  }
   // ---------------- frame loop ----------------
   private frame() {
     const elapsed = this.clock.getDelta();
@@ -1630,7 +1817,7 @@ export class Game {
     this.input.update(dt);
     const cinematic = this.cutscenes.active || this.mode === 'cutscene' || this.mode === 'finale' || this.ui.cardShowing;
     this.music.update(dt, !cinematic, !!this.ui.currentSpeaker);   // ducked under dialogue
-    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.spaceId });
+    this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.mode === 'title' ? 'title' : this.spaceId, crowd: this.crowdLevel(dt) });
     const veh = this.player.vehicle;
     this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike' && !isRide(veh.kind), isAircraft(veh?.kind ?? 'car') ? Math.max(14, veh!.speed) : veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
@@ -1659,6 +1846,7 @@ export class Game {
     const a = this.input.state;
     for (const h of this.devHooks) h(dt);
     const uiBlocking = this.mode === 'title' && !document.body.classList.contains('booted') ? true : this.ui.update(a);   // menus wait for the loading screen
+    this.touch.setVisible(this.touchOn() && this.mode === 'playing' && !uiBlocking && !this.cutscenes.active);
 
     if (this.mode === 'title') {
       this.markers.forEach(m => m.visible = false);
@@ -1702,7 +1890,8 @@ export class Game {
       if (this.hoops) {
         if (inHart) this.hoops.update(dt, this.player.position, this.player.yaw, this.player.speed, a, canAct && !this.player.vehicle);
         else if (this.inHart) this.hoops.end();
-        if (this.hartJace) this.hartJace.root.visible = this.hoops.mode !== 'oneOnOne';
+        if (this.hartJace) this.hartJace.root.visible = this.hoops.mode !== 'game';
+        if (this.hartKenzie) this.hartKenzie.root.visible = this.hoops.mode !== 'game';
       }
       this.inHart = inHart;
       this.cameraRig.follow = !!this.player.vehicle;
@@ -1725,6 +1914,7 @@ export class Game {
       this.updateCoins(dt); this.updateMarkers(dt);
       this.sideQuests.update(dt, !uiBlocking && !this.pauseOpen && !this.controllerLost && !this.buildingInfoOpen); this.updateGuide();
       this.life.update(dt, !uiBlocking && !this.pauseOpen && !this.controllerLost && !this.buildingInfoOpen);
+      this.tourT += dt; if (this.tourT > 0.4) { this.tourT = 0; this.orientation.update(); this.bulletin.update(); }
       this.watchControllers();
       if (canAct) {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
@@ -1738,21 +1928,21 @@ export class Game {
         else if (a.pressed('photo')) { a.consume('photo'); this.life.photo.open(); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
         else if (a.pressed('journal') && this.hudBtn) { a.consume('journal'); this.hudBtn.fn(); }
-        else if (a.pressed('map')) { a.consume('map'); this.ui.bigMap(() => {}); }   // the map always opens the map (the journal has its own button: J / Joy-Con Y)
+        else if (a.pressed('map')) { a.consume('map'); this.openMap(); }   // the map always opens the map (the journal has its own button: J / Joy-Con Y)
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;
       const coinTotal = this.coinTotal();
       const job = this.life.race.target() ?? this.life.jobs?.target() ?? null;
       const guidePt = job ? { x: job.x, z: job.z } : this.guide ? this.targetPoint({ x: this.guide.x, z: this.guide.z }) : null;
-      const sideLine = [this.spaceId === 'bldg-hart' ? this.hoops?.tracker() ?? null : null, this.life.race.tracker(), this.life.jobs?.tracker() ?? null, this.life.events.tracker(), this.life.hangingWith ? `🤝 Hanging out with ${this.life.hangingWith.name}` : null, this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
+      const sideLine = [this.spaceId === 'bldg-hart' ? this.hoops?.tracker() ?? null : null, this.life.race.tracker(), this.life.jobs?.tracker() ?? null, this.life.events.tracker(), this.life.hangingWith ? `🤝 Hanging out with ${this.life.hangingWith.name}` : null, this.sideQuests.tracker(), this.orientation.tracker(), this.bulletin.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
       this.ui.updateHud({
         objective: obj.text, era: `${ERAS[this.world.era].label} · 🕒 ${this.life.clock.label()}`,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
         prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (isAircraft(this.player.vehicle.kind) && this.player.altitude() > 0.05 ? (this.player.autoLand ? 'Landing… (press again to cancel)' : 'Land here') : this.player.vehicle.kind === 'heli' ? 'Get out of the helicopter' : this.player.vehicle.kind === 'plane' ? 'Get out of the plane (stop first)' : this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'board' ? 'Step off the longboard' : this.player.vehicle.kind === 'sled' ? 'Get off the sled' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, eraId: this.world.era, target: guidePt ?? this.targetPoint(obj.target), interior: interiorLabel,
-        markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[], ...(guidePt ? [guidePt] : [])], side: sideLine,
+        markers: [...this.markerPoints(), ...this.tourMarker(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[], ...(guidePt ? [guidePt] : [])], side: sideLine,
         targetLabel: job ? job.label : this.guide ? this.guide.label : this.targetLabel(obj.target),   // asked for directions: the pointer leads there until you arrive
         doors: this.spaceId === 'exterior' ? this.entrances.filter(e => !e.eras || e.eras.includes(this.world.era)) : [],
         coins: `● ${coinTotal} coins`, driving: this.player.vehicle?.kind ?? false,

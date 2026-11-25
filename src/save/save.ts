@@ -5,9 +5,14 @@ import type { RewardReceipt } from '../quests/rewards';
 import type { LifeSave } from '../campuslife/progress';
 import { QUEST_ERA, QUEST_ORDER } from '../quests/order';
 import { ERA_ORDER } from '../world/eras';
+import { SETTINGS } from '../core/settings';
 
 export const SAVE_VERSION = 4;
 const KEY = 'spirit-of-ricks.save';
+export const SLOT_COUNT = 3;
+/** Slot 1 keeps the original key, so saves from before slots existed load as slot 1. */
+export const slotKey = (slot: number) => (slot <= 1 ? KEY : `${KEY}.${slot}`);
+const cur = () => Math.max(1, Math.min(SLOT_COUNT, SETTINGS.slot || 1));
 
 export interface SaveData {
   version: number;
@@ -57,17 +62,22 @@ const MIGRATIONS: Record<number, Migration> = {
   3: addStoryMissions,
 };
 
-export function loadSave(): SaveData | null {
+export function loadSave(slot = cur()): SaveData | null {
   try {
-    const raw = localStorage.getItem(KEY); if (!raw) return null;
+    const raw = localStorage.getItem(slotKey(slot)); if (!raw) return null;
     let d = JSON.parse(raw);
     while (d && d.version < SAVE_VERSION && MIGRATIONS[d.version]) d = MIGRATIONS[d.version](d);
     if (!d || d.version !== SAVE_VERSION) { console.warn('Save schema mismatch; ignoring.'); return null; }
     return d as SaveData;
   } catch (e) { console.warn('Could not read save', e); return null; }
 }
-export function writeSave(d: SaveData): boolean {
-  try { localStorage.setItem(KEY, JSON.stringify({ ...d, version: SAVE_VERSION, savedAt: new Date().toISOString() })); return true; }
+export function writeSave(d: SaveData, slot = cur()): boolean {
+  try { localStorage.setItem(slotKey(slot), JSON.stringify({ ...d, version: SAVE_VERSION, savedAt: new Date().toISOString() })); return true; }
   catch (e) { console.warn('Could not write save', e); return false; }
 }
-export function clearSave() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } }
+export function clearSave(slot = cur()) { try { localStorage.removeItem(slotKey(slot)); } catch { /* ignore */ } }
+/** One-line description of a slot for the slot picker (null = empty). */
+export function slotSummary(slot: number): { name: string; era: EraId; savedAt: string; done: number } | null {
+  const d = loadSave(slot); if (!d) return null;
+  return { name: d.playerName ?? 'Alex', era: d.era, savedAt: d.savedAt, done: Object.values(d.quests).filter(q => q.status === 'completed').length };
+}

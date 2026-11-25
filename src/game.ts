@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import './interiors/campusInteriors';   // registers campus building interiors + their doors (before the world is built)
 import { HOME_ID, HOME_SPOTS } from './interiors/apartment';
 import { HART, MC_SPOTS, STRIKE_ZONE } from './interiors/campusInteriors';
-import { benchPress, kg, shootout, treadmill, type HartHost } from './campuslife/hartGames';
+import { benchPress, kg, treadmill, type HartHost } from './campuslife/hartGames';
+import { Hoops } from './campuslife/hoops';
 import { bookHunt, cafeteria, carRepair, intramurals, pingPong, planetarium, recordsHtml, rhythm, tourGuide } from './campuslife/minigames';
 import { Apartment, Celebrations, PETS, petHunger, scheduleHtml, nextClass } from './campuslife/studentLife';
 import { openPhone } from './campuslife/phone';
@@ -756,9 +757,16 @@ export class Game {
     this.interactions.add({ id: 'hart:bench', kind: 'generic', at: { ...HART.benchStand, space: H }, radius: 1.6, enabled: free,
       prompt: () => `Bench press contest${P.stat('benchBest') ? ` (record ${P.stat('benchBest')} lb / ${kg(P.stat('benchBest'))} kg)` : ''}`,
       onInteract: () => run(() => benchPress(this.lifeHost, P, k, HART.bench, HART.benchStand)) });
-    this.interactions.add({ id: 'hart:shootout', kind: 'generic', at: { x: HART.shots[0].x, z: HART.shots[0].z - 0.8, space: H }, radius: 2, enabled: free,
-      prompt: () => `Shooting challenge — 60 seconds${P.stat('hoopsBest') ? ` (record ${P.stat('hoopsBest')} pts)` : ''}`,
-      onInteract: () => run(() => shootout(this.lifeHost, P, k, { x: HART.hoopX, y: HART.hoopY, z: HART.hoopZ }, HART.shots)) });
+    // real basketball on the south half court: shootaround, the 60-second challenge, and 1-on-1 vs Jace
+    const hoops = this.hoops = new Hoops(this.lifeHost, P, this.interiors.groups.get(H)!, this.interiors.origin(H));
+    const notPlaying = () => free() && !hoops.holding && hoops.mode === 'free';
+    this.interactions.add({ id: 'hart:shootout', kind: 'generic', at: { x: -19.5, z: 15.6, space: H }, radius: 1.8, enabled: notPlaying,
+      prompt: () => `Shooting challenge — 60 seconds${P.stat('hoopsBest') ? ` (record ${P.stat('hoopsBest')} pts)` : ''}`, onInteract: () => hoops.startChallenge() });
+    const jace = new Avatar({ ...eraLook('presentFinale', 4411), shirt: '#7a2b2b', shorts: true }); jace.setLabel('Jace', '1-on-1');
+    this.hartJace = jace;
+    this.interactions.add({ id: 'hart:1on1', kind: 'npc', at: { x: -24.8, z: 8.5, space: H }, radius: 2.4, visual: jace.root, enabled: notPlaying,
+      prompt: () => `Play 1-on-1 vs Jace — first to 11${P.stat('oneOnOneWins') ? ` (${P.stat('oneOnOneWins')} wins)` : ''}`,
+      onInteract: async () => { await this.ui.dialogue([{ speaker: 'Jace · Student', text: this.life.progress.stat('oneOnOneWins') ? 'Back for more? Let’s go — make it, take it… no, just kidding. Check ball!' : 'You want to run one? First to eleven. Twos and threes. Don’t foul me!' }]); hoops.startOneOnOne(); } });
   }
   /** Building minigames, part-time jobs, the stadium race, intramurals, celebrations, the pet and decor. */
   private setupActivities() {
@@ -837,6 +845,9 @@ export class Game {
     });
   }
   private lifeHost!: ConstructorParameters<typeof CampusLife>[0];
+  hoops: Hoops | null = null;
+  private hartJace: Avatar | null = null;
+  private inHart = false;
   /** Every coin you own: story rewards, pickups, side quests and campus life (minus what you spent). */
   coinTotal() { return this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin + this.sideQuests.coins() + this.life.coinsNet(); }
   /** Pause menu: campus life (achievements, friends, collection, photos). */
@@ -1471,7 +1482,8 @@ export class Game {
       };
       const V = SETTINGS as unknown as Record<string, number>;
       head('Sound');
-      slider('Music', () => Math.round(SETTINGS.musicVolume * 100), v => { V.musicVolume = v / 100; });
+      button(() => `Background music: ${SETTINGS.music ? 'On' : 'Off'}`, () => { SETTINGS.music = !SETTINGS.music; });
+      slider('Music volume', () => Math.round(SETTINGS.musicVolume * 100), v => { V.musicVolume = v / 100; });
       slider('Sound effects', () => Math.round(SETTINGS.sfxVolume * 100), v => { V.sfxVolume = v / 100; playSound('tick'); });
       slider('Ambience (wind, birds)', () => Math.round(SETTINGS.ambienceVolume * 100), v => { V.ambienceVolume = v / 100; });
       slider('Character voices', () => Math.round(SETTINGS.voiceVolume * 100), v => { V.voiceVolume = v / 100; });
@@ -1685,6 +1697,14 @@ export class Game {
       const canAct = !uiBlocking && !this.busy && !this.interactions.busy && !photo.active;
       if (photo.active) this.ui.showHud(false);
       if (!this.buildingInfoOpen) this.player.update(dt, a, this.cameraRig.yaw, canAct);
+      // basketball in the Hart (before other interactions: E shoots while you have the ball)
+      const inHart = this.spaceId === 'bldg-hart';
+      if (this.hoops) {
+        if (inHart) this.hoops.update(dt, this.player.position, this.player.yaw, this.player.speed, a, canAct && !this.player.vehicle);
+        else if (this.inHart) this.hoops.end();
+        if (this.hartJace) this.hartJace.root.visible = this.hoops.mode !== 'oneOnOne';
+      }
+      this.inHart = inHart;
       this.cameraRig.follow = !!this.player.vehicle;
       if (this.camFocus) { const c = this.renderer.camera; c.position.copy(this.camFocus.from); c.lookAt(this.camFocus.to); }
       else this.cameraRig.update(dt, uiBlocking ? null : a, this.player.position, this.space, this.player.yaw);
@@ -1725,7 +1745,7 @@ export class Game {
       const coinTotal = this.coinTotal();
       const job = this.life.race.target() ?? this.life.jobs?.target() ?? null;
       const guidePt = job ? { x: job.x, z: job.z } : this.guide ? this.targetPoint({ x: this.guide.x, z: this.guide.z }) : null;
-      const sideLine = [this.life.race.tracker(), this.life.jobs?.tracker() ?? null, this.life.events.tracker(), this.life.hangingWith ? `🤝 Hanging out with ${this.life.hangingWith.name}` : null, this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
+      const sideLine = [this.spaceId === 'bldg-hart' ? this.hoops?.tracker() ?? null : null, this.life.race.tracker(), this.life.jobs?.tracker() ?? null, this.life.events.tracker(), this.life.hangingWith ? `🤝 Hanging out with ${this.life.hangingWith.name}` : null, this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
       this.ui.updateHud({
         objective: obj.text, era: `${ERAS[this.world.era].label} · 🕒 ${this.life.clock.label()}`,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,

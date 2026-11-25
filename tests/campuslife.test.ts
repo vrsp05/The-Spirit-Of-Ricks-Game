@@ -119,3 +119,21 @@ describe('more campus activities', () => {
     for (const e of ['ricks1999', 'byui', 'presentFinale'] as const) for (const s of scheduleFor(e)) for (const d of s.days) expect(d).toBeLessThan(5);
   });
 });
+
+import * as THREE from 'three';
+import { COURT, shotVelocity, shotPoints } from '../src/campuslife/hoops';
+describe('real basketball', () => {
+  const fly = (from: THREE.Vector3, v: THREE.Vector3) => { const p = from.clone(), vel = v.clone(); for (let i = 0; i < 2000; i++) { const prevY = p.y; vel.y -= 9.8 / 600; p.addScaledVector(vel, 1 / 600); if (prevY >= COURT.hoop.y && p.y < COURT.hoop.y) return Math.hypot(p.x - COURT.hoop.x, p.z - COURT.hoop.z); } return 99; };
+  it('the ideal shot drops through the rim from anywhere on the court', () => {
+    for (const [x, z] of [[-13, 8.4], [-17, 9.6], [-19.6, 12], [-13, 5.8], [-8, 3]]) {
+      const from = new THREE.Vector3(x, 2.25, z), miss = fly(from, shotVelocity(from, COURT.hoop));
+      expect(miss).toBeLessThan(COURT.rimR - COURT.ballR * 0.3);
+    }
+  });
+  it('too much or too little power misses', () => {
+    const from = new THREE.Vector3(-13, 2.25, 6), v = shotVelocity(from, COURT.hoop);
+    expect(fly(from, v.clone().multiplyScalar(1.12))).toBeGreaterThan(COURT.rimR);
+    expect(fly(from, v.clone().multiplyScalar(0.88))).toBeGreaterThan(COURT.rimR);
+  });
+  it('threes from beyond the arc', () => { expect(shotPoints(-13, 10)).toBe(2); expect(shotPoints(-13, 5)).toBe(3); });
+});

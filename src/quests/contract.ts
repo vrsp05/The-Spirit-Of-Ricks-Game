@@ -9,7 +9,7 @@ import type { InteractableDef } from '../interact/interactables';
 import type { EraId } from '../world/eras';
 import type { CutsceneSpec } from '../cutscene/Cutscene';
 
-export type QuestId = 'professors' | 'construction' | 'letters';
+export type QuestId = 'professors' | 'y2k' | 'vikings' | 'construction' | 'capsule' | 'snowday' | 'letters';
 export type QuestStatus = 'locked' | 'available' | 'active' | 'completed';
 
 export interface DialogueLine { speaker: string; text: string; placeholder?: boolean }

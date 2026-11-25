@@ -104,11 +104,17 @@ export class Renderer {
   }
   private baseExposure = 0.72;
   /** Brightness setting (exposure multiplier). */
-  setBrightness(b: number) { this.sepia.uniforms.exposure.value = this.baseExposure * b; }
+  setBrightness(b: number) { this.sepia.uniforms.exposure.value = this.baseExposure * b * (0.8 + 0.2 * this.day); }
+  private baseEnv = 0.55; private day = 1;
+  /** Day/night: 1 = the era's daylight look, 0 = night (dimmer sky light and exposure). */
+  setDaylight(day: number) {
+    if (Math.abs(day - this.day) < 0.002) return;
+    this.day = day; this.scene.environmentIntensity = this.baseEnv * (0.35 + 0.65 * day); this.setBrightness(SETTINGS.brightness);
+  }
   /** Era time-of-day: environment light, haze, exposure. (World sets sun, sky dome, night lights, season.) */
   setAtmosphere(a: Atmosphere) {
     this.scene.environment = this.skyEnvironment(a);
-    this.scene.environmentIntensity = a.envIntensity;
+    this.baseEnv = a.envIntensity; this.scene.environmentIntensity = a.envIntensity * (0.35 + 0.65 * this.day);
     this.fog.color.set(a.fog); this.fog.density = a.fogDensity;
     this.baseExposure = a.exposure; this.setBrightness(SETTINGS.brightness);
   }

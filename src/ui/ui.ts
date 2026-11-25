@@ -393,7 +393,7 @@ export class UI {
       this.ptext.textContent = `${d.targetLabel ? d.targetLabel + ' · ' : ''}${dist} m`;
     }
     this.coinsEl.textContent = d.coins;
-    this.helpEl.textContent = d.driving === 'heli' ? 'Helicopter: WASD fly · Space climb · F descend · Shift faster · E land / get out' : d.driving === 'plane' ? 'Plane: W throttle · S slow / reverse · A/D turn · Space climb · F dive · E land / get out' : d.driving ? 'W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · M map · Esc pause';
+    this.helpEl.textContent = d.driving === 'heli' ? 'Helicopter: WASD fly · Space climb · F descend · Shift faster · E land / get out' : d.driving === 'plane' ? 'Plane: W throttle · S slow / reverse · A/D turn · Space climb · F dive · E land / get out' : d.driving ? 'W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · B longboard · P camera · M map · Esc pause';
     if (d.interior) {   // indoors: the campus map stays visible, centred on the building you're in
       g.fillStyle = 'rgba(20,16,12,0.72)'; g.fillRect(0, S - 22, S, 22);
       g.fillStyle = '#ffd34d'; g.font = 'bold 11px system-ui'; g.textAlign = 'center'; g.fillText(`Inside: ${d.interior.split('—')[0].trim()}`.slice(0, 30), S / 2, S - 8); g.textAlign = 'start';

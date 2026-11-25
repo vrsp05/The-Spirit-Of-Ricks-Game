@@ -627,8 +627,18 @@ export class World {
   private skyU!: { top: { value: THREE.Color }; mid: { value: THREE.Color }; horizon: { value: THREE.Color }; sun: { value: THREE.Vector3 } };
   private cloudMat!: THREE.MeshStandardMaterial;
   private seasonU = { snowAmt: { value: 0 }, autumnAmt: { value: 0 } };
+  /** Lamp-post heads (they glow at night) and their positions. */
+  readonly lampMat = new THREE.MeshStandardMaterial({ color: '#fff3c8', emissive: '#ffd27a', emissiveIntensity: 0.15 });
+  lamps: { x: number; z: number }[] = [];
+  private stars!: THREE.Points;
   private makeSky(): THREE.Object3D {
     const grp = new THREE.Group();
+    // stars (fade in at night)
+    { const N = 900, pos = new Float32Array(N * 3), r = rng(91);
+      for (let i = 0; i < N; i++) { const a = r() * Math.PI * 2, y = 0.08 + r() * 0.92, h = Math.sqrt(1 - y * y); pos.set([Math.cos(a) * h * 1500, y * 1500, Math.sin(a) * h * 1500], i * 3); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: '#ffffff', size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+      this.stars.frustumCulled = false; this.stars.renderOrder = -9; this.stars.visible = false; grp.add(this.stars); }
     const sunDir = new THREE.Vector3(50, 100, 35).normalize();
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 32, 16), new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
@@ -697,7 +707,8 @@ export class World {
       this.obstacles.push({ x: b.x, z: b.z, r: 0.7 });
     });
     const pole = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 4, 0.16), lambert('#2e3236'), lamps.length);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: '#fff3c8', emissive: '#ffd27a', emissiveIntensity: 0.15 }), lamps.length);
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), this.lampMat, lamps.length);
+    this.lamps = lamps;
 
     lamps.forEach((l, i) => {
       const y = terrainHeight(l.x, l.z);
@@ -850,7 +861,12 @@ export class World {
   /** Weather particles in a box around the player: snowflakes (winter) or tumbling leaves (autumn). */
   private weather!: THREE.Points;
   private weatherVel!: Float32Array;
-  private weatherKind: 'snow' | 'leaves' | null = null;
+  private weatherKind: 'snow' | 'leaves' | 'rain' | null = null;
+  private seasonWeather: 'snow' | 'leaves' | null = null;
+  /** A passing shower (rain, or heavier snow in winter) on top of the season's weather. */
+  private shower = false;
+  /** Wind push on the particles (m/s, x/z) — Rexburg gusts. */
+  readonly gust = new THREE.Vector2();
   private lastT = 0;
   private makeWeather(): THREE.Object3D {
     const N = 1600, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), rnd = rng(8);
@@ -861,24 +877,33 @@ export class World {
     this.weather.frustumCulled = false; this.weather.visible = false;
     return this.weather;
   }
+  /** Start/stop a shower (rain; in winter, a snow squall). */
+  setShower(on: boolean) { this.shower = on; this.setWeather(this.seasonWeather); }
+  get raining() { return this.weatherKind === 'rain'; }
+  get showerOn() { return this.shower; }
   private setWeather(kind: 'snow' | 'leaves' | null) {
-    this.weatherKind = kind; this.weather.visible = !!kind;
-    if (!kind) return;
+    this.seasonWeather = kind;
+    const k: 'snow' | 'leaves' | 'rain' | null = this.shower ? (kind === 'snow' ? 'snow' : 'rain') : kind;
+    this.weatherKind = k; this.weather.visible = !!k;
+    if (!k) return;
     const col = this.weather.geometry.getAttribute('color') as THREE.BufferAttribute, rnd = rng(12), c = new THREE.Color();
     const leaves = ['#d9822b', '#c4501f', '#e3b23c', '#a8361c'];
-    for (let i = 0; i < col.count; i++) { c.set(kind === 'snow' ? '#ffffff' : leaves[(rnd() * 4) | 0]); col.setXYZ(i, c.r, c.g, c.b); }
+    for (let i = 0; i < col.count; i++) { c.set(k === 'snow' ? '#ffffff' : k === 'rain' ? '#a9c2d8' : leaves[(rnd() * 4) | 0]); col.setXYZ(i, c.r, c.g, c.b); }
     col.needsUpdate = true;
-    const mat = this.weather.material as THREE.PointsMaterial; mat.size = kind === 'snow' ? 0.14 : 0.26;
-    this.weather.geometry.setDrawRange(0, kind === 'snow' ? 1600 : 260);
+    const mat = this.weather.material as THREE.PointsMaterial; mat.size = k === 'snow' ? (this.shower ? 0.18 : 0.14) : k === 'rain' ? 0.09 : 0.26;
+    this.weather.geometry.setDrawRange(0, k === 'leaves' ? 260 : 1600);
   }
   private updateWeather(dt: number, t: number, target: THREE.Vector3) {
     if (!this.weatherKind) return;
     this.weather.visible = !SETTINGS.reducedMotion;
     const p = this.weather.geometry.getAttribute('position') as THREE.BufferAttribute, a = p.array as Float32Array;
-    const fall = this.weatherKind === 'snow' ? 1.3 : 0.9, n = this.weatherKind === 'snow' ? 1600 : 260;
+    const wk = this.weatherKind, fall = wk === 'snow' ? (this.shower ? 2.2 : 1.3) : wk === 'rain' ? 16 : 0.9, n = wk === 'leaves' ? 260 : 1600;
+    const gx = this.gust.x * (wk === 'rain' ? 0.4 : 1), gz = this.gust.y * (wk === 'rain' ? 0.4 : 1);
     for (let i = 0; i < n; i++) {
       const k = i * 3, v = this.weatherVel[i];
-      a[k + 1] -= fall * v * dt;
+      a[k + 1] -= fall * v * dt; a[k] += gx * v * dt; a[k + 2] += gz * v * dt;
+      if (a[k] > 45) a[k] -= 90; else if (a[k] < -45) a[k] += 90;
+      if (a[k + 2] > 45) a[k + 2] -= 90; else if (a[k + 2] < -45) a[k + 2] += 90;
       a[k] += Math.sin(t * (this.weatherKind === 'snow' ? 0.6 : 1.7) + i) * dt * (this.weatherKind === 'snow' ? 0.4 : 1.1);
       a[k + 2] += Math.cos(t * 0.5 + i * 1.3) * dt * 0.3;
       if (a[k + 1] < 0) a[k + 1] += 40;
@@ -889,6 +914,7 @@ export class World {
   /** Era look: sun, sky dome, clouds, season (renderer handles env light, haze, exposure, bloom). */
   applyAtmosphere(era: EraId) {
     const A = { ...ATMOSPHERE[era], season: SETTINGS.season };   // time of day per era, season chosen by the player
+    this.baseAtmo = A; this.lastHour = -1;
     this.sunOffset.set(...A.sun); this.sun.color.set(A.sunColor); this.sun.intensity = A.sunIntensity;
     this.hemi.color.set(A.hemiSky); this.hemi.groundColor.set(A.hemiGround); this.hemi.intensity = A.hemiIntensity;
     this.skyU.top.value.set(A.skyTop); this.skyU.mid.value.set(A.skyMid); this.skyU.horizon.value.set(A.horizon); this.skyU.sun.value.copy(this.sunOffset).normalize();
@@ -1218,11 +1244,58 @@ export class World {
   buildingStanding(id: string): boolean {
     const b = BUILDINGS.find(x => x.id === id); return !!b && eraState(b, ERAS[this.era].year) === 'standing';
   }
+  private baseAtmo: (typeof ATMOSPHERE)[EraId] | null = null;
+  private lastHour = -1;
+  /** 0 = night … 1 = full day (set by setTimeOfDay). */
+  daylight = 1;
+  /**
+   * Time of day on top of the era's look: the era's atmosphere is "full day"; dawn/dusk warm it,
+   * night turns it blue, lights the lamp posts and shows the stars. hour = 0..24. Returns the fog colour to use.
+   */
+  setTimeOfDay(hour: number, fog: THREE.Color): void {
+    const A = this.baseAtmo; if (!A) return;
+    if (Math.abs(hour - this.lastHour) < 0.02) return; this.lastHour = hour;
+    const ss = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const day = ss(5.6, 7.4, hour) * (1 - ss(18.8, 20.6, hour));
+    const warm = Math.max(0, 1 - Math.abs(hour - 6.9) / 1.4) + Math.max(0, 1 - Math.abs(hour - 19.4) / 1.6);
+    const w = Math.min(1, warm) * 0.85, night = 1 - day;
+    this.daylight = day;
+    const C = (h: string) => new THREE.Color(h);
+    const mix = (base: string, dusk: string, nightC: string) => C(base).lerp(C(dusk), w * day).lerp(C(nightC), night);
+    // the sun crosses the sky (east in the morning, west in the evening); at night a dim blue moonlight
+    const ang = Math.max(0, Math.min(Math.PI, ((hour - 6) / 14) * Math.PI));
+    const base = new THREE.Vector3(...A.sun), r = Math.hypot(base.x, base.z) + 40;
+    const sunPos = new THREE.Vector3(Math.cos(ang) * r, Math.max(18, Math.sin(ang) * (base.y + 20)), base.z * 0.6 + 25);
+    this.sunOffset.copy(day > 0.02 ? sunPos : new THREE.Vector3(-40, 90, 50));
+    this.sun.intensity = A.sunIntensity * day * (1 - w * 0.35) + 0.85 * night;
+    this.sun.color.copy(mix(A.sunColor, '#ffb070', '#9db4ff'));
+    this.hemi.intensity = A.hemiIntensity * (0.55 + 0.45 * day) + 0.3 * night;
+    this.hemi.color.copy(mix(A.hemiSky, '#f2c9a0', '#7080b8')); this.hemi.groundColor.copy(mix(A.hemiGround, '#6a4a3a', '#262a3a'));
+    this.skyU.top.value.copy(mix(A.skyTop, '#4a5f9a', '#0b1530'));
+    this.skyU.mid.value.copy(mix(A.skyMid, '#e0a080', '#16244a'));
+    this.skyU.horizon.value.copy(mix(A.horizon, '#f4a35e', '#2a3560'));
+    this.skyU.sun.value.copy(this.sunOffset).normalize().multiplyScalar(day > 0.02 ? 1 : -1);
+    this.cloudMat.emissive.copy(mix(A.cloud, '#f0b090', '#2a3350'));
+    fog.copy(mix(A.fog, '#d8a888', '#1c2440'));
+    this.lampMat.emissiveIntensity = 0.15 + night * 2.6;
+    for (const l of this.lampLights) l.intensity = night * 14;
+    const so = this.stars.material as THREE.PointsMaterial; so.opacity = Math.max(0, night - 0.25) * 1.2; this.stars.visible = so.opacity > 0.01;
+  }
+  /** Warm pools of light under the lamp posts closest to the player (night only). */
+  private lampLights: THREE.PointLight[] = [];
+  private lampPick = 0;
+  private updateLampLights(target: THREE.Vector3, dt: number) {
+    if (!this.lampLights.length) for (let i = 0; i < 4; i++) { const l = new THREE.PointLight('#ffcf80', 0, 16, 1.6); this.lampLights.push(l); this.exterior.add(l); }
+    if (this.daylight > 0.95) return;
+    this.lampPick -= dt; if (this.lampPick > 0) return; this.lampPick = 0.5;
+    const near = [...this.lamps].sort((a, b) => (a.x - target.x) ** 2 + (a.z - target.z) ** 2 - ((b.x - target.x) ** 2 + (b.z - target.z) ** 2)).slice(0, 4);
+    this.lampLights.forEach((l, i) => { const p = near[i]; if (p) l.position.set(p.x, terrainHeight(p.x, p.z) + 3.7, p.z); });
+  }
   updateSun(target: THREE.Vector3) {
     this.clouds.rotation.y = (performance.now() / 1000) * 0.0025;                // slow drift
     this.clouds.position.set(target.x, 0, target.z);
     const t = performance.now() / 1000; this.windTime.value = t;
-    const dt = Math.min(0.1, this.lastT ? t - this.lastT : 0); this.lastT = t; this.updateWeather(dt, t, target);
+    const dt = Math.min(0.1, this.lastT ? t - this.lastT : 0); this.lastT = t; this.updateWeather(dt, t, target); this.updateLampLights(target, dt);
     this.waterTex.forEach((tx, i) => tx.offset.set(t * (i ? -0.011 : 0.007), t * (i ? 0.006 : 0.009)));
     // Snap the shadow camera to whole shadow-map texels in light space: otherwise shadow edges
     // shimmer/swim on walls and windows every time the player moves.

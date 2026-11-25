@@ -7,7 +7,7 @@ const KEY_BUTTONS: Record<string, ButtonName[]> = {
   Escape: ['pause', 'back'], Backspace: ['back'],
   KeyM: ['map'], ShiftLeft: ['run'], ShiftRight: ['run'], KeyC: ['cameraReset'],
   Backquote: ['devToggle'], F1: ['devToggle'],
-  KeyR: ['alt'], KeyF: ['alt2'], KeyT: ['rUp'], KeyG: ['rDown'], KeyH: ['hint'], KeyJ: ['journal'], Tab: ['tools'],
+  KeyR: ['alt'], KeyF: ['alt2'], KeyT: ['rUp'], KeyG: ['rDown'], KeyH: ['hint'], KeyJ: ['journal'], Tab: ['tools'], KeyP: ['photo'], KeyB: ['ride'], KeyQ: ['phone'],
 };
 
 export class KeyboardMouseSource implements InputSource {

@@ -3,7 +3,7 @@ import { GAME_CONFIG } from '../config/game.config';
 import type { ActionState } from '../input/actions';
 import { Avatar } from './Avatar';
 import { CAMPUS } from '../world/campusData';
-import { isAircraft, PARAMS, type Vehicle } from './Vehicle';
+import { isAircraft, isRide, PARAMS, type Vehicle } from './Vehicle';
 
 /** Where the player currently is (exterior campus or an interior). */
 export interface Space {
@@ -74,7 +74,7 @@ export class PlayerController {
 
   update(dt: number, input: ActionState, cameraYaw: number, enabled: boolean) {
     if (this.vehicle) { if (isAircraft(this.vehicle.kind)) this.fly(dt, input, cameraYaw, enabled); else this.drive(dt, input, enabled); return; }
-    if (this.lying) { const l = this.lying; this.avatar.root.position.set(l.x, l.y, l.z); this.avatar.root.rotation.y = l.yaw; this.avatar.animate(dt, 0); return; }
+    if (this.lying) { const l = this.lying; this.avatar.root.position.set(l.x, l.y, l.z); this.avatar.root.rotation.y = l.yaw; this.avatar.animate(dt, 0); this.emote?.(dt); return; }
     if (this.seated) { this.avatar.root.position.set(this.position.x, this.position.y - 0.25, this.position.z); this.avatar.root.rotation.y = this.yaw; return; }
     let mx = 0, my = 0;
     if (enabled) { mx = input.axes.moveX; my = input.axes.moveY; }
@@ -116,6 +116,8 @@ export class PlayerController {
     this.emote?.(dt);
   }
 
+  /** Push the player (wind), with collisions. */
+  nudge(dx: number, dz: number) { if (!this.vehicle && !this.seated && !this.lying) { this.move(dx, dz, GAME_CONFIG.player.radius); this.sync(); } }
   /** Height above the ground or roof below (0 = landed). */
   altitude() { return this.position.y - this.floorAt(this.position.x, this.position.z); }
 
@@ -184,12 +186,32 @@ export class PlayerController {
     this.avatar.root.visible = !cart.hideRider;
   }
 
+  /** Longboard: height of the current ollie above the ground, and events for campus life. */
+  private hop = 0; private hopV = 0; private air = 0; private rideT = 0;
+  /** Called when a longboard ollie lands (airtime in seconds). */
+  onOllie: ((airtime: number) => void) | null = null;
   /** Golf cart: W/S throttle & brake/reverse, A/D steer (relative to the cart). */
   private drive(dt: number, input: ActionState, enabled: boolean) {
     const cart = this.vehicle!, C = PARAMS[cart.kind];
     const throttle = enabled ? input.axes.moveY : 0, steer = enabled ? input.axes.moveX : 0;
     const max = throttle >= 0 ? C.maxSpeed : -C.reverseSpeed;
     const tgt = Math.abs(throttle) > 0.05 ? max * Math.abs(throttle) : 0, step = C.accel * dt;
+    if (isRide(cart.kind)) {
+      // gravity along the slope: downhill speeds you up (the sled mostly runs on hills), uphill slows you down
+      const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), g0 = this.space.groundY(this.position.x, this.position.z);
+      const slope = (this.space.groundY(this.position.x + fx, this.position.z + fz) - g0);
+      const fric = cart.kind === 'sled' ? 0.9 : 0.35, top = cart.kind === 'sled' ? 16 : 15;
+      const push = Math.abs(throttle) > 0.05 && Math.abs(cart.speed) < max * Math.abs(throttle) ? Math.sign(throttle) * C.accel : 0;
+      cart.speed += (-9.8 * slope * 0.9 + push - Math.sign(cart.speed) * fric) * dt;
+      if (throttle < -0.05 && cart.speed > 0) cart.speed = Math.max(0, cart.speed - C.accel * 1.8 * dt);   // brake (foot down)
+      if (Math.abs(cart.speed) < 0.05 && !push) cart.speed = 0;
+      cart.speed = Math.max(-C.reverseSpeed - 2, Math.min(top, cart.speed));
+      // ollie (longboard): jump to hop; land it for style points
+      if (cart.kind === 'board') {
+        if (enabled && this.hop <= 0 && input.pressed('jump')) { this.hopV = 4.6; this.hop = 0.001; this.air = 0; }
+        if (this.hop > 0) { this.air += dt; this.hopV -= 14 * dt; this.hop += this.hopV * dt; if (this.hop <= 0) { this.hop = 0; this.onOllie?.(this.air); } }
+      }
+    } else
     cart.speed += Math.max(-step * 1.6, Math.min(step, tgt - cart.speed));
     this.yaw -= steer * C.turnRate * dt * Math.max(-1, Math.min(1, cart.speed / 4));
     const dx = Math.sin(this.yaw) * cart.speed * dt, dz = Math.cos(this.yaw) * cart.speed * dt;
@@ -197,14 +219,16 @@ export class PlayerController {
     this.move(dx, dz, C.radius);
     const moved = this.position.distanceTo(before);
     if (moved < Math.hypot(dx, dz) * 0.5) cart.speed *= -0.25; // bump
-    this.position.y = this.space.groundY(this.position.x, this.position.z);
+    this.position.y = this.space.groundY(this.position.x, this.position.z) + (isRide(cart.kind) ? this.hop : 0);
     this.speed = Math.abs(cart.speed);
     cart.root.position.copy(this.position); cart.root.rotation.y = this.yaw;
     cart.animate(dt, steer);
     // rider in the vehicle's seat (vehicle-local x right, z forward)
     this.seatRider(cart);
     if (cart.pose === 'bike') this.avatar.pedal(cart.speed);
+    else if (cart.kind === 'board') { this.rideT += dt; this.avatar.boardPose(this.rideT, steer); this.avatar.root.rotation.y = this.yaw + Math.PI / 2; }
     else if (cart.pose === 'stand') this.avatar.scoot(cart.speed);
+    if (cart.kind === 'board') cart.body.rotation.x = this.hop > 0 ? -Math.min(0.35, this.hopV * 0.08) : 0;
   }
 
   private move(dx: number, dz: number, r: number) {

@@ -1,7 +1,13 @@
 // Game orchestrator: wires world, player, input, UI, quests, interiors, save and finale.
 import * as THREE from 'three';
 import './interiors/campusInteriors';   // registers campus building interiors + their doors (before the world is built)
-import { HOME_ID, HOME_SPOTS } from './interiors/apartment';   // the player's apartment (same: registers before the world)
+import { HOME_ID, HOME_SPOTS } from './interiors/apartment';
+import { HART, MC_SPOTS, STRIKE_ZONE } from './interiors/campusInteriors';
+import { benchPress, kg, shootout, treadmill, type HartHost } from './campuslife/hartGames';
+import { bookHunt, cafeteria, carRepair, intramurals, pingPong, planetarium, recordsHtml, rhythm, tourGuide } from './campuslife/minigames';
+import { Apartment, Celebrations, PETS, petHunger, scheduleHtml, nextClass } from './campuslife/studentLife';
+import { openPhone } from './campuslife/phone';
+import { accessoryLook, bowl, openStore, ownsOutfit, storeNameFor } from './campuslife/mcFun';   // the player's apartment (same: registers before the world)
 import { OUTFITS, outfitById, outfitLook } from './player/outfits';
 import { ATMOSPHERE } from './config/atmosphere';
 import { MusicPlayer } from './fx/music';
@@ -21,20 +27,25 @@ import { InteriorManager } from './interiors/interiors';
 import { Avatar, makeLabel } from './player/Avatar';
 import { CameraRig } from './player/CameraRig';
 import { PlayerController, type Space } from './player/PlayerController';
-import { QuestManager, QUEST_ORDER, freshQuestState, voxelBox } from './quests/QuestManager';
+import { QuestManager, QUEST_ERA, QUEST_ORDER, freshQuestState, voxelBox } from './quests/QuestManager';
 import type { QuestId } from './quests/contract';
 import { createQuestModules } from './quests';
 import { Renderer } from './render/Renderer';
-import { clearSave, loadSave, writeSave, type SaveData } from './save/save';
+import { clearSave, loadSave, SAVE_VERSION, writeSave, type SaveData } from './save/save';
 import { STORY } from './story/story';
 import { esc, UI } from './ui/ui';
 import { CAMPUS, everOccupied, nudgeFree, obb, onVehicleRoad, PATH_KINDS, pointInPoly, terrainHeight, toGame } from './world/campusData';
-import { isAircraft, Vehicle, type CarStyle } from './player/Vehicle';
+import { isAircraft, isRide, Vehicle, type CarStyle } from './player/Vehicle';
 import { ERAS, type EraId } from './world/eras';
 import { makeDoor, World, type BuildingSign } from './world/World';
-import { LineBag, NpcCrowd } from './world/Npcs';
+import { eraLook, LineBag, NpcCrowd } from './world/Npcs';
 import { JOIN_LINES } from './world/npcChatter';
+import { ACHIEVEMENTS } from './campuslife/progress';
+import { COLLECTIBLES } from './campuslife/collectibles';
+const ACHIEVEMENT_COUNT = ACHIEVEMENTS.length, COLLECTIBLE_COUNT = COLLECTIBLES.length;
 import { SideQuests } from './sidequests/SideQuests';
+import { CampusLife } from './campuslife/CampusLife';
+import { ERA_START_HOUR } from './campuslife/clock';
 import { Finale } from './finale/finale';
 import { CutsceneRunner, type CutsceneSpec } from './cutscene/Cutscene';
 import { Effects } from './fx/fireworks';
@@ -81,7 +92,7 @@ export class Game {
   outfit = 'assistant';
   /** Re-apply the chosen season everywhere (set up in the constructor). */
   applySeason: () => void = () => {};
-  private stepDist = 0;
+  private lastFootfall = 0;
   difficulty: DifficultyId = GAME_CONFIG.difficulty.default as DifficultyId;
   colorStage = 0;
   introSeen = false;
@@ -99,6 +110,8 @@ export class Game {
   npcs!: NpcCrowd;
   /** Optional errands from characters around campus (src/sidequests/). */
   sideQuests!: SideQuests;
+  /** Day/night, weather, happenings, collectibles, music, photos, friends, achievements (src/campuslife/). */
+  life!: CampusLife;
   /** Enterable doors (shown on the minimap / map). */
   readonly entrances: { id: string; x: number; z: number; eras: EraId[] | null; label: string }[] = [];
   private coins: { id: string; mesh: THREE.Object3D; x: number; z: number }[] = [];
@@ -131,7 +144,7 @@ export class Game {
     this.exteriorSpace = {
       id: 'exterior', interior: false,
       solid: (x, z, r) => this.world.blockedByBuildings(x, z, r),
-      blocked: (x, z, r) => this.world.blocked(x, z, r) || (!this.player.noclip && (!!this.npcs?.hit(x, z, r) || !!this.traffic?.hit(x, z, r))),
+      blocked: (x, z, r) => this.world.blocked(x, z, r) || (!this.player.noclip && (!!this.npcs?.hit(x, z, r) || !!this.traffic?.hit(x, z, r) || !!this.life?.hit(x, z, r))),
       groundY: (x, z) => this.world.groundY(x, z),
       occluderTop: (x, z) => this.world.grid.topAt(x, z),
     };
@@ -214,6 +227,7 @@ export class Game {
     this.traffic.setEra(this.world.era, SETTINGS.season);
     this.balls = new BallGames(this.renderer.scene);
     this.setupSideQuests();
+    this.setupLife();
     this.ui.onLine = l => (l ? this.voice.speak(l.speaker, l.text) : this.voice.stop());
     const unlockAudio = () => { loadSamples(); window.removeEventListener('pointerdown', unlockAudio); window.removeEventListener('keydown', unlockAudio); };
     window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -353,14 +367,16 @@ export class Game {
       if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 5) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 100)) continue;
       add(new Vehicle(`bike-${bikes++}`, 'bike'), x, z, Math.atan2(bx - ax, bz - az));
     }
-    // electric scooters parked by the paths (rideable)
+    // electric scooters parked by the paths (rideable; present day only)
     const SC = ['#2fbf71', '#1f2328', '#e8a33d', '#3d6fa8'];
     let scooters = 0;
     for (let tries = 0; tries < 3000 && scooters < 10; tries++) {
       const r = paths[(rnd() * paths.length) | 0], [ax, az] = r.pts[0], [bx, bz] = r.pts[1], L = Math.hypot(bx - ax, bz - az); if (L < 4) continue;
       const nx = -(bz - az) / L, nz = (bx - ax) / L, x = (ax + bx) / 2 + nx * (r.width / 2 + 0.6), z = (az + bz) / 2 + nz * (r.width / 2 + 0.6);
       if (!CAMPUS.campus.some(c => pointInPoly(x, z, c)) || everOccupied(x, z, 1) || onVehicleRoad(x, z) || this.world.nearDoor(x, z, 4) || this.carts.some(c => (c.cart.root.position.x - x) ** 2 + (c.cart.root.position.z - z) ** 2 < 64)) continue;
-      add(new Vehicle(`scooter-${scooters}`, 'scooter', 'boxy90s', SC[scooters++ % SC.length]), x, z, Math.atan2(bx - ax, bz - az));
+      const sc = new Vehicle(`scooter-${scooters}`, 'scooter', 'boxy90s', SC[scooters++ % SC.length]);
+      sc.eras = ['presentFinale'];   // shared electric scooters are a recent thing: present day only
+      add(sc, x, z, Math.atan2(bx - ax, bz - az));
     }
   }
   /** Benches: E to sit; moving or pressing E again stands up. */
@@ -397,6 +413,8 @@ export class Game {
     playSound(cart.kind === 'bike' ? 'bell' : cart.kind === 'scooter' ? 'tick' : 'carDoor'); if (cart.kind === 'car' || cart.kind === 'cart') setTimeout(() => playSound('engineStart'), 250);
     if (cart.kind === 'heli') { this.ui.toast('Helicopter: hold Space / B to climb · F / L to descend · stick or WASD to fly · Shift / ZR faster · E / A: land, then get out', 7000); return; }
     if (cart.kind === 'plane') { this.ui.toast('Plane: W / stick up = throttle · A/D turn · hold Space / B to climb (from 16 m/s) · F / L to dive · S to slow down · E / A: auto-land, then get out', 8000); return; }
+    if (cart.kind === 'board') { this.ui.toast('Longboard: W push · S brake · A/D carve · Space ollie · downhill = faster · B or E to step off', 6000); return; }
+    if (cart.kind === 'sled') { this.ui.toast('Sled: hills do the work! W push · S brake · A/D steer · B or E to get off', 6000); return; }
     this.ui.toast(cart.kind === 'bike' ? 'W/S pedal · A/D steer · E to get off' : cart.kind === 'scooter' ? 'W/S go/brake · A/D steer · E to step off' : 'W/S drive · A/D steer · E to get out');
   }
   exitCart(force = false) {
@@ -414,12 +432,22 @@ export class Game {
     if (isAircraft(cart.kind)) { cart.root.position.y = this.world.groundY(cart.root.position.x, cart.root.position.z); cart.fly(1, 0, 0, 0); cart.body.rotation.set(0, 0, 0); this.cameraRig.distance = GAME_CONFIG.camera.distance; }
     if (cart.kind === 'car' || cart.kind === 'cart') playSound('carDoor');
     // step out to the side
-    const side = cart.kind === 'car' ? 2.4 : cart.kind === 'plane' ? 2.2 : cart.kind === 'heli' ? 2.0 : 1.8;
+    const side = cart.kind === 'car' ? 2.4 : cart.kind === 'plane' ? 2.2 : cart.kind === 'heli' ? 2.0 : isRide(cart.kind) ? 0.9 : 1.8;
     const sx = Math.cos(this.player.yaw) * side, sz = -Math.sin(this.player.yaw) * side;
     const p = this.player.position, dir = !this.exteriorSpace.blocked(p.x - sx, p.z - sz, 0.45) ? -1 : 1;
     this.player.place(this.exteriorSpace, p.x + sx * dir, p.z + sz * dir, this.player.yaw);
     this.unstick();
-    this.addVehicleInteract(cart);
+    if (isRide(cart.kind)) { cart.root.removeFromParent(); playSound('tick'); } else this.addVehicleInteract(cart);
+  }
+  /** B: grab your longboard (a sled in winter) and ride it anywhere outside; B again to step off. */
+  toggleRide() {
+    if (this.player.vehicle) { if (isRide(this.player.vehicle.kind)) this.exitCart(); else this.ui.toast('You’re already riding something.'); return; }
+    if (this.spaceId !== 'exterior') { this.ui.toast('Ride outside — not in the hallways!'); playSound('error'); return; }
+    if (this.player.seated || this.busy) return;
+    const kind = SETTINGS.season === 'winter' ? 'sled' : 'board';
+    const v = new Vehicle(`ride-${kind}`, kind, 'boxy90s', ['#c0392b', '#2f6d8e', '#2fbf71', '#d1a12f'][(Math.random() * 4) | 0]);
+    v.root.position.copy(this.player.position); v.root.rotation.y = this.player.yaw; this.renderer.scene.add(v.root);
+    this.enterCart(v, v.id);
   }
   /** Which interior a building's doors lead into. */
   private interiorFor(buildingId: string): string | null {
@@ -596,6 +624,7 @@ export class Game {
     const joined = this.npcs.chatInfo(w);
     if (joined) { this.npcs.endChat(w); joined.partner.talking = 999; }
     const pick = <T,>(a: T[]) => a[(Math.random() * a.length) | 0];
+    let hangOut = false;
     try {
       await this.faceToFace(w.avatar.root, async () => {
         const open: Parameters<UI['dialogue']>[0] = [];
@@ -604,29 +633,233 @@ export class Game {
           open.push({ speaker: `${joined.partner.name} · ${GAME_CONFIG.npcs.title}`, text: w.met ? `Oh, you know ${w.name}? Hi, I’m ${joined.partner.name}!` : `I’m ${joined.partner.name}, by the way. Nice to meet you!` });
           this.npcs.meet(joined.partner);
         } else if (!w.met) open.push({ speaker: who, text: `Hi! I’m ${w.name}. ${this.lineBag.next(key, pool)}` });
+        else if (this.life.friendLevelOf(w.name) >= 2) open.push({ speaker: who, text: `${me}! ${['There’s my favorite person!', 'I was hoping I’d run into you!', 'Perfect timing, I was just thinking about you!'][(Math.random() * 3) | 0]} ${this.lineBag.next(key, pool)}` });
         else open.push({ speaker: who, text: `Hey, ${me}! ${this.lineBag.next(key, pool)}` });
         this.npcs.meet(w); w.heard++;
         await this.ui.dialogue(open);
+        const up = this.life.talked(w);
+        if (up) { playSound('success'); await this.ui.dialogue([{ speaker: who, text: up.gift }]); this.ui.toast(`🤝 ${w.name} is now your ${up.level}! +${up.coins} coins`, 4000); }
         for (let turn = 0; turn < 8; turn++) {
           const choice = await this.ui.panel({ title: `Talking with ${w.name}`, buttons: [
             { id: 'chat', label: '💬 Chat a little more' },
             { id: 'dir', label: '🧭 Ask for directions' },
             ...(this.sideQuests.hintFor() ? [{ id: 'hint', label: '❓ Anyone need help around here?' }] : []),
+            ...(this.life.collectibleHint() ? [{ id: 'shiny', label: '✨ Seen anything interesting lying around?' }] : []),
+            ...(this.life.friendLevelOf(w.name) >= 1 && this.life.hangingWith !== w ? [{ id: 'hang', label: '🤝 Want to walk around with me?' }] : []),
+            ...(this.life.friendLevelOf(w.name) >= 1 ? [{ id: 'icecream', label: '🍦 Let’s get ice cream! (6 coins)' }, { id: 'dance', label: '💃 Go country dancing at the MC?' }] : []),
             { id: 'bye', label: '👋 Goodbye' },
           ] });
           if (choice === 'chat') await this.ui.dialogue([{ speaker: who, text: this.lineBag.next(key, pool) }]);
           else if (choice === 'dir') { if (await this.askDirections(w.name, who)) break; }
           else if (choice === 'hint') await this.ui.dialogue([{ speaker: who, text: this.sideQuests.hintFor()! }]);
+          else if (choice === 'shiny') await this.ui.dialogue([{ speaker: who, text: this.life.collectibleHint() ?? 'Hmm, nothing lately.' }]);
+          else if (choice === 'icecream') {
+            if (!this.life.progress.spend(6, this.coinTotal())) { await this.ui.dialogue([{ speaker: who, text: 'Ha, maybe when payday comes! Try a part-time job.' }]); continue; }
+            await this.ui.dialogue([{ speaker: who, text: ['Yes! Huckleberry for me.', 'Ice cream in Rexburg? Always.', 'I know the perfect place!'][(Math.random() * 3) | 0] }]);
+            await this.ui.blackout('🍦 …', 1400);
+            await this.ui.dialogue([{ speaker: who, text: `This was fun, ${me}. We should do this more often!` }]);
+            this.life.progress.friends[w.name] = (this.life.progress.friends[w.name] ?? 0) + 2; this.life.progress.add('dates'); playSound('success'); this.ui.toast(`🍦 You and ${w.name} grew closer!`); this.save(); break;
+          } else if (choice === 'dance') {
+            const wed = this.life.clock.day === 2 && this.life.clock.hour >= 18;
+            if (!wed) { await this.ui.dialogue([{ speaker: who, text: 'Country dancing is Wednesday nights at the MC — let’s go then! (Or right now, just for practice?)' }]); }
+            await rhythm(this.lifeHost, this.life.progress, 'dance');
+            this.life.progress.friends[w.name] = (this.life.progress.friends[w.name] ?? 0) + (wed ? 2 : 1); this.life.progress.add('dates'); this.save(); break;
+          }
+          else if (choice === 'hang') { await this.ui.dialogue([{ speaker: who, text: ['Sure! Lead the way.', 'I’d love to! I’ve got a little time before class.', 'Yes! Let’s go.'][(Math.random() * 3) | 0] }]); hangOut = true; break; }
           else { await this.ui.dialogue([{ speaker: who, text: pick([`See you around, ${me}!`, 'Bye! Have a good one.', 'Catch you later!', 'Good luck with everything!']) }]); break; }
         }
       });
     } finally { this.busy = false; this.npcTalking = false; w.talking = 1.5; if (joined) joined.partner.talking = 1.5; }
+    if (hangOut) { w.talking = 0; this.life.hangOut(w); }
+  }
+
+  // ---------------- campus life ----------------
+  private setupLife() {
+    this.life = new CampusLife(this.lifeHost = {
+      scene: this.renderer.scene, camera: this.renderer.camera, npcs: this.npcs, world: this.world, ui: this.ui, avatar: this.player.avatar,
+      era: () => this.world.era, season: () => SETTINGS.season,
+      player: () => ({ x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, yaw: this.player.yaw, space: this.spaceId, driving: this.player.vehicle?.kind ?? false, seated: this.player.seated, speed: this.player.speed }),
+      playerName: () => this.playerName,
+      nudgePlayer: (dx, dz) => this.player.nudge(dx, dz),
+      spotBy: (b, side, out) => this.sideQuestsHost.spotBy(b, side, out),
+      doorOf: id => {
+        const ds = this.world.buildingDoors().filter(d => d.id === id); if (!ds.length) return null;
+        const poly = registryPoly(id), cx = poly ? poly.reduce((a, q) => a + q[0], 0) / poly.length : ds[0].x, cz = poly ? poly.reduce((a, q) => a + q[1], 0) / poly.length : ds[0].z;
+        const d = ds.reduce((a, q) => (Math.hypot(q.x - cx, q.z - cz) < Math.hypot(a.x - cx, a.z - cz) ? q : a));
+        return [d.x + d.nx * 1.5, d.z + d.nz * 1.5];
+      },
+      addInteractable: d => this.interactions.add({ id: d.id, kind: d.npc ? 'npc' : 'generic', at: d.at, radius: d.radius, prompt: d.prompt, visual: d.visual, enabled: d.enabled, onInteract: d.onInteract }),
+      removeInteractable: id => this.interactions.remove(id),
+      talk: (npc, lines) => this.faceToFace(npc, () => this.ui.dialogue(lines)),
+      choose: (title, body, buttons) => this.ui.panel({ title, body, buttons }),
+      toast: (t, ms) => this.ui.toast(t, ms),
+      sound: n => playSound(n),
+      wallet: () => this.coinTotal(),
+      canPlay: () => this.mode === 'playing' && !this.busy && !this.ui.blocking && !this.cutscenes.active && !this.pauseOpen && !this.interactions.busy,
+      sideBusy: () => !!this.sideQuests.tracker(),
+      takeThrow: () => { const a = this.input.state; if (a.pressed('alt')) { a.consume('alt'); return true; } return false; },
+      holdItem: c => this.player.avatar.holdItem(c, 0.32),
+      seat: (x, z, yaw) => { this.player.place(this.exteriorSpace, x, z, yaw); this.player.seated = true; this.player.avatar.sit(true); this.player.avatar.root.rotation.y = yaw; playSound('sit'); },
+      stand: () => { if (this.player.seated) this.standUp(); },
+      save: () => this.save(),
+    });
+    this.life.clock.running = SETTINGS.dayNight;
+    this.life.setup({
+      spawnAircraft: k => this.spawnAircraft(k),
+      roofY: (x, z) => this.world.grid.topAt(x, z),
+      vehicle: () => { const v = this.player.vehicle; return v ? { kind: v.kind, yaw: this.player.yaw, speed: v.speed, altitude: this.player.altitude() } : null; },
+    });
+    this.life.setupShelf(this.interiors.groups.get(HOME_ID)!, HOME_ID);
+    this.setupManwaring();
+    this.setupHart();
+    this.setupActivities();
+    this.world.onEraChanged.push(() => this.life.setEra());
+    this.player.onOllie = air => this.life.ollie(air);
+  }
+  /** Manwaring Center: stairs to the Strike Zone, bowling, the grill and the school store. */
+  private setupManwaring() {
+    const MC = 'bldg-manwaring'; if (!this.interiors.defs.has(MC) || !this.interiors.defs.has(STRIKE_ZONE)) return;
+    const at = (space: string, p: { x: number; z: number }) => ({ x: p.x, z: p.z, space });
+    const free = () => !this.busy && !this.player.seated;
+    const goTo = async (space: string, p: { x: number; z: number }, yaw: number) => {
+      await this.enterInterior(space); const w = this.interiors.toWorld(space, p.x, p.z);
+      this.player.place(this.space, w.x, w.z, yaw); this.cameraRig.reset(yaw); this.cameraRig.snap(this.player.position);
+    };
+    const hooks = { wallet: () => this.coinTotal(), eat: (f: { name: string; color: string; line: string }) => { void this.eat(f); }, refreshLook: () => { this.applyOutfit(); this.save(); },
+      storeName: () => storeNameFor(ERAS[this.world.era].institution), era: () => this.world.era, decorChanged: () => this.life.apartment?.refresh() };
+    this.interactions.add({ id: 'mc:down', kind: 'door', at: at(MC, MC_SPOTS.stairsDown), radius: 2.2, enabled: free, prompt: 'Go downstairs: Strike Zone (bowling & games)', onInteract: () => goTo(STRIKE_ZONE, { x: MC_SPOTS.stairsUp.x - 2.5, z: MC_SPOTS.stairsUp.z - 1 }, Math.PI) });
+    this.interactions.add({ id: 'mc:up', kind: 'door', at: at(STRIKE_ZONE, MC_SPOTS.stairsUp), radius: 2.4, enabled: free, prompt: 'Go upstairs: the Crossroads', onInteract: () => goTo(MC, { x: MC_SPOTS.stairsDown.x + 2.5, z: MC_SPOTS.stairsDown.z - 1 }, Math.PI) });
+    this.interactions.add({ id: 'mc:bowl', kind: 'generic', at: at(STRIKE_ZONE, MC_SPOTS.bowl), radius: 2.2, enabled: free, prompt: () => `Bowl a game${this.life.progress.stat('bowlBest') ? ` (best ${this.life.progress.stat('bowlBest')})` : ''}`, onInteract: () => bowl(this.lifeHost, this.life.progress) });
+    this.interactions.add({ id: 'mc:grill', kind: 'generic', at: at(STRIKE_ZONE, MC_SPOTS.grill), radius: 2.4, enabled: free, prompt: 'Order at the Strike Zone Grill', onInteract: () => openStore(this.lifeHost, this.life.progress, hooks, 'food') });
+    this.interactions.add({ id: 'mc:store', kind: 'generic', at: at(MC, MC_SPOTS.store), radius: 2.6, enabled: free, prompt: () => `Shop at the ${storeNameFor(ERAS[this.world.era].institution)} (clothes, accessories, snacks)`, onInteract: () => openStore(this.lifeHost, this.life.progress, hooks) });
+  }
+  /** Hart Building: the treadmill sprint and the 60-second shooting challenge (records saved). */
+  private setupHart() {
+    const H = 'bldg-hart'; if (!this.interiors.defs.has(H)) return;
+    const free = () => !this.busy && !this.player.seated;
+    const k: HartHost = {
+      toWorld: (x, z) => this.interiors.toWorld(H, x, z),
+      place: (x, z, yaw) => { const w = this.interiors.toWorld(H, x, z); this.player.place(this.space, w.x, w.z, yaw); this.player.avatar.root.rotation.y = yaw; this.cameraRig.reset(yaw); this.cameraRig.distance = 7; this.cameraRig.pitch = 0.35; this.cameraRig.snap(this.player.position); },
+      emote: fn => { this.player.emote = fn; },
+      lie: at => {
+        if (at) {
+          this.player.lying = { x: at.x, y: 0, z: at.z, yaw: at.yaw }; this.player.avatar.lie(true, at.height);
+          this.camFocus = { from: new THREE.Vector3(at.x + 3.2, 2.4, at.z + 0.4), to: new THREE.Vector3(at.x, 0.75, at.z - 1.2) };   // a side shot of the bench
+        } else { this.player.lying = null; this.player.avatar.lie(false); this.camFocus = null; }
+      },
+    };
+    const run = async (f: () => Promise<void>) => { if (this.busy) return; this.busy = true; try { await f(); } finally { this.busy = false; } };
+    const P = this.life.progress, tenths = (n: number) => `${Math.floor(n / 600)}:${((n % 600) / 10).toFixed(1).padStart(4, '0')}`;
+    this.interactions.add({ id: 'hart:treadmill', kind: 'generic', at: { ...HART.treadmillStand, space: H }, radius: 1.8, enabled: free,
+      prompt: () => `Run on the treadmill — 400 m sprint${P.stat('treadBest') ? ` (record ${tenths(P.stat('treadBest'))})` : ''}`,
+      onInteract: () => run(() => treadmill(this.lifeHost, P, k, HART.treadmill, HART.treadmillStand)) });
+    this.interactions.add({ id: 'hart:bench', kind: 'generic', at: { ...HART.benchStand, space: H }, radius: 1.6, enabled: free,
+      prompt: () => `Bench press contest${P.stat('benchBest') ? ` (record ${P.stat('benchBest')} lb / ${kg(P.stat('benchBest'))} kg)` : ''}`,
+      onInteract: () => run(() => benchPress(this.lifeHost, P, k, HART.bench, HART.benchStand)) });
+    this.interactions.add({ id: 'hart:shootout', kind: 'generic', at: { x: HART.shots[0].x, z: HART.shots[0].z - 0.8, space: H }, radius: 2, enabled: free,
+      prompt: () => `Shooting challenge — 60 seconds${P.stat('hoopsBest') ? ` (record ${P.stat('hoopsBest')} pts)` : ''}`,
+      onInteract: () => run(() => shootout(this.lifeHost, P, k, { x: HART.hoopX, y: HART.hoopY, z: HART.hoopZ }, HART.shots)) });
+  }
+  /** Building minigames, part-time jobs, the stadium race, intramurals, celebrations, the pet and decor. */
+  private setupActivities() {
+    const P = this.life.progress, L = this.life, free = () => !this.busy && !this.player.seated;
+    const run = async (f: () => Promise<unknown>) => { if (this.busy) return; this.busy = true; try { await f(); } finally { this.busy = false; } };
+    const spot = (id: string, space: string, x: number, z: number, prompt: () => string, go: () => Promise<unknown> | void, r = 2.2) => {
+      if (!this.interiors.defs.has(space)) return;
+      this.interactions.add({ id, kind: 'generic', at: { x, z, space }, radius: r, enabled: free, prompt, onInteract: () => run(async () => { await go(); }) });
+    };
+    const H = this.lifeHost, rec = (k: string, f: (v: number) => string) => (P.stat(k) ? ` (best ${f(P.stat(k))})` : '');
+    const choose = (title: string, body: string, opts: { id: string; label: string }[]) => this.ui.panel({ title, body, buttons: [...opts, { id: 'no', label: 'Not now' }] });
+    // McKay: find books (for fun or as a paid shift)
+    spot('act:library', 'bldg-mckay', -14, 10.9, () => `Library: find books by call number${rec('bookBest', v => `${(v / 10).toFixed(1)} s`)}`, async () => {
+      const r = await choose('McKay Library', 'Help find books on the shelves. Or work a shift and get paid per book!', [{ id: 'play', label: '📕 Find 5 books (record)' }, { id: 'job', label: '💼 Work a library shift (paid)' }]);
+      if (r === 'play' || r === 'job') await bookHunt(H, P, { paid: r === 'job' });
+    });
+    spot('act:planetarium', 'bldg-romney', -11.6, 8.6, () => 'Planetarium show: connect the constellations', () => planetarium(H, P));
+    spot('act:concert', 'bldg-snow', 0, -8.4, () => `Play along with the concert${rec('rhythmBest', v => `${v}%`)}`, () => rhythm(H, P, 'concert'), 2.6);
+    spot('act:repair', 'bldg-austin', -14, -3.0, () => `Fix cars in the shop${rec('repairBest', v => `${v} pts`)}`, () => carRepair(H, P));
+    spot('act:pong', 'mc-strikezone', MC_SPOTS.pong.x, MC_SPOTS.pong.z + 1.6, () => `Play ping-pong${P.stat('pongWins') ? ` (${P.stat('pongWins')} wins)` : ''}`, () => pingPong(H, P, this.friendNames(1)[0] ?? 'Jace'));
+    spot('act:cafe', 'bldg-manwaring', 19, -13.2, () => 'Work a Crossroads shift (paid)', () => cafeteria(H, P));
+    spot('act:tour', 'bldg-manwaring', 14, 14.5, () => 'Work as a campus tour guide (paid)', () => tourGuide(H, P, this.world.era));
+    spot('act:records', 'bldg-hart', -6, -15.4, () => 'Campus records board', () => { const s = this.ui.menu('Campus records', [{ label: 'Back', action: () => this.ui.pop(s) }], { html: recordsHtml(P), subtitle: 'Beat the campus’s best students in every event.', onBack: () => this.ui.pop(s), className: 'life-list' }); });
+    spot('act:intramurals', 'bldg-hart', -23.4, 13.4, () => `Intramural 3-on-3 tournament${P.stat('imTitles') ? ` (${P.stat('imTitles')} 🏆)` : ''}`, async () => {
+      const week = Math.floor(L.clock.minutes / (1440 * 7));
+      if (P.stat('imWeek') > week) { this.ui.toast('This week’s tournament is over. Come back next week!', 3500); return; }
+      await intramurals(H, P, this.friendNames(2), week);
+    });
+    // the stadium race
+    const start = L.race.setup();
+    if (start) {
+      const coach = new Avatar({ ...eraLook(this.world.era, 9400), shirt: '#2a2a2a', hat: 'cap', hatColor: '#c0392b' }); coach.setLabel('Coach Reed', 'Stadium race');
+      this.interactions.add({ id: 'act:race', kind: 'npc', at: { x: start.x + 3, z: start.z }, radius: 3, visual: coach.root, enabled: () => free() && !L.race.active,
+        prompt: () => `Talk to Coach Reed — stadium race${rec('raceBest', v => `${(v / 10).toFixed(1)} s`)}`,
+        onInteract: async () => { const r = await choose('Stadium race', 'One lap around the field against Wyatt, Ivy and me. Run through the four rings — sprint with Shift!', [{ id: 'go', label: '🏁 Race!' }]); if (r === 'go') L.race.begin(); } });
+    }
+    // seasonal celebrations
+    const home = this.world.doorPlacement(this.location('door.home')), quad = this.resolve('spawn');
+    L.celebrations = new Celebrations(H, () => ({ lamps: this.world.lamps, doors: this.world.buildingDoors(), quad: { x: quad.x + 12, z: quad.z + 8 } }), (x, y, z) => this.effects.fireworks(x, y, z, 1.4, SETTINGS.reducedMotion));
+    L.celebrations.set(SETTINGS.season); void home;
+    const prevSeason = this.applySeason; this.applySeason = () => { prevSeason(); L.celebrations?.set(SETTINGS.season); };
+    // the pet and decorations in the apartment
+    const hg = this.interiors.groups.get(HOME_ID)!; L.apartment = new Apartment(hg, P);
+    ((hg.userData.ticks ??= []) as ((dt: number, t: number) => void)[]).push((_dt, t) => L.apartment?.tick(t));
+    this.interactions.add({ id: 'home:pet', kind: 'generic', at: { x: 3.0, z: 4.5, space: HOME_ID }, radius: 1.6, enabled: free,
+      prompt: () => { const k = P.stat('pet'); return k ? `Feed your ${PETS.find(p => p.id === k)!.name.toLowerCase()}` : 'Adopt a pet'; },
+      onInteract: async () => {
+        if (!P.stat('pet')) { const r = await this.ui.panel({ title: 'Adopt a pet', body: 'Every apartment needs a little roommate. Who will it be?', buttons: [...PETS.map(p => ({ id: String(p.id), label: `${p.icon} ${p.name}` })), { id: 'no', label: 'Maybe later' }] });
+          if (!r || r === 'no') return; P.set('pet', Number(r)); P.set('petFed', L.clock.minutes); L.apartment?.refresh(); playSound('success'); this.ui.toast(`${PETS.find(p => p.id === Number(r))!.icon} Welcome home, little buddy!`); this.save(); return; }
+        const hrs = petHunger(P, L.clock); P.set('petFed', L.clock.minutes); P.add('petFeeds'); playSound('pop');
+        this.ui.toast(hrs > 24 ? '🥺 So hungry! Your pet gobbles up the food. Try to feed it every day.' : hrs > 8 ? '😊 Your pet happily eats.' : '🙂 Not very hungry, but it nibbles a little.', 3500); this.save();
+      } });
+  }
+  /** Names of your closest friends (for teammates and rivals). */
+  private friendNames(n: number) { const f = Object.entries(this.life.progress.friends).sort((a, b) => b[1] - a[1]).map(x => x[0]); return [...f, 'Dallin', 'Kenzie', 'Jace'].slice(0, n); }
+  /** The phone (Q): a pager in 1999–2001, a smartphone later. */
+  showPhone() {
+    const L = this.life, P = L.progress, era = this.world.era, msgs: { from: string; text: string }[] = [];
+    const n = nextClass(L.clock, era); if (n) { const mins = Math.round(n.at - L.clock.minutes), when = mins <= 90 ? (mins > 0 ? `in ${mins} min` : 'now!') : `${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][Math.floor(n.at / 1440) % 7]} ${String(n.slot.hour).padStart(2, '0')}:00`; msgs.push({ from: 'Next class', text: `${n.slot.subject} — ${when}` }); }
+    const f = this.friendNames(3).filter(x => P.friends[x]);
+    for (const name of f) msgs.push({ from: name, text: ['Want to get ice cream later? 🍦', 'Saw you on campus today! Wave next time!', 'Intramurals this week? We need you!', 'Study group at the library tonight?'][(name.length + L.clock.day) % 4] });
+    const hint = L.collectibleHint(); if (hint) msgs.push({ from: 'Campus buzz', text: hint });
+    if (P.stat('pet') && petHunger(P, L.clock) > 12) msgs.push({ from: 'Home', text: 'Your pet looks hungry. 🥺' });
+    if (L.celebrations?.label()) msgs.push({ from: 'Campus news', text: L.celebrations.label() });
+    const sub = (title: string, html: string) => { const s = this.ui.menu(title, [{ label: 'Back', action: () => this.ui.pop(s) }], { html, onBack: () => this.ui.pop(s), className: 'life-list' }); };
+    openPhone(this.lifeHost, {
+      era, time: L.clock.label(), weather: this.world.raining ? '🌧️' : SETTINGS.season === 'winter' ? '❄️' : this.world.daylight < 0.2 ? '🌙' : '☀️', messages: msgs,
+      apps: [
+        { id: 'map', icon: '🗺️', name: 'Map', open: () => this.ui.bigMap(() => {}) },
+        { id: 'sched', icon: '📚', name: 'Classes', open: () => sub('Class schedule', scheduleHtml(L.clock, era, P)) },
+        { id: 'records', icon: '🏆', name: 'Records', open: () => sub('Campus records', recordsHtml(P)) },
+        { id: 'friends', icon: '🤝', name: 'Friends', open: () => sub('Friends', L.friendsHtml()) },
+        { id: 'photos', icon: '🖼️', name: 'Photos', open: () => sub('Photo album', L.photo.albumHtml()) },
+        { id: 'ach', icon: '⭐', name: 'Achievements', open: () => sub('Achievements', L.achievementsHtml()) },
+      ],
+    });
+  }
+  private lifeHost!: ConstructorParameters<typeof CampusLife>[0];
+  /** Every coin you own: story rewards, pickups, side quests and campus life (minus what you spent). */
+  coinTotal() { return this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin + this.sideQuests.coins() + this.life.coinsNet(); }
+  /** Pause menu: campus life (achievements, friends, collection, photos). */
+  showLifeMenu() {
+    const P = this.life.progress, close = () => this.ui.pop(s);
+    const sub = (title: string, html: string, subtitle?: string) => { const m = this.ui.menu(title, [{ label: 'Back', action: () => this.ui.pop(m) }], { html, subtitle, onBack: () => this.ui.pop(m), className: 'life-list' }); };
+    const s = this.ui.menu('Campus life', [
+      { label: '📷 Take photos (camera mode — P)', action: () => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.life.photo.open(); } },
+      { label: `🛹 ${SETTINGS.season === 'winter' ? 'Grab a sled' : 'Grab your longboard'} (B)`, action: () => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.toggleRide(); } },
+      { label: `🏆 Achievements (${P.achievements.size}/${ACHIEVEMENT_COUNT})`, action: () => sub('Achievements', this.life.achievementsHtml()) },
+      { label: `🚗 Vehicle jobs (${this.life.jobs?.doneCount() ?? 0}/5)`, action: () => sub('Vehicle jobs', this.life.jobs?.journalHtml() ?? '') },
+      { label: `🤝 Friends (${Object.keys(P.friends).length})`, action: () => sub('Friends', this.life.friendsHtml()) },
+      { label: `📦 Collection (${P.collected.size}/${COLLECTIBLE_COUNT})`, action: () => this.life.showCollection() },
+      { label: `🖼️ Photo album (${this.life.photo.album.length})`, action: () => sub('Photo album', this.life.photo.albumHtml(), 'Your latest photos (kept in this browser).') },
+      { label: 'Back', action: close },
+    ], { subtitle: `${this.life.clock.label()} · ${this.life.coinsNet()} coins earned from campus life`, onBack: close });
   }
 
   // ---------------- side quests ----------------
+  private sideQuestsHost!: ConstructorParameters<typeof SideQuests>[0];
   private setupSideQuests() {
     const outward: Record<string, number> = { n: Math.PI, s: 0, e: Math.PI / 2, w: -Math.PI / 2 };
-    this.sideQuests = new SideQuests({
+    this.sideQuests = new SideQuests(this.sideQuestsHost = {
       scene: this.renderer.scene,
       era: () => this.world.era,
       difficulty: () => this.difficulty,
@@ -783,6 +1016,7 @@ export class Game {
     if (this.player.vehicle) this.exitCart(true);
     await this.ui.card(ERAS[era].cardTitle, subtitle ?? ERAS[era].label, 2600);
     this.setEra(era);
+    this.life.resetClockForEra();
   }
 
   setEra(era: EraId) {
@@ -809,6 +1043,7 @@ export class Game {
       this.player.place(this.interiors.space(id), p.x, p.z, Math.PI);
       this.cameraRig.reset(Math.PI); this.cameraRig.pitch = 0.9; this.cameraRig.distance = 9; this.cameraRig.snap(this.player.position);
     });
+    this.life.visited(id);
     this.save();
   }
   async exitInterior(instant = false) {
@@ -850,12 +1085,12 @@ export class Game {
   // ---------------- save ----------------
   snapshot(): SaveData {
     return {
-      version: 3, savedAt: '', difficulty: this.difficulty, era: this.world.era, colorStage: this.colorStage,
+      version: SAVE_VERSION, savedAt: '', difficulty: this.difficulty, era: this.world.era, colorStage: this.colorStage,
       quests: this.quests.state.quests, targets: this.quests.state.targets, rewards: this.quests.state.rewards,
       player: { space: this.spaceId, x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw },
       coins: [...this.collectedCoins],
       introSeen: this.introSeen, finaleReached: this.finaleReached, playerName: this.playerName, outfit: this.outfit,
-      sideQuests: this.sideQuests.snapshot(),
+      sideQuests: this.sideQuests.snapshot(), life: this.life.snapshot(),
     };
   }
   save() { if (!this.finale.previewing && (this.mode === 'playing' || this.mode === 'finale')) writeSave(this.snapshot()); }
@@ -870,6 +1105,7 @@ export class Game {
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(GAME_CONFIG.story.startEra);
+    this.life.load(undefined); this.applyOutfit();
     this.applyColor(true);
     if (this.spaceId !== 'exterior') { this.spaceId = 'exterior'; this.interiors.show(null); this.world.exterior.visible = true; }
     const s = this.resolve('spawn');
@@ -889,6 +1125,7 @@ export class Game {
     this.world.refreshBuildings();
     this.clearTrees();
     this.setEra(d.era);
+    this.life.load(d.life); this.applyOutfit();
     this.applyColor(true);
     if (!d.player) { const sp = this.resolve('spawn'); d.player = { space: 'exterior', x: sp.x, z: sp.z, yaw: this.location('spawn').yaw ?? 0 }; }
     if (d.player.space !== 'exterior' && this.interiors.defs.has(d.player.space)) {
@@ -954,32 +1191,32 @@ export class Game {
   /** Testing only: start at any quest with the earlier ones marked complete (no coins). */
   private showQuestJump() {
     let diff: DifficultyId = 'easy';
-    const go = (stage: 1 | 2 | 3 | 4) => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.jumpToQuest(stage, diff); };
+    const go = (stage: number) => { this.ui.clear(); this.pauseOpen = false; this.quests.resumeAll(); this.jumpToQuest(stage, diff); };
     const s = this.ui.menu('Testing: jump to a quest', [
       { label: 'Difficulty: Easy (click to switch)', action: () => { diff = diff === 'easy' ? 'hard' : 'easy'; (s.el.querySelectorAll('button')[0] as HTMLButtonElement).textContent = `Difficulty: ${diff === 'easy' ? 'Easy' : 'Hard'} (click to switch)`; } },
-      { label: 'Quest 1 — Hire the professors (1999)', action: () => go(1) },
-      { label: 'Quest 2 — Build the campus (2001)', action: () => go(2) },
-      { label: 'Quest 3 — Find and place B Y U I (2011)', action: () => go(3) },
-      { label: 'Finale — STC celebration (present day)', action: () => go(4) },
+      ...QUEST_ORDER.map((id, i) => ({ label: `Mission ${i + 1} — ${this.quests.modules.get(id)?.title ?? id} (${ERAS[QUEST_ERA[id]].year | 0})`, action: () => go(i + 1) })),
+      { label: 'Finale — STC celebration (present day)', action: () => go(QUEST_ORDER.length + 1) },
       { label: 'Back', action: () => this.ui.pop(s) },
     ], { subtitle: 'For testing: earlier quests are marked complete and earn no coins.', onBack: () => this.ui.pop(s) });
   }
-  jumpToQuest(stage: 1 | 2 | 3 | 4, diff: DifficultyId) {
+  /** Testing: start at story mission `stage` (1-based, QUEST_ORDER); QUEST_ORDER.length + 1 = the finale. Earlier missions count as skipped. */
+  jumpToQuest(stage: number, diff: DifficultyId) {
     if (stage === 1) { this.newGame(diff); return; }
-    const st = freshQuestState();
+    const st = freshQuestState(), n = QUEST_ORDER.length, finale = stage > n;
     const done = (id: QuestId) => {
       st.quests[id] = { status: 'completed', data: { __devSkipped: true } };
       st.rewards[id] = computeReward({ questId: id, tuning: { base: 0, qualityMax: 0, speedMax: 0, hardBonus: 0 }, difficulty: diff, activeSeconds: 0, targetSeconds: 1, qualityScore: 0, skippedFraction: 1, devSkipped: true });
     };
-    done('professors'); st.quests.construction.status = 'available';
-    let era: EraId = 'transition';
-    if (stage >= 3) { done('construction'); st.targets['construction:taylor'] = 'solved'; st.targets['construction:icenter'] = 'solved'; st.quests.letters.status = 'available'; era = 'byui'; }
-    if (stage >= 4) { done('letters'); st.quests.letters.data = { __devSkipped: true, cards: true, found: ['B', 'Y', 'U', 'I'], placed: ['B', 'Y', 'U', 'I'] }; era = 'presentFinale'; }
+    QUEST_ORDER.slice(0, stage - 1).forEach(done);
+    if (!finale) st.quests[QUEST_ORDER[stage - 1]].status = 'available';
+    if (st.quests.construction.status === 'completed') { st.targets['construction:taylor'] = 'solved'; st.targets['construction:icenter'] = 'solved'; }
+    if (finale) st.quests.letters.data = { __devSkipped: true, cards: true, found: ['B', 'Y', 'U', 'I'], placed: ['B', 'Y', 'U', 'I'] };
+    const era: EraId = finale ? 'presentFinale' : QUEST_ERA[QUEST_ORDER[stage - 1]];
     let player: SaveData['player'];
-    if (stage === 4) { const d = this.world.doorPlacement(this.location('door.stc.main')); player = { space: 'exterior', x: d.x + d.nx * 4, z: d.z + d.nz * 4, yaw: Math.atan2(-d.nx, -d.nz) }; }
+    if (finale) { const d = this.world.doorPlacement(this.location('door.stc.main')); player = { space: 'exterior', x: d.x + d.nx * 4, z: d.z + d.nz * 4, yaw: Math.atan2(-d.nx, -d.nz) }; }
     else { const p = this.interiors.toWorld('kimball-office', 0, -4); player = { space: 'kimball-office', x: p.x, z: p.z, yaw: Math.PI }; }
-    this.continueGame({ version: 3, savedAt: '', difficulty: diff, era, colorStage: this.quests.completedCount(), quests: st.quests, targets: st.targets, rewards: st.rewards, player, coins: [], introSeen: true, finaleReached: false });
-    this.ui.toast(stage === 4 ? 'Testing: playing the ending.' : 'Testing: talk to President Bednar to start the quest.', 5000);
+    this.continueGame({ version: SAVE_VERSION, savedAt: '', difficulty: diff, era, colorStage: stage - 1, quests: st.quests, targets: st.targets, rewards: st.rewards, player, coins: [], introSeen: true, finaleReached: false });
+    this.ui.toast(finale ? 'Testing: playing the ending.' : 'Testing: talk to President Bednar to start the mission.', 5000);
   }
 
   private chooseDifficulty() {
@@ -1000,6 +1237,10 @@ export class Game {
       ['Helicopter', 'WASD fly · hold Space climb · hold F descend · E land / get out', 'Left stick · hold Button 2 climb · Button 1 land', 'Left stick · hold B climb · hold L/ZL descend · A land'],
       ['Plane', 'W throttle · S slow · A/D turn · hold Space climb · F dive · E land / get out', 'Left stick · hold Button 2 climb · Button 1 land', 'Left stick · hold B climb · hold L/ZL dive · A land'],
       ['Superpowers', 'Pause → Superpowers (or type a code)', 'Pause → Superpowers', '+ → Superpowers'],
+      ['Longboard / sled', 'B (W push · S brake · Space ollie)', 'Pause → Campus life', '+ → Campus life'],
+      ['Camera (photos)', 'P · Space/E to shoot · Esc to close', 'Pause → Campus life', '+ → Campus life'],
+      ['Throw (snowball fights)', 'R', 'Button 3 / right stick', 'X / right stick'],
+      ['Piano', 'A S D F G H J K · W E T Y U', 'D-pad + Button 1', 'D-pad + A'],
       ['Camera', 'Drag mouse · wheel zoom · C reset', 'Right stick · right click reset', 'Right stick'],
       ['Interact / confirm', 'E · Enter · Space', 'Button 1', 'A'], ['Back', 'Esc · Backspace', 'Button 2', 'B'],
       ['Map / objective', 'M', 'Button 3', 'X'], ['Journal (Quest 3 cards)', 'J', 'Pause menu', 'Y'], ['Pause / menu', 'Esc', 'Button 4', '+ or −'], ['Menus', 'Arrows/WASD + Enter, or mouse', 'Left stick + Button 1', 'Left stick or D-pad + A'],
@@ -1039,6 +1280,7 @@ export class Game {
       ...(this.player.handstand ? [{ label: 'Back on your feet', action: () => { this.player.setHandstand(false); close(); } }] : []),
       ...(this.player.superSpeed || this.player.superJump ? [{ label: 'Turn off superpowers', action: () => { this.player.superSpeed = this.player.superJump = false; this.ui.toast('Superpowers off.'); close(); } }] : []),
       { label: `📋 Side quests (${this.sideQuests.doneCount()}/${this.sideQuests.journal().length} done)`, action: () => this.showSideJournal() },
+      { label: `🌟 Campus life — photos, friends, collection, achievements (${this.life.progress.achievements.size}/${ACHIEVEMENT_COUNT} 🏆)`, action: () => this.showLifeMenu() },
       { label: `👕 Change outfit (${outfitById(this.outfit).name})`, action: () => this.showWardrobe() },
       { label: '⚡ Superpowers & cheat codes', action: () => this.showCheats() },
       { label: 'Settings (sound, brightness, season…)', action: () => this.showSettings() },
@@ -1127,17 +1369,17 @@ export class Game {
 
   // ---------------- outfits ----------------
   private applyOutfit() {
-    const P = this.player; P.avatar.rebuild(outfitLook(this.outfit, SETTINGS.season === 'winter'));
+    const P = this.player; P.avatar.rebuild({ ...outfitLook(this.outfit, SETTINGS.season === 'winter'), ...(this.life ? accessoryLook(this.life.progress) : {}) });
     if (P.jetpack) P.avatar.setJetpack(true);
   }
   /** Wardrobe: pick an outfit (shown on the character right away). */
   showWardrobe() {
     const s = this.ui.menu('Wardrobe', [
-      ...OUTFITS.map(o => ({ label: `${o.id === this.outfit ? '✓ ' : ''}${o.name} — ${o.note}`, action: () => {
+      ...OUTFITS.filter(o => !this.life || ownsOutfit(this.life.progress, o.id)).map(o => ({ label: `${o.id === this.outfit ? '✓ ' : ''}${o.name} — ${o.note}`, action: () => {
         this.outfit = o.id; this.applyOutfit(); this.save(); playSound('pop'); this.ui.toast(`Changed into: ${o.name}.`); this.ui.pop(s);
       } })),
       { label: 'Back', action: () => this.ui.pop(s) },
-    ], { subtitle: 'Choose what to wear. (In winter a coat goes on top when you’re outside.)', onBack: () => this.ui.pop(s) });
+    ], { subtitle: 'Choose what to wear. (In winter a coat goes on top when you’re outside.) More clothes and accessories at the school store in the Manwaring Center.', onBack: () => this.ui.pop(s) });
   }
 
   // ---------------- the apartment ----------------
@@ -1163,7 +1405,8 @@ export class Game {
       P.lying = null; P.avatar.lie(false);
       const b = this.interiors.toWorld(HOME_ID, HOME_SPOTS.bed.x, HOME_SPOTS.bed.z);
       P.place(this.space, b.x, b.z, -Math.PI / 2);
-      playSound('chime'); this.ui.toast('Good morning! You feel well rested. (Game saved.)', 4000);
+      this.life.clock.sleepUntilMorning();
+      playSound('chime'); this.ui.toast(`Good morning! It’s ${this.life.clock.label()}. You feel well rested. (Game saved.)`, 4000);
       this.save();
     } finally { P.lying = null; this.busy = false; }
   }
@@ -1182,12 +1425,12 @@ export class Game {
       { label: 'Close the fridge', action: () => this.ui.pop(s) },
     ], { subtitle: 'You don’t need to eat in this game… but it’s nice.', onBack: () => this.ui.pop(s) });
   }
-  private async eat(f: { name: string; color: string; line: string }) {
+  async eat(f: { name: string; color: string; line: string }) {
     if (this.busy) return; this.busy = true;
     const P = this.player; let t = 0;
     try {
       P.avatar.holdItem(f.color);
-      P.emote = dt => { t += dt; P.avatar.eatPose(t, t / 3); if (Math.floor(t * 3.2 / (Math.PI * 2) + 0.5) !== Math.floor((t - dt) * 3.2 / (Math.PI * 2) + 0.5)) playSound('pop'); };
+      P.emote = dt => { t += dt; P.avatar.eatPose(t, t / 3); if (Math.floor(t * 3.2 / (Math.PI * 2) + 0.5) !== Math.floor((t - dt) * 3.2 / (Math.PI * 2) + 0.5)) playSound('bite'); };
       await this.wait(3000);
       this.ui.toast(`Mmm… ${f.name.toLowerCase()}. ${f.line}`, 4500);
     } finally { P.emote = null; P.avatar.holdItem(null); this.busy = false; }
@@ -1238,6 +1481,7 @@ export class Game {
       slider('Brightness', () => Math.round(SETTINGS.brightness * 100), v => { V.brightness = v / 100; this.renderer.setBrightness(SETTINGS.brightness); }, 60, 140, 5);
       const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
       button(() => `Season: ${SETTINGS.season[0].toUpperCase()}${SETTINGS.season.slice(1)} (whole game)`, () => { SETTINGS.season = SEASONS[(SEASONS.indexOf(SETTINGS.season) + 1) % 4]; this.applySeason(); });
+      button(() => `Day & night cycle: ${SETTINGS.dayNight ? 'On (1 minute = 1 hour)' : 'Off (fixed time per era)'}`, () => { SETTINGS.dayNight = !SETTINGS.dayNight; this.life.clock.running = SETTINGS.dayNight; if (!SETTINGS.dayNight) this.applySeason(); });
       button(() => `Graphics: ${SETTINGS.graphics === 'high' ? 'High' : 'Low (faster)'}`, () => { SETTINGS.graphics = SETTINGS.graphics === 'high' ? 'low' : 'high'; this.renderer.setQuality(SETTINGS.graphics, this.world.sun); });
       button(() => `Reduced motion: ${SETTINGS.reducedMotion ? 'On' : 'Off'}`, () => { SETTINGS.reducedMotion = !SETTINGS.reducedMotion; });
       head('Controllers');
@@ -1376,7 +1620,7 @@ export class Game {
     this.music.update(dt, !cinematic, !!this.ui.currentSpeaker);   // ducked under dialogue
     this.ambience.update(dt, { outdoor: this.spaceId === 'exterior' && this.mode !== 'finale', season: SETTINGS.season, cinematic, room: this.spaceId });
     const veh = this.player.vehicle;
-    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike', isAircraft(veh?.kind ?? 'car') ? Math.max(14, veh!.speed) : veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
+    this.engine.update(this.mode === 'playing' && !this.pauseOpen && !!veh && veh.kind !== 'bike' && !isRide(veh.kind), isAircraft(veh?.kind ?? 'car') ? Math.max(14, veh!.speed) : veh?.speed ?? 0, veh?.kind === 'cart' ? 'cart' : veh?.kind === 'scooter' ? 'scooter' : 'car');
     this.jetLoop.update(this.mode === 'playing' && !this.pauseOpen && this.player.thrusting ? 0.5 : 0, 1);
     this.updateTraffic(dt);
     if (this.spaceId !== 'exterior') this.interiors.update(dt);
@@ -1388,17 +1632,18 @@ export class Game {
         else if (e.type === 'bounce') playSound('bounce');
       }
     }
-    // footsteps: one per ~0.8 m walked (shorter when running), surface from where you are
-    const P = this.player;
-    if (this.mode === 'playing' && !this.cutscenes.active && !P.vehicle && !P.seated && P.grounded && P.speed > 0.6) {
-      this.stepDist += P.speed * dt;
-      if (this.stepDist > (P.speed > 6 ? 1.3 : 0.8)) {
-        this.stepDist = 0;
-        const x = P.position.x, z = P.position.z, winter = SETTINGS.season === 'winter';
-        const hard = this.world.onPath(x, z) || onVehicleRoad(x, z);
-        playStep(this.spaceId !== 'exterior' ? 'wood' : hard ? 'concrete' : winter ? 'snow' : 'grass', P.speed > 6 ? 0.45 : 0.3);
+    // footsteps: one each time a foot lands in the walk animation; the surface sets the sound
+    const P = this.player, feet = P.avatar.footfalls;
+    if (feet !== this.lastFootfall) {
+      this.lastFootfall = feet;
+      if (this.mode === 'playing' && !this.cutscenes.active && !P.vehicle && !P.seated && P.grounded && P.speed > 0.6) {
+        const x = P.position.x, z = P.position.z, winter = SETTINGS.season === 'winter', indoor = this.spaceId !== 'exterior';
+        const fs = indoor ? this.interiors.defs.get(this.spaceId)?.floorStyle : undefined;
+        const surface = indoor ? (fs === 'carpet' || fs === 'patternCarpet' ? 'carpet' : fs === 'wood' || fs === 'court' || fs === 'sport' ? 'wood' : 'tile')
+          : this.world.onPath(x, z) || onVehicleRoad(x, z) ? (winter && Math.random() < 0.3 ? 'snow' : 'concrete') : winter ? 'snow' : 'grass';
+        playStep(surface, P.speed > 6 ? 1 : 0.6, indoor);
       }
-    } else this.stepDist = 0.5;
+    }
     const a = this.input.state;
     for (const h of this.devHooks) h(dt);
     const uiBlocking = this.mode === 'title' && !document.body.classList.contains('booted') ? true : this.ui.update(a);   // menus wait for the loading screen
@@ -1432,7 +1677,13 @@ export class Game {
       this.ui.showHud(false);
     } else {
       this.ui.showHud(true);
-      const canAct = !uiBlocking && !this.busy && !this.interactions.busy;
+      const photo = this.life.photo;
+      if (photo.active) {
+        if (uiBlocking || a.pressed('back') || a.pressed('pause')) { a.consume('back'); a.consume('pause'); photo.close(); }
+        else if (a.pressed('confirm') || a.pressed('interact') || a.pressed('photo') || a.pressed('jump')) { for (const b of ['confirm', 'interact', 'photo', 'jump'] as const) a.consume(b); photo.snap(); }
+      }
+      const canAct = !uiBlocking && !this.busy && !this.interactions.busy && !photo.active;
+      if (photo.active) this.ui.showHud(false);
       if (!this.buildingInfoOpen) this.player.update(dt, a, this.cameraRig.yaw, canAct);
       this.cameraRig.follow = !!this.player.vehicle;
       if (this.camFocus) { const c = this.renderer.camera; c.position.copy(this.camFocus.from); c.lookAt(this.camFocus.to); }
@@ -1453,31 +1704,36 @@ export class Game {
       const nearbySign = canAct ? this.nearbyBuildingSign() : null;
       this.updateCoins(dt); this.updateMarkers(dt);
       this.sideQuests.update(dt, !uiBlocking && !this.pauseOpen && !this.controllerLost && !this.buildingInfoOpen); this.updateGuide();
+      this.life.update(dt, !uiBlocking && !this.pauseOpen && !this.controllerLost && !this.buildingInfoOpen);
       this.watchControllers();
       if (canAct) {
         if (this.player.seated && (a.pressed('interact') || Math.hypot(a.axes.moveX, a.axes.moveY) > 0.4 || a.pressed('jump'))) { a.consume('interact'); this.standUp(); }
-        else if (this.player.vehicle && a.pressed('interact')) { a.consume('interact'); this.exitCart(); }
+        else if (this.player.vehicle && (a.pressed('interact') || (a.pressed('ride') && isRide(this.player.vehicle.kind)))) { a.consume('interact'); a.consume('ride'); this.exitCart(); }
         else if (focus && a.pressed('interact')) { a.consume('interact'); if (focus.kind === 'npc' && focus.visual) this.stageConversation(focus.visual); void this.interactions.trigger(); }
         else if (ballNear && a.pressed('interact')) { a.consume('interact'); if (this.balls.action(this.player.position, this.player.yaw)) playSound(ballNear.startsWith('Kick') ? 'kick' : 'tick'); }
         else if (insp && a.pressed('interact')) { a.consume('interact'); insp.onInspect(); }
         else if (npc && a.pressed('interact')) { a.consume('interact'); void this.talkToNpc(npc); }
+        else if (a.pressed('ride')) { a.consume('ride'); this.toggleRide(); }
+        else if (a.pressed('phone')) { a.consume('phone'); this.showPhone(); }
+        else if (a.pressed('photo')) { a.consume('photo'); this.life.photo.open(); }
         else if (a.pressed('pause')) { a.consume('pause'); this.showPause(); }
         else if (a.pressed('journal') && this.hudBtn) { a.consume('journal'); this.hudBtn.fn(); }
         else if (a.pressed('map')) { a.consume('map'); this.ui.bigMap(() => {}); }   // the map always opens the map (the journal has its own button: J / Joy-Con Y)
       }
       const obj = this.currentObjective();
       const interiorLabel = this.spaceId !== 'exterior' ? this.interiors.defs.get(this.spaceId)!.label : null;
-      const coinTotal = this.quests.totalRewardCoins() + this.collectedCoins.size * GAME_CONFIG.rewards.pickupCoin + this.sideQuests.coins();
-      const guidePt = this.guide ? this.targetPoint({ x: this.guide.x, z: this.guide.z }) : null;
-      const sideLine = [this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
+      const coinTotal = this.coinTotal();
+      const job = this.life.race.target() ?? this.life.jobs?.target() ?? null;
+      const guidePt = job ? { x: job.x, z: job.z } : this.guide ? this.targetPoint({ x: this.guide.x, z: this.guide.z }) : null;
+      const sideLine = [this.life.race.tracker(), this.life.jobs?.tracker() ?? null, this.life.events.tracker(), this.life.hangingWith ? `🤝 Hanging out with ${this.life.hangingWith.name}` : null, this.sideQuests.tracker(), this.guide ? `🧭 ${this.guide.label} · ${Math.round(Math.hypot(this.guide.x - this.player.position.x, this.guide.z - this.player.position.z))} m` : null].filter(Boolean).join('\n') || null;
       this.ui.updateHud({
-        objective: obj.text, era: ERAS[this.world.era].label,
+        objective: obj.text, era: `${ERAS[this.world.era].label} · 🕒 ${this.life.clock.label()}`,
         buildingHint: nearbySign ? 'Click the building name sign to learn more.' : null,
-        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (isAircraft(this.player.vehicle.kind) && this.player.altitude() > 0.05 ? (this.player.autoLand ? 'Landing… (press again to cancel)' : 'Land here') : this.player.vehicle.kind === 'heli' ? 'Get out of the helicopter' : this.player.vehicle.kind === 'plane' ? 'Get out of the plane (stop first)' : this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
+        prompt: canAct ? (this.player.seated ? 'Stand up (E or move)' : this.player.vehicle ? (isAircraft(this.player.vehicle.kind) && this.player.altitude() > 0.05 ? (this.player.autoLand ? 'Landing… (press again to cancel)' : 'Land here') : this.player.vehicle.kind === 'heli' ? 'Get out of the helicopter' : this.player.vehicle.kind === 'plane' ? 'Get out of the plane (stop first)' : this.player.vehicle.kind === 'bike' ? 'Get off the bicycle' : this.player.vehicle.kind === 'board' ? 'Step off the longboard' : this.player.vehicle.kind === 'sled' ? 'Get off the sled' : this.player.vehicle.kind === 'scooter' ? 'Step off the scooter' : this.player.vehicle.kind === 'car' ? 'Get out of the car' : 'Get out of the golf cart') : focus ? this.interactions.promptText(focus) : ballNear ? ballNear : insp ? (insp.prompt ?? 'Inspect') : npc ? `Talk to ${npc.name}` : null) : null,
         px: this.player.position.x, pz: this.player.position.z, ...this.mapPosition(), pyaw: this.player.yaw, camYaw: this.cameraRig.yaw,
         map: this.world.mapCanvas, eraId: this.world.era, target: guidePt ?? this.targetPoint(obj.target), interior: interiorLabel,
         markers: [...this.markerPoints(), ...this.quests.waypoints().map(w => this.targetPoint(w)).filter(Boolean) as { x: number; z: number }[], ...(guidePt ? [guidePt] : [])], side: sideLine,
-        targetLabel: this.guide ? this.guide.label : this.targetLabel(obj.target),   // asked for directions: the pointer leads there until you arrive
+        targetLabel: job ? job.label : this.guide ? this.guide.label : this.targetLabel(obj.target),   // asked for directions: the pointer leads there until you arrive
         doors: this.spaceId === 'exterior' ? this.entrances.filter(e => !e.eras || e.eras.includes(this.world.era)) : [],
         coins: `● ${coinTotal} coins`, driving: this.player.vehicle?.kind ?? false,
       });
@@ -1492,7 +1748,13 @@ export class Game {
       const c = this.renderer.camera, o = this.overhead, h = o.span / 2 / Math.tan(THREE.MathUtils.degToRad(c.fov / 2));
       c.position.set(o.x, h, o.z + 0.001); c.up.set(0, 0, -1); this.renderer.scene.fog = null; c.lookAt(o.x, 0, o.z); c.far = h + 500; c.updateProjectionMatrix();
     } else if (this.renderer.camera.up.z !== 0) { this.renderer.camera.up.set(0, 1, 0); this.renderer.scene.fog = this.renderer.fog; this.renderer.camera.far = 2500; this.renderer.camera.updateProjectionMatrix(); }
+    if (SETTINGS.dayNight && this.life) {
+      const story = this.mode === 'playing';   // the title, opening and finale keep each era's designed look
+      this.world.setTimeOfDay(story ? (this.spaceId === 'exterior' ? this.life.clock.hour : 13) : ERA_START_HOUR[this.world.era], this.renderer.fog.color);
+      this.renderer.setDaylight(this.world.daylight);
+    } else this.renderer.setDaylight(1);
     this.renderer.render(dt);
+    if (this.life?.photo.active) this.life.photo.afterRender(this.renderer.canvas, { camera: this.renderer.camera, hour: this.life.clock.hour, daylight: this.world.daylight });
     this.ui.setMapColor(this.renderer.colorAmount);
   }
 }

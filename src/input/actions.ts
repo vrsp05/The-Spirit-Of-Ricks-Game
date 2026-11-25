@@ -6,7 +6,7 @@ export type AxisName = 'moveX' | 'moveY' | 'lookX' | 'lookY';
 export type ButtonName =
   | 'interact' | 'confirm' | 'back' | 'map' | 'pause'
   | 'run' | 'runToggle' | 'cameraReset'
-  | 'navUp' | 'navDown' | 'navLeft' | 'navRight' | 'devToggle' | 'jump' | 'alt' | 'alt2' | 'hint' | 'journal' | 'tools' | 'rLeft' | 'rRight' | 'rUp' | 'rDown';
+  | 'navUp' | 'navDown' | 'navLeft' | 'navRight' | 'devToggle' | 'jump' | 'alt' | 'alt2' | 'hint' | 'journal' | 'tools' | 'rLeft' | 'rRight' | 'rUp' | 'rDown' | 'photo' | 'ride' | 'phone';
 
 export interface SourceFrame {
   axes: Partial<Record<AxisName, number>>;   // -1..1; moveY/lookY: +1 = forward/up
@@ -23,7 +23,7 @@ export interface InputSource {
   raw?(): { axes: number[]; buttons: boolean[] } | null; // for the input test view
 }
 
-const ALL_BUTTONS: ButtonName[] = ['interact', 'confirm', 'back', 'map', 'pause', 'run', 'runToggle', 'cameraReset', 'navUp', 'navDown', 'navLeft', 'navRight', 'devToggle', 'jump', 'alt', 'alt2', 'hint', 'journal', 'tools', 'rLeft', 'rRight', 'rUp', 'rDown'];
+const ALL_BUTTONS: ButtonName[] = ['interact', 'confirm', 'back', 'map', 'pause', 'run', 'runToggle', 'cameraReset', 'navUp', 'navDown', 'navLeft', 'navRight', 'devToggle', 'jump', 'alt', 'alt2', 'hint', 'journal', 'tools', 'rLeft', 'rRight', 'rUp', 'rDown', 'photo', 'ride', 'phone'];
 
 export class ActionState {
   axes: Record<AxisName, number> = { moveX: 0, moveY: 0, lookX: 0, lookY: 0 };

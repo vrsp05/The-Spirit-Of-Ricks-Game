@@ -7,7 +7,8 @@ import type { EraId } from '../world/eras';
 import type { DialogueLine, QuestContext, QuestId, QuestModule, QuestStatus, QuestUI, QuestWorld } from './contract';
 import { advanceTimer, computeReward, type RewardReceipt } from './rewards';
 
-export const QUEST_ORDER: QuestId[] = ['professors', 'construction', 'letters'];
+import { QUEST_ORDER } from './order';
+export { QUEST_ORDER, QUEST_ERA } from './order';
 
 export interface QuestState {
   quests: Record<string, { status: QuestStatus; data: Record<string, unknown> }>;

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { textCanvas } from '../world/World';
 
 export interface Rect { x0: number; z0: number; x1: number; z1: number; h?: number; color?: string }
-export type FloorStyle = 'checker' | 'wood' | 'tile' | 'carpet' | 'court';
+export type FloorStyle = 'wood' | 'tile' | 'carpet' | 'court' | 'checker' | 'terrazzo' | 'mcTile' | 'darkTile' | 'sport' | 'patternCarpet';
 
 // ---------------------------------------------------------------- materials (shared, so rooms stay cheap)
 const mats = new Map<string, THREE.MeshStandardMaterial>();
@@ -62,6 +62,41 @@ export function floorTexture(style: FloorStyle, base: string, W: number, D: numb
       g.fillStyle = shade(base, (i + j) % 7 === 0 ? 0.9 : 0.97 + r() * 0.05); g.fillRect(x, y, t, t);
       g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x, y, t, 1); g.fillRect(x, y, 1, t);
     }
+  } else if (style === 'terrazzo') {
+    // polished light terrazzo with grey border bands (Kimball atrium)
+    g.fillStyle = base; g.fillRect(0, 0, c.width, c.height);
+    for (let i = 0; i < c.width * c.height / 10; i++) { g.fillStyle = shade(base, 0.8 + r() * 0.35); g.fillRect(r() * c.width, r() * c.height, 1.5, 1.5); }
+    g.fillStyle = 'rgba(90,92,96,0.55)';
+    for (let x = 0; x < c.width; x += 6 * px) g.fillRect(x, 0, 0.35 * px, c.height);
+    for (let y = 0; y < c.height; y += 6 * px) g.fillRect(0, y, c.width, 0.35 * px);
+  } else if (style === 'mcTile') {
+    // large grey/white rectangular tiles in a random pattern (Manwaring Center)
+    const tw = 1.2 * px, th = 0.6 * px, tones = [1.0, 0.93, 0.82, 0.7];
+    for (let y = 0; y < c.height; y += th) for (let x = 0; x < c.width; x += tw) {
+      g.fillStyle = shade(base, tones[(r() * tones.length) | 0]); g.fillRect(x, y, tw, th);
+      g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(x, y, tw, 1); g.fillRect(x, y, 1, th);
+    }
+  } else if (style === 'darkTile') {
+    // big charcoal porcelain tiles (Science and Technology Center)
+    const t = 1.2 * px;
+    for (let y = 0; y < c.height; y += t / 2) for (let x = (Math.round(y / (t / 2)) % 2) * t / 2; x < c.width + t; x += t) {
+      g.fillStyle = shade(base, 0.92 + r() * 0.14); g.fillRect(x - t / 2, y, t, t / 2);
+      g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x - t / 2, y, t, 1); g.fillRect(x - t / 2, y, 1, t / 2);
+    }
+  } else if (style === 'sport') {
+    // blue sport floor with red, yellow and white lines (Hart fitness center)
+    g.fillStyle = base; g.fillRect(0, 0, c.width, c.height);
+    for (let i = 0; i < c.width * c.height / 30; i++) { g.fillStyle = shade(base, 0.9 + r() * 0.2); g.fillRect(r() * c.width, r() * c.height, 2, 2); }
+    const lw = Math.max(2, px * 0.09);
+    for (const [col, off] of [['#f4f1e8', 0.2], ['#e6c33a', 0.45], ['#d9452b', 0.7]] as [string, number][]) {
+      g.fillStyle = col; g.fillRect(0, c.height * off, c.width, lw); g.fillRect(c.width * (off * 0.9 + 0.05), 0, lw, c.height);
+    }
+  } else if (style === 'patternCarpet') {
+    // grey commercial carpet with a darker geometric pattern (McKay Library)
+    g.fillStyle = base; g.fillRect(0, 0, c.width, c.height);
+    for (let i = 0; i < c.width * c.height / 14; i++) { g.fillStyle = shade(base, 0.8 + r() * 0.35); g.fillRect(r() * c.width, r() * c.height, 2, 2); }
+    g.strokeStyle = shade(base, 0.72); g.lineWidth = Math.max(1, px * 0.06);
+    for (let y = 0; y < c.height; y += 1.6 * px) for (let x = 0; x < c.width; x += 1.6 * px) { g.strokeRect(x + 0.3 * px, y + 0.3 * px, 1.0 * px, 1.0 * px); }
   } else if (style === 'carpet') {
     g.fillStyle = base; g.fillRect(0, 0, c.width, c.height);
     for (let i = 0; i < c.width * c.height / 18; i++) { g.fillStyle = shade(base, 0.85 + r() * 0.3); g.fillRect(r() * c.width, r() * c.height, 2, 2); }
@@ -79,9 +114,9 @@ const SKY = () => mat('#cfe6f5', { emissive: '#bfe0f2', emissiveIntensity: 0.65,
  * Baseboards and a chair rail along the outer walls, windows with daylight on the north/east/west walls
  * (skipped where an inner wall meets the outer wall), and wall lights between them.
  */
-export function dressRoom(g: THREE.Object3D, W: number, D: number, wall: string, walls: Rect[], opts: { windows?: boolean } = {}) {
+export function dressRoom(g: THREE.Object3D, W: number, D: number, wall: string, walls: Rect[], opts: { windows?: boolean; height?: number } = {}) {
   const base = mat(shade(wall, 0.45)), rail = mat(shade(wall, 0.8)), lower = mat(shade(wall, 0.9));
-  const H = 3.6;
+  const H = opts.height ?? 3.6;
   // north wall + side walls: baseboard, lower wainscot band, chair rail
   box(g, W, 0.16, 0.05, base, 0, 0.08, -D / 2 + 0.03, false);
   box(g, W, 0.9, 0.02, lower, 0, 0.55, -D / 2 + 0.012, false);
@@ -233,8 +268,8 @@ export function waterCooler(g: THREE.Object3D, x: number, z: number) {
   const b = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.45, 12), mat('#9fd0ef', { transparent: true, opacity: 0.7, roughness: 0.1 })); b.position.set(x, 1.24, z); g.add(b);
 }
 /** A pendant light (ceiling cord + glowing shade) hanging at height y. */
-export function pendant(g: THREE.Object3D, x: number, z: number, y = 2.9) {
-  box(g, 0.02, 3.6 - y, 0.02, '#2a2a2a', x, (3.6 + y) / 2, z, false);
+export function pendant(g: THREE.Object3D, x: number, z: number, y = 2.9, ceiling = 3.6) {
+  box(g, 0.02, ceiling - y, 0.02, '#2a2a2a', x, (ceiling + y) / 2, z, false);
   const shadeM = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.3, 0.25, 12), mat('#2f3a30')); shadeM.position.set(x, y, z); g.add(shadeM);
   box(g, 0.2, 0.04, 0.2, mat('#fff3cf', { emissive: '#ffe0a0', emissiveIntensity: 1.2 }), x, y - 0.13, z, false);
 }
@@ -258,3 +293,53 @@ export function bookcase(g: THREE.Object3D, x: number, z: number, w: number, ry:
   g.add(grp);
   const c = Math.abs(Math.cos(ry)) > 0.5; solid(g, { x0: x - (c ? w / 2 : 0.2), x1: x + (c ? w / 2 : 0.2), z0: z - (c ? 0.2 : w / 2), z1: z + (c ? 0.2 : w / 2) });
 }
+
+// ---------------------------------------------------------------- architecture (atriums, halls)
+/** A round column floor-to-ceiling (Kimball atrium, Manwaring balcony supports). Solid. */
+export function column(g: THREE.Object3D, x: number, z: number, h = 3.6, r = 0.4, color = '#f4f1ea') {
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16), mat(color)); c.position.set(x, h / 2, z); c.castShadow = c.receiveShadow = true; g.add(c);
+  box(g, r * 2.4, 0.14, r * 2.4, shade(color, 0.88), x, 0.07, z, false);
+  solid(g, { x0: x - r - 0.05, x1: x + r + 0.05, z0: z - r - 0.05, z1: z + r + 0.05 });
+}
+const GLASS = () => mat('#cfe7f0', { transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.1 });
+/** A glass railing between two points at height y (balconies, stairs). */
+export function glassRail(g: THREE.Object3D, x0: number, z0: number, x1: number, z1: number, y: number, h = 1.0) {
+  const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0);
+  const pane = new THREE.Mesh(new THREE.BoxGeometry(L, h, 0.03), GLASS()); pane.position.set((x0 + x1) / 2, y + h / 2, (z0 + z1) / 2); pane.rotation.y = -a; g.add(pane);
+  const top = box(g, L, 0.06, 0.08, '#b9bec4', (x0 + x1) / 2, y + h, (z0 + z1) / 2, false); top.rotation.y = -a;
+}
+/**
+ * An upper-floor walkway around the north and side walls at height y (two-storey atriums):
+ * a white slab with a fascia, a glass railing on the open edge, lights under it.
+ */
+export function balcony(g: THREE.Object3D, W: number, D: number, y: number, depth = 2.4, color = '#f2f0ec', sides: ('n' | 'e' | 'w')[] = ['n', 'e', 'w']) {
+  const under = mat('#fff3cf', { emissive: '#ffe4a8', emissiveIntensity: 1.1 });
+  const slab = (cx: number, cz: number, w: number, d: number) => { box(g, w, 0.35, d, color, cx, y, cz); };
+  if (sides.includes('n')) { slab(0, -D / 2 + depth / 2, W, depth); glassRail(g, -W / 2 + (sides.includes('w') ? depth : 0), -D / 2 + depth, W / 2 - (sides.includes('e') ? depth : 0), -D / 2 + depth, y + 0.17);
+    for (let x = -W / 2 + 3; x < W / 2 - 2; x += 4) box(g, 0.5, 0.04, 0.5, under, x, y - 0.19, -D / 2 + depth / 2, false); }
+  for (const s of ['e', 'w'] as const) if (sides.includes(s)) {
+    const sx = s === 'e' ? 1 : -1, z0 = -D / 2 + (sides.includes('n') ? depth : 0), len = D / 2 + D / 2 - (sides.includes('n') ? depth : 0) - 4;
+    slab(sx * (W / 2 - depth / 2), z0 + len / 2, depth, len); glassRail(g, sx * (W / 2 - depth), z0, sx * (W / 2 - depth), z0 + len, y + 0.17);
+    for (let z = z0 + 2; z < z0 + len; z += 4) box(g, 0.5, 0.04, 0.5, under, sx * (W / 2 - depth / 2), y - 0.19, z, false);
+  }
+}
+/** A straight staircase rising along +z from (x, z) by `rise` over `run` metres (decorative; its footprint is solid). */
+export function stairs(g: THREE.Object3D, x: number, z: number, w: number, run: number, rise: number, color = '#e8e4dc', ry = 0) {
+  const grp = new THREE.Group(); grp.position.set(x, 0, z); grp.rotation.y = ry; g.add(grp);
+  const n = Math.max(4, Math.round(rise / 0.18)), sd = run / n;
+  for (let i = 0; i < n; i++) { box(grp, w, (i + 1) * (rise / n), sd, i % 2 ? color : shade(color, 0.95), 0, (i + 1) * (rise / n) / 2, -i * sd - sd / 2); box(grp, w, 0.02, 0.05, '#9aa0a6', 0, (i + 1) * (rise / n) + 0.01, -i * sd - 0.03, false); }
+  for (const sx of [-1, 1]) glassRail(grp, sx * w / 2, 0, sx * w / 2, -run, rise / 2, 1.0 + rise / 2);
+  const c = Math.abs(Math.cos(ry)) > 0.5, hw = c ? w / 2 : run / 2, hd = c ? run / 2 : w / 2, ox = c ? 0 : -Math.sin(ry) * run / 2, oz = c ? -Math.cos(ry) * run / 2 : 0;
+  solid(g, { x0: x + ox - hw, x1: x + ox + hw, z0: z + oz - hd, z1: z + oz + hd });
+}
+/** A flat overlay on the floor with its own material (a zone of carpet, terrazzo or a sport floor). */
+export function floorZone(g: THREE.Object3D, x: number, z: number, w: number, d: number, style: FloorStyle, base: string) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: floorTexture(style, base, w, d), roughness: style === 'terrazzo' || style === 'darkTile' ? 0.35 : 0.8 }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.012, z); m.receiveShadow = true; g.add(m); return m;
+}
+/** A glowing round globe light hanging from the ceiling. */
+export function globeLight(g: THREE.Object3D, x: number, z: number, y: number, ceiling: number, r = 0.35) {
+  box(g, 0.02, ceiling - y, 0.02, '#2a2a2a', x, (ceiling + y) / 2, z, false);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat('#fff8e8', { emissive: '#ffe9b8', emissiveIntensity: 1.3 })); s.position.set(x, y, z); g.add(s);
+}
+export { GLASS as glassMat, shade };

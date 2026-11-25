@@ -48,6 +48,9 @@ export class Avatar {
   private talkT = 0;
   talking = false;
   seated = false;
+  /** Counts each time a foot lands in the walk cycle (footstep sounds follow the legs). */
+  footfalls = 0;
+  private lastFoot = 0;
   private scaleF: number;
 
   constructor(public look: AvatarLook, scale = 1) {
@@ -59,9 +62,11 @@ export class Avatar {
   /** Re-dress the character (keeps pose, label and position). */
   rebuild(look: AvatarLook) {
     this.look = look;
+    this.propObj?.removeFromParent();
     this.hips.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
     this.hips.clear(); this.eyes = []; this.jet = null; this.held = null;
     this.build(look);
+    if (this.propObj) this.torso.add(this.propObj);
     if (this.seated) this.sit(true);
   }
 
@@ -147,6 +152,7 @@ export class Avatar {
     this.spd += (speed - this.spd) * Math.min(1, dt * 8);
     const s = this.spd, moving = s > 0.15;
     if (moving) this.phase += dt * (4.2 + s * 1.05); else this.phase *= Math.max(0, 1 - dt * 6);
+    if (moving) { const k = Math.floor(this.phase / Math.PI); if (k !== this.lastFoot) { this.lastFoot = k; this.footfalls++; } }
     const amp = moving ? Math.min(0.95, 0.3 + s * 0.13) : 0;
     const sw = Math.sin(this.phase) * amp;
     this.legL.rotation.x = -sw; this.legR.rotation.x = sw;
@@ -184,7 +190,9 @@ export class Avatar {
     this.shinL.rotation.x = this.shinR.rotation.x = on ? Math.PI / 2 : 0;
     this.armL.rotation.x = this.armR.rotation.x = on ? -0.7 : 0;
     this.foreL.rotation.x = this.foreR.rotation.x = on ? -0.5 : 0;
-    this.hips.position.y = 0; this.body.rotation.x = 0; this.torso.rotation.y = 0;
+    this.legL.rotation.y = this.legL.rotation.z = this.legR.rotation.y = this.legR.rotation.z = 0;
+    this.armL.rotation.y = this.armL.rotation.z = this.armR.rotation.y = this.armR.rotation.z = 0;
+    this.hips.position.y = 0; this.body.rotation.x = 0; this.body.rotation.z = 0; this.torso.rotation.y = 0;
   }
   private pedalT = 0;
   /** Bicycle pose: legs pedal with speed (knees pumping), arms forward on the handlebar, slight lean. */
@@ -202,6 +210,14 @@ export class Avatar {
     this.legL.rotation.x = 0.08; this.legR.rotation.x = -0.25; this.shinL.rotation.x = 0.05; this.shinR.rotation.x = 0.25;
     this.armL.rotation.x = this.armR.rotation.x = -1.15; this.foreL.rotation.x = this.foreR.rotation.x = -0.2;
     this.hips.position.y = 0; this.body.rotation.x = Math.min(0.12, Math.abs(speed) * 0.012); this.torso.rotation.y = 0;
+  }
+  /** Standing sideways on a longboard: knees bent, arms out for balance (lean = −1..1 steering). */
+  boardPose(t: number, lean: number) {
+    this.seated = true;
+    this.legL.rotation.set(0.32, 0, 0); this.legR.rotation.set(-0.32, 0, 0); this.shinL.rotation.x = 0.35; this.shinR.rotation.x = 0.35;
+    this.armL.rotation.set(-0.2, 0, -1.0 - Math.sin(t * 2) * 0.12); this.armR.rotation.set(0.2, 0, 1.0 + Math.sin(t * 2.3) * 0.12);
+    this.foreL.rotation.x = this.foreR.rotation.x = -0.15;
+    this.hips.position.y = -0.1; this.body.rotation.x = 0; this.body.rotation.z = lean * 0.18; this.torso.rotation.y = 0;
   }
   // ---------------------------------------------------------------- handstand, sleeping, eating
   private handstand = false;
@@ -234,6 +250,36 @@ export class Avatar {
     this.armL.rotation.set(0, 0, on ? 0.12 : 0); this.armR.rotation.set(0, 0, on ? -0.12 : 0); this.foreL.rotation.x = this.foreR.rotation.x = 0;
     this.hips.position.y = 0; this.torso.rotation.y = 0; this.torso.scale.y = 1; this.head.rotation.set(0, 0, 0);
     if (!on) for (const e of this.eyes) e.scale.y = 1;
+  }
+  private umbrella: THREE.Group | null = null;
+  /** An open umbrella over the head (rain); null puts it away. */
+  setUmbrella(color: string | null) {
+    if (this.umbrella) { this.umbrella.removeFromParent(); this.umbrella = null; }
+    if (!color) return;
+    const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color, roughness: 0.6, side: THREE.DoubleSide });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 5), new THREE.MeshStandardMaterial({ color: '#2a2a2a' })); pole.position.y = 0.55; g.add(pole);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.32, 8, 1, true), m); top.position.y = 1.15; top.castShadow = true; g.add(top);
+    g.position.set(0.22, 1.25, 0.08); g.rotation.z = -0.12; this.root.add(g); this.umbrella = g;
+  }
+  /** Something bigger carried in front (a guitar for the street musician); null removes it. */
+  private propObj: THREE.Object3D | null = null;
+  setProp(o: THREE.Object3D | null) { if (this.propObj) this.propObj.removeFromParent(); this.propObj = o; if (o) this.torso.add(o); }
+  /** Arms forward and up (throwing, catching, playing an instrument). k = 0..1 lift, right/left arm. */
+  reach(right: number, left = right) {
+    this.armR.rotation.set(-1.2 - right * 1.4, 0, 0.1); this.foreR.rotation.x = -0.3;
+    this.armL.rotation.set(-1.2 - left * 1.4, 0, -0.1); this.foreL.rotation.x = -0.3;
+  }
+  /** Bench press while lying on your back: p = 0 bar on the chest (elbows bent) … 1 arms locked out. */
+  press(p: number) {
+    const arm = -0.55 - p * 1.02, fore = -(1 - p) * 1.35;
+    this.armL.rotation.set(arm, 0, -0.25 * (1 - p)); this.armR.rotation.set(arm, 0, 0.25 * (1 - p));
+    this.foreL.rotation.x = this.foreR.rotation.x = fore;
+    for (const e of this.eyes) e.scale.y = 1;                                   // awake (lie() closes the eyes)
+  }
+  /** Strumming a guitar held across the body. */
+  strum(t: number) {
+    this.armL.rotation.set(-0.9, 0, -0.5); this.foreL.rotation.x = -1.1;
+    this.armR.rotation.set(-0.5 + Math.sin(t * 14) * 0.12, 0, 0.35); this.foreR.rotation.x = -1.0;
   }
   private held: THREE.Mesh | null = null;
   /** Something in the right hand (food); null drops it. */

@@ -2,7 +2,7 @@
 // Pick one from the wardrobe in your apartment or from the pause menu; the choice is saved.
 import type { AvatarLook } from './Avatar';
 
-export interface Outfit { id: string; name: string; note: string; look: Partial<AvatarLook> }
+export interface Outfit { id: string; name: string; note: string; look: Partial<AvatarLook>; /** Sold at the school store (coins); free outfits have no price. */ price?: number; /** Eras the store sells it in (still wearable later). */ sold?: string[] }
 
 /** Skin and hair of the player character (shared by every outfit). */
 export const PLAYER_BASE: AvatarLook = { shirt: '#f2efe6', pants: '#3a4252', skin: '#e2b893', hair: '#4a3324' };
@@ -16,6 +16,10 @@ export const OUTFITS: Outfit[] = [
   { id: 'farmer', name: 'Potato farmer', note: 'Green flannel, work pants, straw-coloured cap.', look: { shirt: '#4a6d3b', pattern: 'flannel', pants: '#5a4a3a', hat: 'cap', hatColor: '#c9a44a', shoes: '#4a3424' } },
   { id: 'lab', name: 'Science lab', note: 'Lab coat and safety glasses.', look: { shirt: '#f2efe6', coat: '#f4f4ee', pants: '#3a4252', glasses: true, tie: '#3b6d5b' } },
   { id: 'winter', name: 'Idaho winter', note: 'Coat, scarf and a warm beanie.', look: { shirt: '#f2efe6', coat: '#2b3a4f', scarf: '#8d3b2f', pants: '#3a4252', hat: 'beanie', hatColor: '#8d3b2f' } },
+  { id: 'hoodie', name: 'School hoodie', note: 'Cozy navy hoodie from the school store.', look: { shirt: '#1f3a6b', jacket: '#1f3a6b', pants: '#2c2f36', shoes: '#f4f1e8' }, price: 40 },
+  { id: 'vikings', name: 'Vikings jersey', note: 'Maroon and gold, straight from the bookstore.', look: { shirt: '#7a2b2b', pattern: 'stripe', pants: '#2c2f36', hat: 'cap', hatColor: '#d1a12f' }, price: 35, sold: ['ricks1999', 'transition'] },
+  { id: 'varsity', name: 'Varsity jacket', note: 'Wool body, white sleeves, big letter on the chest.', look: { shirt: '#f2efe6', jacket: '#7a2b2b', coat: undefined, pants: '#3a4252', shoes: '#f4f1e8' }, price: 60 },
+  { id: 'runner', name: 'Running gear', note: 'Light jacket, shorts and bright shoes.', look: { shirt: '#2fbf71', jacket: '#1c1c1c', pants: '#1c1c1c', shorts: true, shoes: '#ff7a1a' }, price: 30, sold: ['byui', 'presentFinale'] },
   { id: 'pajamas', name: 'Pajamas', note: 'Striped and comfy. Perfect for the apartment.', look: { shirt: '#7b8fc4', pattern: 'stripe', pants: '#7b8fc4', shoes: '#c9c3b8' } },
 ];
 

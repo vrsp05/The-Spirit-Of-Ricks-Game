@@ -2,8 +2,11 @@
 import type { EraId } from '../world/eras';
 import type { QuestStatus } from '../quests/contract';
 import type { RewardReceipt } from '../quests/rewards';
+import type { LifeSave } from '../campuslife/progress';
+import { QUEST_ERA, QUEST_ORDER } from '../quests/order';
+import { ERA_ORDER } from '../world/eras';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 const KEY = 'spirit-of-ricks.save';
 
 export interface SaveData {
@@ -21,10 +24,29 @@ export interface SaveData {
   finaleReached: boolean;
   playerName?: string;                // asked when a new game starts
   outfit?: string;                    // wardrobe choice (player/outfits.ts)
+  life?: LifeSave;                    // campus life: clock, achievements, friends, collectibles, photos (campuslife/)
   sideQuests?: Record<string, { status: 'available' | 'active' | 'ready' | 'done'; earned: number; data: Record<string, unknown> }>; // optional errands (sidequests/)
 }
 
 type Migration = (old: any) => any;
+/** v3 → v4: four story missions were added (y2k, vikings, capsule, snowday). Missions from an era you've already
+ *  left, or before a mission you've already started, count as done (no reward); the first unfinished one opens. */
+export function addStoryMissions(d: any): any {
+  const q: Record<string, { status: string; data: Record<string, unknown> }> = { ...(d.quests ?? {}) };
+  const st = (id: string) => q[id]?.status ?? 'locked', eraIdx = ERA_ORDER.indexOf(d.era);
+  QUEST_ORDER.forEach((id, i) => {
+    if (q[id]) return;
+    const laterStarted = QUEST_ORDER.slice(i + 1).some(x => st(x) === 'active' || st(x) === 'completed');
+    q[id] = { status: laterStarted || eraIdx > ERA_ORDER.indexOf(QUEST_ERA[id]) ? 'completed' : 'locked', data: { __migrated: true } };
+  });
+  let open = true;
+  for (const id of QUEST_ORDER) {
+    if (q[id].status === 'completed') continue;
+    if (open) { if (q[id].status === 'locked') q[id].status = 'available'; open = false; }
+    else if (q[id].status === 'available') q[id].status = 'locked';
+  }
+  return { ...d, version: 4, quests: q, colorStage: QUEST_ORDER.filter(id => q[id].status === 'completed').length };
+}
 const MIGRATIONS: Record<number, Migration> = {
   // v1 positions used the uncompacted map: respawn at the start point, no coins yet.
   1: (v1) => ({ ...v1, version: 2, player: null, coins: [] }),
@@ -32,6 +54,7 @@ const MIGRATIONS: Record<number, Migration> = {
   2: (v2) => ({ ...v2, version: 3, difficulty: v2.difficulty === 'challenging' ? 'hard' : 'easy', rewards: {}, targets: {},
     quests: { professors: { status: 'available', data: {} }, construction: { status: 'locked', data: {} }, letters: { status: 'locked', data: {} } },
     era: 'ricks1999', colorStage: 0, player: null }),
+  3: addStoryMissions,
 };
 
 export function loadSave(): SaveData | null {

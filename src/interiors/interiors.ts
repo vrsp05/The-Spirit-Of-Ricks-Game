@@ -6,7 +6,7 @@ import { GAME_CONFIG } from '../config/game.config';
 import type { Space } from '../player/PlayerController';
 import { textCanvas } from '../world/World';
 import { CAMPUS_LAYOUTS, updateActors, actorSpots } from './campusInteriors';
-import { box, bulletin, clock, dressRoom, flagStand, floorTexture, globe, painting, pendant, plant, poster, rug, screen, solidsOf, waterCooler, deskLamp, type FloorStyle } from './decor';
+import { box, bulletin, clock, column, dressRoom, flagStand, floorTexture, floorZone, globe, painting, pendant, plant, poster, rug, screen, solidsOf, waterCooler, deskLamp, type FloorStyle } from './decor';
 import type { EraId } from '../world/eras';
 
 interface Rect { x0: number; z0: number; x1: number; z1: number; h?: number; color?: string }
@@ -16,6 +16,8 @@ export interface InteriorDef {
   blockers?: Rect[]; decorate?: (g: THREE.Group) => void; onEra?: (era: EraId) => void;
   /** Floor material (default: checker tiles) and whether the dressing pass adds windows. */
   floorStyle?: FloorStyle; windows?: boolean;
+  /** Wall height (default 3.6 m; atriums and halls are taller). */
+  height?: number;
 }
 
 // Layout extras per interior. STC layout is an APPROXIMATION (no verified floor
@@ -35,7 +37,11 @@ const LAYOUTS: Record<string, Partial<InteriorDef>> = {
       painting(g, -9.97, 2.0, -6.5, Math.PI / 2, 1.6, 1.05, 1); painting(g, 9.97, 2.0, -6.5, -Math.PI / 2, 1.6, 1.05, 2);
       deskLamp(g, -1.8, 0.95, -8.7); box(g, 0.34, 0.08, 0.26, '#2f5f9e', 1.9, 0.99, -8.5); box(g, 0.32, 0.08, 0.24, '#8d2f2f', 1.9, 1.07, -8.5); box(g, 0.5, 0.01, 0.35, '#f4f1e8', -0.6, 0.955, -8.4);
       clock(g, 0, 3.05, -10.97, 0);
-      // the hall: lights, a notice board, plants
+      // the hall, like the real Kimball atrium: polished terrazzo, white round columns, warm wood panels
+      floorZone(g, 0, 4.6, 5.2, 12.8, 'terrazzo', '#e6e2da');
+      for (const z of [0.4, 9.6]) { column(g, -2.05, z, 3.6, 0.28); }
+      for (let z = -1.4; z < 10.8; z += 1.2) box(g, 0.05, 2.4, 1.1, z % 2.4 < 1.2 ? '#9a6b44' : '#8d6140', -2.57, 1.2, z + 0.6, false);
+      box(g, 0.05, 2.4, 3.6, '#9a6b44', 2.57, 1.2, 0.3, false); box(g, 0.05, 2.4, 2.4, '#9a6b44', 2.57, 1.2, 9.8, false);
       pendant(g, 0, 1.5, 3.0); pendant(g, 0, 6.5, 3.0);
       bulletin(g, -2.58, 1.6, 4.2, Math.PI / 2, 2.2); plant(g, -2.05, 10.2, 0.9); plant(g, 2.05, 7.9, 0.9);
       // Personnel Services: a water cooler, a plant, a clock and a notice about the interviews
@@ -113,7 +119,7 @@ export class InteriorManager {
       const L = (LAYOUTS[id] ?? CAMPUS_LAYOUTS[id] ?? {}) as Partial<InteriorDef>;
       const def: InteriorDef = { id, label: cfg.label, width: cfg.width, depth: cfg.depth, exteriorDoor: cfg.exteriorDoor,
         floor: L.floor ?? '#b9a68a', wall: L.wall ?? '#e6dccb', walls: L.walls ?? [], props: L.props ?? [], signs: L.signs ?? [],
-        blockers: L.blockers, decorate: L.decorate, onEra: L.onEra, floorStyle: L.floorStyle, windows: L.windows };
+        blockers: L.blockers, decorate: L.decorate, onEra: L.onEra, floorStyle: L.floorStyle, windows: L.windows, height: L.height };
       this.defs.set(id, def);
       this.origins.set(id, new THREE.Vector3(20000 + n++ * 300, 0, 20000));
       const g = this.build(def); g.visible = false; this.groups.set(id, g); scene.add(g);
@@ -128,10 +134,10 @@ export class InteriorManager {
 
   private build(d: InteriorDef): THREE.Group {
     const g = new THREE.Group(); g.position.copy(this.origins.get(d.id)!);
-    const W = d.width, D = d.depth, H = 3.6;
+    const W = d.width, D = d.depth, H = d.height ?? 3.6;
     // floor: wood planks, tiles, carpet, a sports court or the classic checker
     const ft = floorTexture(d.floorStyle ?? 'checker', d.floor, W, D);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ft, roughness: d.floorStyle === 'wood' || d.floorStyle === 'court' ? 0.55 : 0.85 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ft, roughness: d.floorStyle === 'wood' || d.floorStyle === 'court' ? 0.55 : d.floorStyle === 'terrazzo' || d.floorStyle === 'mcTile' || d.floorStyle === 'darkTile' ? 0.35 : 0.85 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
     const wallMat = new THREE.MeshStandardMaterial({ color: d.wall });
     const addBox = (r: Rect, h: number, mat: THREE.Material) => {
@@ -148,7 +154,7 @@ export class InteriorManager {
     for (const r of d.walls) addBox(r, r.h ?? H, wallMat);
     for (const p of d.props) addBox(p, p.h ?? 1, new THREE.MeshStandardMaterial({ color: p.color ?? '#7a6a5a' }));
     // baseboards, chair rail, windows with daylight, wall lights
-    dressRoom(g, W, D, d.wall, d.walls, { windows: d.windows });
+    dressRoom(g, W, D, d.wall, d.walls, { windows: d.windows, height: H });
     // exit mat
     const mat = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.4), new THREE.MeshStandardMaterial({ color: '#6b2f2a' }));
     mat.rotation.x = -Math.PI / 2; mat.position.set(0, 0.02, D / 2 - 0.8); g.add(mat);

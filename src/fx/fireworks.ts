@@ -32,7 +32,7 @@ export class Effects {
       const sp = 9 + Math.random() * 5;
       this.parts.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(r * Math.cos(th) * sp, u * sp + 2, r * Math.sin(th) * sp), life: 0, max: 1.4 + Math.random() * 0.6, color: c });
     }
-    playSound('pop');
+    playSound('boom');
   }
 
   /** Ring that expands across campus while colour returns. */

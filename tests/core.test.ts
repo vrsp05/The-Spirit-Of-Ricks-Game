@@ -46,7 +46,7 @@ describe('quest state idempotency', () => {
     m.ctx().complete(); m.ctx().complete();
     expect(m.onCompleted).toHaveBeenCalledTimes(1);
     expect(m.qm.receipt('professors')!.total).toBe(100 + 25 + 50);
-    expect(m.qm.status('construction')).toBe('available');
+    expect(m.qm.status('y2k')).toBe('available');   // the next mission in the story order opens
   });
   it('timer pauses when not running', () => {
     m.qm.start('professors'); m.qm.tick(0.5, true); m.qm.tick(0.5, false); m.qm.tick(0.25, true);
@@ -64,13 +64,13 @@ describe('quest state idempotency', () => {
 });
 
 describe('save migration', () => {
-  it('v2 saves migrate to v3 (Easy/Hard, empty receipts, quest progress restarts)', async () => {
+  it('v2 saves migrate to v4 (Easy/Hard, empty receipts, quest progress restarts, new missions added)', async () => {
     const store: Record<string, string> = {};
     (globalThis as any).localStorage = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } };
     store['spirit-of-ricks.save'] = JSON.stringify({ version: 2, savedAt: 'x', difficulty: 'challenging', era: 'byui', colorStage: 2, quests: { professors: { status: 'completed', data: {} } }, targets: { a: 'b' }, player: { space: 'exterior', x: 1, z: 2, yaw: 0 }, coins: ['coin-1'], introSeen: true, finaleReached: false });
     const { loadSave } = await import('../src/save/save');
     const d = loadSave()!;
-    expect(d.version).toBe(3); expect(d.difficulty).toBe('hard'); expect(d.rewards).toEqual({}); expect(d.coins).toEqual(['coin-1']);
+    expect(d.version).toBe(4); expect(d.quests.y2k.status).toBe('locked'); expect(d.difficulty).toBe('hard'); expect(d.rewards).toEqual({}); expect(d.coins).toEqual(['coin-1']);
     expect(d.quests.professors.status).toBe('available'); expect(d.era).toBe('ricks1999');
   });
 });

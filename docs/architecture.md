@@ -71,10 +71,31 @@ Each device is an `InputSource`:
   3. Completing it advances the colour stage, may move to the next era, and saves.
   4. After all three are done (letters placed on the sign), the game moves to the present day and the STC finale.
 
+## Story order (`src/quests/order.ts`)
+- Seven missions: `professors → y2k → vikings` (1999) · `construction → capsule` (2001) · `snowday → letters` (2011) → finale. `GAME_CONFIG.story.eraAfterQuest` moves the era after `vikings` and `capsule`; `colorStages` has one stage per mission.
+- The four extra missions live in `src/quests/more/` and use only the quest contract.
+- Saves are version 4. `addStoryMissions` (save.ts) migrates v3 saves: missions from an era you've left, or before one you've started, count as done without a reward; the first unfinished mission opens.
+
 ## Side quests (`src/sidequests/`)
 - **`SideQuests.ts`:** optional errands, separate from the story chain in `src/quests/`. Each has a giver avatar placed beside a building (`SideHost.spotBy`), a floating status icon, and its own runtime (pickups, a follower, a timer, flyers). It talks to the game only through the `SideHost` interface that `game.ts` implements.
 - State is saved as `SaveData.sideQuests` (optional field, no save-version bump). Timed quests return to their giver after a reload.
 - **`trivia.ts`:** pure question generator over `world/presidents.ts` and the building registry; era-aware and never names BYU–Idaho before the present day (tested in `tests/sidequests.test.ts`).
+
+## Campus life (`src/campuslife/`)
+- **`CampusLife.ts`:** owns everything that makes walking around fun and talks to the game only through `LifeHost` (`host.ts`, implemented in `game.ts`). Each frame it ticks the clock, drives the crowd's schedule (`NpcCrowd.busyness / rush / focus`), the weather (gusts → `World.gust`, showers → `World.setShower` + umbrellas), the busker, collectible sparkle, a friend hanging out, and the happenings.
+- **`clock.ts`:** the campus clock (pure, tested). `World.setTimeOfDay(hour)` blends each era's atmosphere toward dawn/dusk/night (sun path, sky, fog, lamp glow, stars, four nearby lamp lights); `Renderer.setDaylight` dims exposure and sky light. The title, opening and finale keep each era's designed look.
+- **`events.ts`:** spontaneous happenings. They borrow students with `NpcCrowd.claim(walker, script)` — a script runs instead of the walker's routine until it returns false.
+- **`collectibles.ts`, `photo.ts`, `sound.ts`, `progress.ts`:** keepsake data + models; camera mode (captures the canvas right after a render; challenges are checked against the camera frustum); synthesized guitar, piano, choir and rain; stats, achievements, friendships, coins earned/spent.
+- Saved as `SaveData.life` (optional, no version bump). The photo album is kept separately in browser storage (`spirit-of-ricks.photos`).
+
+## Vehicle jobs & the Manwaring Center (`src/campuslife/vehicleJobs.ts`, `mcFun.ts`)
+- `VehicleJobs` places five instructors at the largest campus parking lot and runs one job at a time (targets with rings/beacons, a timer, the HUD pointer via `jobs.target()`). It needs a small `JobHost` (spawn aircraft, roof height, the vehicle's heading/speed/altitude). Completion and best times are campus-life stats (`job:<id>`, `jobBest:<id>`).
+- `mcFun.ts`: the school store (outfits with a `price` in `player/outfits.ts`, accessories merged over the outfit, snacks eaten on the spot) and the bowling minigame. The Strike Zone is a second interior (`mc-strikezone`) linked to the Crossroads by stair interactables in `game.setupManwaring()`.
+
+## Activities (`src/campuslife/hartGames.ts`, `minigames.ts`, `studentLife.ts`, `phone.ts`)
+- Panel minigames share one shape: a `ui.custom` panel, keyboard taps read straight from `keydown` (exact timing) with controller input through panel actions, and records kept as campus-life stats (`p.set` / `p.best`). The campus records board (`RIVALS`) compares them with fictional students' marks.
+- `game.setupHart()` / `setupActivities()` place the interactables in each room; the Hart's pick-up game and the treadmill runners animate through per-room `ticks` (`updateActors`).
+- `studentLife.ts`: the class schedule (`Classes`, attended when you enter the building), `StadiumRace` (laps around the football field), `Celebrations` (decorations by season) and the apartment `Apartment` (pet + decor owned via `own:decor-*` stats).
 
 ## Interiors (`src/interiors/`)
 - Each room is built at its own far-away origin. The exterior is hidden while you're inside.

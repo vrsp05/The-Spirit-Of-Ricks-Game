@@ -11,6 +11,8 @@ export interface Settings {
   season: 'spring' | 'summer' | 'autumn' | 'winter';
   /** Exposure multiplier, 0.6–1.4. */
   brightness: number;
+  /** Day/night cycle (the campus clock runs; off = each era's fixed time of day). */
+  dayNight: boolean;
 }
 
 function systemReducedMotion() {
@@ -18,7 +20,7 @@ function systemReducedMotion() {
 }
 
 function load(): Settings {
-  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true, season: 'autumn', brightness: 1 };
+  const d: Settings = { reducedMotion: systemReducedMotion(), muted: false, graphics: 'high', music: true, musicVolume: 0.3, sfxVolume: 0.8, ambienceVolume: 0.6, voiceVolume: 0.9, voices: true, season: 'autumn', brightness: 1, dayNight: true };
   try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(d, JSON.parse(raw)); } catch { /* ignore */ }
   return d;
 }

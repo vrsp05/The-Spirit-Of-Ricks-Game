@@ -13,7 +13,7 @@ export const STORY = {
     { speaker: B(), text: 'This college is about to grow in ways most people can’t imagine yet, and I’m going to need your help.' },
   ],
   allQuestsDone: (): DialogueLine[] => [
-    { speaker: B(), text: '{player}, look at what we’ve done together. Teachers hired, buildings raised, and a new name on the sign.' },
+    { speaker: B(), text: '{player}, look at what we’ve done together. Teachers hired, the computers saved, a game night to remember, buildings raised, a time capsule buried, a blizzard beaten — and a new name on the sign.' },
     { speaker: B(), text: 'Go and see the campus as it is today. I think you’ll be proud of what it became.' },
   ],
   presentDaySubtitle: 'The letters are in place. Head to the Science and Technology Center.',

@@ -54,6 +54,32 @@ export const GAME_CONFIG = {
     'letter.U':              { x: -196, z: -232, building: 'hart', offset: 7, label: 'Hart Building / athletics area' },
     'letter.I':              { x: -40, z: -405, building: 'snow', offset: 2.2, label: 'Snow Performing Arts Center' },
     'sign.byui':             { x: -2.5, z: -76, yaw: -Math.PI / 2, label: 'BYUI letters on the lawn east of the roundabout' },
+    // Extra story missions (src/quests/more/). Building anchors snap to that building's wall.
+    'y2k.library':           { x: 20, z: -215, building: 'mckay', offset: 6, label: 'McKay Library' },
+    'y2k.smith':             { x: 94, z: -238, building: 'smith', offset: 6, label: 'Smith Building' },
+    'y2k.romney':            { x: -12, z: -318, building: 'romney', offset: 6, label: 'Romney Building' },
+    'y2k.hart':              { x: -196, z: -232, building: 'hart', offset: 9, label: 'Hart Building' },
+    'y2k.lab':               { x: -82, z: 108, building: 'austin', offset: 6, label: 'Austin Building — computer lab' },
+    'vikings.band':          { x: -40, z: -405, building: 'snow', offset: 6, label: 'Snow Building' },
+    'vikings.sticks':        { x: -40, z: -405, building: 'snow', offset: 13, label: 'Lawn by the Snow Building' },
+    'vikings.mascot':        { x: -12, z: -318, building: 'romney', offset: 9, label: 'Romney Building' },
+    'vikings.cheer':         { x: 20, z: -215, building: 'mckay', offset: 9, label: 'McKay Library' },
+    'vikings.gym':           { x: -196, z: -232, building: 'hart', offset: 4.5, label: 'Hart Building — game night' },
+    'capsule.taylor':        { x: 40, z: -60, building: 'taylor', offset: 7, label: 'Taylor Building' },
+    'capsule.romney':        { x: -12, z: -318, building: 'romney', offset: 7, label: 'Romney Building' },
+    'capsule.mckay':         { x: 20, z: -215, building: 'mckay', offset: 7, label: 'McKay Library' },
+    'capsule.austin':        { x: -82, z: 108, building: 'austin', offset: 7, label: 'Austin Building' },
+    'capsule.site':          { x: 108, z: -98, label: 'Time capsule, Kimball quad' },
+    'snow.drift.kimball':    { x: 125, z: -60, building: 'kimball', offset: 5, label: 'Kimball Building doorway' },
+    'snow.drift.taylor':     { x: 40, z: -60, building: 'taylor', offset: 5, label: 'Taylor Building doorway' },
+    'snow.drift.mckay':      { x: 20, z: -215, building: 'mckay', offset: 5, label: 'McKay Library doorway' },
+    'snow.drift.smith':      { x: 94, z: -238, building: 'smith', offset: 5, label: 'Smith Building doorway' },
+    'snow.drift.romney':     { x: -12, z: -318, building: 'romney', offset: 5, label: 'Romney Building doorway' },
+    'snow.student.hart':     { x: -196, z: -232, building: 'hart', offset: 8, label: 'Hart Building' },
+    'snow.student.austin':   { x: -82, z: 108, building: 'austin', offset: 8, label: 'Austin Building' },
+    'snow.student.snow':     { x: -40, z: -405, building: 'snow', offset: 8, label: 'Snow Building' },
+    'snow.student.taylor':   { x: 40, z: -60, building: 'taylor', offset: 11, label: 'Taylor Building' },
+    'snow.center':           { x: -60, z: -158, building: 'icenter', offset: 6, label: 'The Center' },
     // Golf carts (fun transport)
     'cart-1':                { x: 96, z: -96, yaw: Math.PI / 2, label: 'Golf cart by the Kimball quad' },
     'cart-2':                { x: 20, z: -330, yaw: 0, label: 'Golf cart by the Romney quad' },
@@ -79,7 +105,7 @@ export const GAME_CONFIG = {
   // Symbolic colour restoration (0 = sepia, 1 = full colour), indexed by completed main quests.
   // Quests report progress inside their stage (up to colorPartialMax of the gap); Q3's 4th letter → full.
   // Stage 0 = a lightly coloured 90s photo; each quest adds colour; the end is fully saturated.
-  colorStages: [0.5, 0.68, 0.84, 1],
+  colorStages: [0.5, 0.56, 0.62, 0.68, 0.76, 0.84, 0.92, 1],   // one stage per completed story mission (7)
   colorPartialMax: 0.8,
   // Colour grade. Aim: a warm 90s photo. Send a reference picture to tune these.
   // Grade interpolates from *Start (first stage) to *End (full colour) as colour returns.
@@ -91,6 +117,10 @@ export const GAME_CONFIG = {
     // Active-time targets (seconds) for the speed bonus: full bonus at/below target, 0 at 2× target.
     targetSec: {
       professors: { easy: 900, hard: 1200 },
+      y2k: { easy: 420, hard: 540 },
+      vikings: { easy: 480, hard: 600 },
+      capsule: { easy: 420, hard: 540 },
+      snowday: { easy: 360, hard: 300 },
       construction: { easy: 420, hard: 720 },
       letters: { easy: 720, hard: 960 },
     } as Record<string, Record<string, number>>,
@@ -99,7 +129,7 @@ export const GAME_CONFIG = {
   story: {
     startEra: 'ricks1999' as EraId,
     // Which era follows each quest. Q3 needs 2010-or-later (temple + I-Center + sign site).
-    eraAfterQuest: { professors: 'transition', construction: 'byui' } as Record<string, EraId>,
+    eraAfterQuest: { vikings: 'transition', capsule: 'byui' } as Record<string, EraId>,   // see quests/order.ts
     finaleEra: 'presentFinale' as EraId,
   },
 
@@ -122,6 +152,7 @@ export const GAME_CONFIG = {
       ],
       allowSkipChallenge: true,
     },
+    y2k: {}, vikings: {}, capsule: {}, snowday: {},
     letters: {
       letters: ['B', 'Y', 'U', 'I'],
       signAnchor: 'sign.byui',

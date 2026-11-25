@@ -2,7 +2,9 @@
 // (a helicopter and a small propeller plane — see PlayerController.fly).
 import * as THREE from 'three';
 
-export type VehicleKind = 'cart' | 'car' | 'bike' | 'scooter' | 'heli' | 'plane';
+export type VehicleKind = 'cart' | 'car' | 'bike' | 'scooter' | 'heli' | 'plane' | 'board' | 'sled';
+/** Your own ride (longboard / sled): summoned with B, it goes away when you step off. */
+export const isRide = (k: VehicleKind) => k === 'board' || k === 'sled';
 export const isAircraft = (k: VehicleKind) => k === 'heli' || k === 'plane';
 export type CarStyle = 'boxy90s' | 'pickup90s' | 'rounded2010s' | 'modern';
 export interface VehicleParams { maxSpeed: number; reverseSpeed: number; accel: number; turnRate: number; radius: number }
@@ -14,6 +16,8 @@ export const PARAMS: Record<VehicleKind, VehicleParams> = {
   scooter: { maxSpeed: 8.5, reverseSpeed: 1.5, accel: 6, turnRate: 2.8, radius: 0.45 },
   heli: { maxSpeed: 22, reverseSpeed: 0, accel: 1.6, turnRate: 2.5, radius: 1.4 },     // run = 34 m/s
   plane: { maxSpeed: 42, reverseSpeed: 0, accel: 9, turnRate: 1.1, radius: 1.6 },     // run = 60 m/s; lifts off from 16 m/s
+  board: { maxSpeed: 9.5, reverseSpeed: 1, accel: 5, turnRate: 2.4, radius: 0.45 },   // hills add speed (up to ~15 m/s)
+  sled: { maxSpeed: 4, reverseSpeed: 0.5, accel: 3, turnRate: 1.8, radius: 0.55 },    // pushing only: hills do the rest
 };
 
 export class Vehicle {
@@ -85,6 +89,19 @@ export class Vehicle {
       box(0.06, 0.95, 0.06, body, 0, 0.66, 0.4); box(0.5, 0.05, 0.05, '#1f2328', 0, 1.13, 0.4);             // stem + bar
       box(0.12, 0.06, 0.16, body, 0, 0.2, -0.42); lamp(box(0.08, 0.05, 0.03, '#fff6c8', 0, 0.95, 0.44));   // rear fender + light
       this.pose = 'stand'; this.seat = { x: 0, y: 0.2, z: -0.05 };
+    } else if (kind === 'board') {
+      // longboard: a long deck with a kicktail, four chunky wheels
+      const deck = color === '#f4f1e8' ? '#c0392b' : color;
+      box(0.3, 0.04, 1.05, deck, 0, 0.14, 0); box(0.3, 0.04, 0.16, deck, 0, 0.17, -0.58).rotation.x = 0.35;
+      box(0.26, 0.012, 0.95, '#2a2a2a', 0, 0.165, 0);
+      for (const z of [-0.36, 0.36]) { box(0.2, 0.04, 0.06, '#9aa3a8', 0, 0.1, z); for (const x of [-0.13, 0.13]) wheel(0.06, 0.12, x, 0.06, z, this.body); }
+      this.pose = 'stand'; this.seat = { x: 0, y: 0.17, z: 0 };
+    } else if (kind === 'sled') {
+      // wooden sled with two runners and a curled front
+      box(0.55, 0.05, 1.2, '#b0753e', 0, 0.22, 0); box(0.55, 0.05, 0.25, '#b0753e', 0, 0.3, 0.62).rotation.x = -0.6;
+      for (const x of [-0.24, 0.24]) { box(0.04, 0.04, 1.35, '#7a2b2b', x, 0.04, 0.05); box(0.04, 0.18, 0.04, '#7a2b2b', x, 0.13, -0.4); box(0.04, 0.18, 0.04, '#7a2b2b', x, 0.13, 0.4); }
+      box(0.04, 0.04, 0.55, '#7a2b2b', 0, 0.3, 0.7).rotation.y = Math.PI / 2;
+      this.pose = 'sit'; this.seat = { x: 0, y: 0.05, z: -0.1 };
     } else if (kind === 'heli') {
       // small helicopter: glass cabin (you can see the pilot), tail boom + rotor, skids, a big two-blade main rotor
       const glass = new THREE.MeshStandardMaterial({ color: '#a9d2e6', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.38 });
@@ -152,7 +169,7 @@ export class Vehicle {
     const accel = (this.speed - this.lastSpeed) / Math.max(dt, 1e-3); this.lastSpeed = this.speed;
     this.pitch += (Math.max(-1, Math.min(1, accel / 12)) * 0.03 - this.pitch) * Math.min(1, dt * 5);
     // cars/carts roll outward in a turn; bikes lean into it
-    const lean = this.kind === 'bike' || this.kind === 'scooter';
+    const lean = this.kind === 'bike' || this.kind === 'scooter' || this.kind === 'board' || this.kind === 'sled';
     this.body.rotation.z = (lean ? -1 : 0.35) * this.steerS * sp * (lean ? 0.3 : 0.12);
     this.body.rotation.x = lean ? 0 : -this.pitch;
     for (const t of this.tails) t.emissiveIntensity = accel < -4 ? 1.8 : 0.25;   // brake lights

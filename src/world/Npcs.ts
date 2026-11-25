@@ -33,6 +33,8 @@ export interface Walker {
   scan: number;
   bubble: Bubble | null;
   posed: boolean;                 // phone pose applied (undo it when they put the phone away)
+  /** A campus happening controls this person (returns false when done). Runs instead of their routine. */
+  script: ((dt: number) => boolean) | null;
 }
 
 /** A speech bubble over someone's head (a canvas sprite; redrawn only when the text changes). */
@@ -128,6 +130,26 @@ export class NpcCrowd {
   /** Player's name (greetings use it once you've met someone). */
   playerName = '';
   private era: EraId = 'ricks1999';
+  // ---- campus schedule (set by campus life from the clock)
+  /** 0 (night: most people indoors) … 1 (class change: packed paths). */
+  busyness = 0.75;
+  /** Class change: everyone walks faster. */
+  rush = false;
+  /** Everyone heads here (devotional), or null. */
+  focus: Vec2 | null = null;
+  private rainOn = false;
+  /** Rain: umbrellas up (sitting/standing people too). */
+  setRain(on: boolean) {
+    if (on === this.rainOn) return; this.rainOn = on;
+    const cols = ['#2f3e57', '#b8423a', '#d1a12f', '#3f6f4a', '#2a2a2a', '#6b3f7a'];
+    for (const w of this.walkers) w.avatar.setUmbrella(on && (w.seed % 5) !== 0 ? cols[w.seed % cols.length] : null);
+  }
+  /** Free for a campus happening: outside, visible, not busy with someone else. */
+  available(w: Walker) { return w.inside <= 0 && !w.script && !w.gather && w.talking <= 0 && w.avatar.root.visible && !this.walkers.some(f => f.leader === w); }
+  /** Take someone out of their routine (ends chats, gets up from benches). */
+  claim(w: Walker, script: (dt: number) => boolean) { this.endChat(w); this.standFromBench(w); w.walkChat = null; w.phone = 0; w.pause = 0; w.script = script; }
+  /** Speech bubble (public for campus happenings). */
+  speak(w: Walker, text: string, seconds = 2.8) { this.say(w, text, seconds); }
 
   /** doors(): entrances of buildings standing in the current era (where people can go). benches(): where they can sit. */
   constructor(private scene: THREE.Scene, count = GAME_CONFIG.npcs.count, private doors: () => Vec2[] = () => [], private benches: () => BenchSpot[] = () => []) {
@@ -141,7 +163,7 @@ export class NpcCrowd {
       const joins = !!prev && !prev.leader && this.rnd() < 0.35, leader = joins ? prev : null;
       const w: Walker = { avatar, route: [], speed: 1.15 + this.rnd() * 0.6, pause: this.rnd() * 3, x: leader ? leader.x + 1 : n[0], z: leader ? leader.z : n[1], yaw: 0, talking: 0,
         name: NAMES[i % NAMES.length], heard: 0, gather: null, seed, path: [], pi: 0, dest: null, inside: 0, leader, side: leader ? (this.walkers.filter(x => x.leader === leader).length % 2 ? -1 : 1) : 0,
-        chat: null, chatCool: 5 + this.rnd() * 30, walkChat: null, bench: null, phone: 0, greetCool: this.rnd() * 20, waving: 0, met: false, scan: this.rnd(), bubble: null, posed: false };
+        chat: null, chatCool: 5 + this.rnd() * 30, walkChat: null, bench: null, phone: 0, greetCool: this.rnd() * 20, waving: 0, met: false, scan: this.rnd(), bubble: null, posed: false, script: null };
       scene.add(avatar.root);
       this.walkers.push(w);
     }
@@ -152,7 +174,7 @@ export class NpcCrowd {
     if (!w.leader && this.rnd() < 0.18 && this.planBench(w)) return;
     const doors = this.doors();
     for (let k = 0; k < 6; k++) {
-      const dest: Vec2 = doors.length ? doors[(this.rnd() * doors.length) | 0] : this.graph.pts[this.graph.random(this.rnd)];
+      const dest: Vec2 = this.focus && this.rnd() < 0.85 ? this.focus : doors.length ? doors[(this.rnd() * doors.length) | 0] : this.graph.pts[this.graph.random(this.rnd)];
       if (Math.hypot(dest[0] - w.x, dest[1] - w.z) < 25) continue;                 // somewhere worth walking to
       const r = this.graph.route(this.graph.nearest(w.x, w.z), this.graph.nearest(dest[0], dest[1]));
       if (r && r.length > 1) { w.path = [...r, dest]; w.pi = 0; w.dest = dest; w.route = w.path; return; }
@@ -268,6 +290,12 @@ export class NpcCrowd {
       }
       w.avatar.root.visible = this.shown;
       const dp = near(w);
+      if (w.script) {
+        if (!w.script(dt)) { w.script = null; w.path = []; w.avatar.talking = false; }
+        w.avatar.root.position.set(w.x, terrainHeight(w.x, w.z), w.z); w.avatar.root.rotation.y = w.yaw;
+        w.bubble?.update(dt, w.x, terrainHeight(w.x, w.z) + 2.75, w.z, this.shown && dp < 45);
+        continue;
+      }
       let moveSpeed = 0, faceYaw: number | null = null, phoneOn = false;
       // ---- look for someone to talk to (a few times a second, not every frame)
       w.scan -= dt;
@@ -276,7 +304,7 @@ export class NpcCrowd {
         const free = (o: Walker) => !o.leader && !o.chat && !o.bench && !o.gather && o.chatCool <= 0 && o.inside <= 0 && o.talking <= 0 && !this.walkers.some(f => f.leader === o);
         if (free(w) && dp > 3) {
           const p = this.walkers.find(o => o !== w && free(o) && near(o) > 3 && Math.hypot(o.x - w.x, o.z - w.z) < 3.2);
-          if (p && this.rnd() < 0.45) this.startChat(w, p);
+          if (p && this.rnd() < (this.rush ? 0.1 : 0.45)) this.startChat(w, p);
         }
         // say hi when the player walks past (by name, once you've met)
         if (!w.chat && !w.walkChat && dp > 2 && dp < 6 && w.greetCool <= 0 && this.rnd() < 0.3) {
@@ -328,7 +356,7 @@ export class NpcCrowd {
       } else if (w.pause > 0) {
         w.pause -= dt; phoneOn = w.phone > 0; w.phone -= dt;
       } else {
-        this.walkPath(w, dt, player, dp, v => { moveSpeed = v; }, () => { w.path = []; w.inside = 12 + this.rnd() * 40; w.avatar.root.visible = false; });
+        this.walkPath(w, dt, player, dp, v => { moveSpeed = v; }, () => { w.path = []; w.inside = Math.min(150, (12 + this.rnd() * 40) / Math.max(0.2, this.busyness ** 1.5)); w.avatar.root.visible = false; });
         if (this.rnd() < dt * 0.02) { w.pause = 1.5 + this.rnd() * 3; w.phone = this.rnd() < 0.6 ? w.pause : 0; }   // the odd stop to check a phone
       }
       if (faceYaw !== null) w.yaw += angleTo(w.yaw, faceYaw) * Math.min(1, dt * 6);
@@ -353,7 +381,7 @@ export class NpcCrowd {
     const fx = Math.sin(w.yaw), fz = Math.cos(w.yaw), pAhead = (player.x - w.x) * fx + (player.z - w.z) * fz;
     if (pAhead > 0 && pAhead < 1.6 && dp < 1.8) return;                                          // someone in the way: wait
     if (d < 0.5) { w.pi++; if (w.pi >= w.path.length) arrive(); return; }
-    const step = Math.min(d, w.speed * dt); w.x += dx / d * step; w.z += dz / d * step; moved(w.speed);
+    const sp = w.speed * (this.rush ? 1.55 : 1), step = Math.min(d, sp * dt); w.x += dx / d * step; w.z += dz / d * step; moved(sp);
     w.yaw += angleTo(w.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 7);
   }
 

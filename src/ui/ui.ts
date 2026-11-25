@@ -8,6 +8,7 @@ import { CAMPUS, allFootprints, buildingsForEra } from '../world/campusData';
 import type { EraId } from '../world/eras';
 import './styles.css';
 
+import { keyFor, keyName } from '../input/keyboardMouse';
 export const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 interface Screen {
@@ -45,7 +46,16 @@ export interface HudData {
   driving: false | string;
 }
 
+/** Colour-blind mode: objectives orange, entrances blue (instead of yellow / green). */
+let CB = false;
+const OBJ = () => (CB ? '#ff8c1a' : '#ffd34d'), OBJ2 = () => (CB ? '#ffc58a' : '#ffe9a3');
+export interface MapPoi { x: number; z: number; icon: string; label: string }
 export class UI {
+  /** Extra things for the big map: activity icons, and the shuttle (fast travel) button. */
+  mapExtras: { pois: MapPoi[]; shuttle?: () => void } | null = null;
+  /** Colour-blind friendly markers (blue/orange instead of yellow/green, plus shapes). */
+  get colorblind() { return CB; }
+  set colorblind(v: boolean) { CB = v; document.body.classList.toggle('colorblind', v); }
   readonly root: HTMLElement;
   private stack: Screen[] = [];
   private hud: HTMLElement;
@@ -355,7 +365,7 @@ export class UI {
     const side = this.root.querySelector('.hud-side') as HTMLElement; if (side.textContent !== (d.side ?? '')) side.textContent = d.side ?? '';
     this.eraEl.textContent = d.era + (d.interior ? ` · ${d.interior}` : '');
     this.promptEl.classList.toggle('hidden', !d.prompt && !d.buildingHint);
-    this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>E</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
+    this.promptEl.innerHTML = `${d.prompt ? `<div><kbd>${esc(keyName(keyFor('interact')))}</kbd> / <kbd>①</kbd> ${esc(d.prompt)}</div>` : ''}${d.buildingHint ? `<div class="building-sign-hint"><span aria-hidden="true">ⓘ</span> ${esc(d.buildingHint)}</div>` : ''}`;
     const g = this.mini.getContext('2d')!, S = 180;
     g.fillStyle = '#2b2622'; g.fillRect(0, 0, S, S);
     if (d.map) {
@@ -366,7 +376,7 @@ export class UI {
       const drawMarker = (m: { x: number; z: number }, primary: boolean) => {
         let tx = (m.x - d.px) / viewM * S + S / 2, ty = (m.z - d.pz) / viewM * S + S / 2;
         const out = tx < 9 || ty < 9 || tx > S - 9 || ty > S - 9;
-        g.fillStyle = primary ? '#ffd34d' : '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2;
+        g.fillStyle = primary ? OBJ() : OBJ2(); g.strokeStyle = '#000'; g.lineWidth = 2;
         if (out) {
           // edge pointer toward an off-screen objective
           const a = Math.atan2(ty - S / 2, tx - S / 2);
@@ -393,7 +403,7 @@ export class UI {
       this.ptext.textContent = `${d.targetLabel ? d.targetLabel + ' · ' : ''}${dist} m`;
     }
     this.coinsEl.textContent = d.coins;
-    this.helpEl.textContent = d.driving === 'heli' ? 'Helicopter: WASD fly · Space climb · F descend · Shift faster · E land / get out' : d.driving === 'plane' ? 'Plane: W throttle · S slow / reverse · A/D turn · Space climb · F dive · E land / get out' : d.driving ? 'W/S drive · A/D steer · E get out' : 'WASD move · Shift sprint · Space jump · drag mouse to orbit · wheel zoom · E interact · B longboard · P camera · M map · Esc pause';
+    this.helpEl.textContent = d.driving === 'heli' ? 'Helicopter: WASD fly · Space climb · F descend · Shift faster · E land / get out' : d.driving === 'plane' ? 'Plane: W throttle · S slow / reverse · A/D turn · Space climb · F dive · E land / get out' : d.driving ? 'W/S drive · A/D steer · E get out' : `${['up', 'left', 'down', 'right'].map(k => keyName(keyFor(k))).join('')} move · ${keyName(keyFor('run'))} sprint · ${keyName(keyFor('jump'))} jump · drag mouse to orbit · wheel zoom · ${keyName(keyFor('interact'))} interact · ${keyName(keyFor('ride'))} longboard · ${keyName(keyFor('photo'))} camera · ${keyName(keyFor('map'))} map · Esc pause`;
     if (d.interior) {   // indoors: the campus map stays visible, centred on the building you're in
       g.fillStyle = 'rgba(20,16,12,0.72)'; g.fillRect(0, S - 22, S, 22);
       g.fillStyle = '#ffd34d'; g.font = 'bold 11px system-ui'; g.textAlign = 'center'; g.fillText(`Inside: ${d.interior.split('—')[0].trim()}`.slice(0, 30), S / 2, S - 8); g.textAlign = 'start';
@@ -443,8 +453,18 @@ export class UI {
       g.font = 'bold 12px sans-serif'; g.textAlign = 'left';
       const showDoorText = view.mpp < 0.45;   // 'Entrance' labels only when zoomed in
       for (const e of d.doors) { const [x, y] = P(e.x, e.z); drawDoorIcon(g, x, y, 7); if (showDoorText) { g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText('Entrance', x + 10, y + 4); g.fillText('Entrance', x + 10, y + 4); } }
-      for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = '#ffe9a3'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
-      if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 8, 0, 7); g.fill(); g.stroke(); }
+      // places to do things (activities, shops, home): emoji icons, named when zoomed in
+      const pois = this.mapExtras?.pois ?? [];
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (const q of pois) {
+        const [x, y] = P(q.x, q.z); if (x < -20 || y < -20 || x > c.width + 20 || y > c.height + 20) continue;
+        g.fillStyle = this.colorblind ? 'rgba(20,40,90,.85)' : 'rgba(30,24,18,.82)'; g.beginPath(); g.arc(x, y, 12, 0, 7); g.fill();
+        g.font = '15px sans-serif'; g.fillText(q.icon, x, y + 1);
+        if (view.mpp < 0.9) { g.font = 'bold 11px sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText(q.label, x, y + 21); g.fillText(q.label, x, y + 21); }
+      }
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = 'bold 12px sans-serif';
+      for (const m of d.markers) { const [x, y] = P(m.x, m.z); g.fillStyle = OBJ2(); g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+      if (d.target) { const [x, y] = P(d.target.x, d.target.z); g.fillStyle = OBJ(); g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); if (CB) { g.moveTo(x, y - 10); g.lineTo(x + 10, y); g.lineTo(x, y + 10); g.lineTo(x - 10, y); g.closePath(); } else g.arc(x, y, 8, 0, 7); g.fill(); g.stroke(); }
       const [x, y] = P(me.x, me.z); g.fillStyle = '#fff'; g.strokeStyle = '#c00'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke();
     };
     let whole = false;
@@ -476,8 +496,9 @@ export class UI {
   bigMap(onClose: () => void) {
     const d = this.lastHud; if (!d?.map) return;
     const el = document.createElement('div'); el.className = 'screen map';
-    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)}${d.interior ? ` · inside: ${esc(d.interior.split(' — ')[0])}` : ''} · <small>north is up · yellow = objectives · green = entrances · red = you · © OpenStreetMap contributors</small>
-      <button data-focus class="map-in">＋</button><button data-focus class="map-out">－</button><button data-focus class="map-zoom">Whole map</button> <button data-focus class="map-close">Close</button></div>
+    const shuttle = this.mapExtras?.shuttle;
+    el.innerHTML = `<div class="map-head">Campus map — ${esc(d.era)}${d.interior ? ` · inside: ${esc(d.interior.split(' — ')[0])}` : ''} · <small>north is up · yellow = objectives · green = entrances · red = you · icons = things to do · © OpenStreetMap contributors</small>
+      ${shuttle ? '<button data-focus class="map-shuttle">🚌 Campus shuttle (fast travel)</button>' : ''}<button data-focus class="map-in">＋</button><button data-focus class="map-out">－</button><button data-focus class="map-zoom">Whole map</button> <button data-focus class="map-close">Close</button></div>
       <div class="map-tip">Wheel or right stick: zoom · drag or left stick: move</div>`;
     const mw = this.mapWidget(() => ({ w: window.innerWidth - 32, h: window.innerHeight - 110 }));
     el.insertBefore(mw.canvas, el.querySelector('.map-tip'));
@@ -485,6 +506,7 @@ export class UI {
     let sc: Screen;
     const close = () => { window.removeEventListener('resize', mw.draw); this.pop(sc); onClose(); };
     el.querySelector('.map-close')!.addEventListener('click', close);
+    el.querySelector('.map-shuttle')?.addEventListener('click', () => { close(); shuttle?.(); });
     el.querySelector('.map-in')!.addEventListener('click', () => mw.zoomBy(1 / 1.4));
     el.querySelector('.map-out')!.addEventListener('click', () => mw.zoomBy(1.4));
     zb.addEventListener('click', () => { zb.textContent = mw.toggleWhole() ? 'Campus view' : 'Whole map'; });
@@ -516,7 +538,7 @@ export class UI {
 
 /** Green door icon used for enterable entrances on the minimap / map. */
 function drawDoorIcon(g: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  g.fillStyle = '#2e8b57'; g.strokeStyle = '#fff'; g.lineWidth = 2;
+  g.fillStyle = CB ? '#1f6fd1' : '#2e8b57'; g.strokeStyle = '#fff'; g.lineWidth = 2;
   g.fillRect(x - r, y - r, r * 2, r * 2); g.strokeRect(x - r, y - r, r * 2, r * 2);
   g.fillStyle = '#f4e3c2'; g.fillRect(x - r * 0.45, y - r * 0.6, r * 0.9, r * 1.5);
 }

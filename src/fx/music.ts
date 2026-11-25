@@ -21,11 +21,10 @@ export class MusicPlayer {
   onTrack: ((title: string) => void) | null = null;
 
   constructor() {
-    this.audio.preload = 'auto';
+    this.audio.preload = 'none';   // nothing downloads until music is switched on (it starts off)
     this.audio.volume = 0;
     this.audio.addEventListener('ended', () => this.next());
     this.audio.addEventListener('error', () => { this.index = (this.index + 1) % TRACKS.length; this.load(); });  // skip a track that fails to load
-    this.load();
     const unlock = () => { this.unlocked = true; window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
     window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
   }
@@ -36,6 +35,7 @@ export class MusicPlayer {
   /** Call every frame. allowed = not in a cutscene / card / finale. */
   update(dt: number, allowed: boolean, duck = false) {
     const on = allowed && SETTINGS.music && SETTINGS.musicVolume > 0 && !SETTINGS.muted;
+    if (on && !this.audio.src) { this.audio.preload = 'auto'; this.load(); }
     const want = on ? (duck ? DUCK : 1) : 0;   // softer while someone is talking
     this.level += Math.sign(want - this.level) * Math.min(Math.abs(want - this.level), dt / (want > this.level ? 1.5 : 0.6));   // fade in 1.5 s, out 0.6 s
     this.audio.volume = Math.max(0, Math.min(1, this.level * SETTINGS.musicVolume));   // Audio settings → Music

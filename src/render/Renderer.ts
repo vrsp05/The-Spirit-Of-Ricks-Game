@@ -54,7 +54,7 @@ export class Renderer {
   private composer: EffectComposer;
   private scenePass: RenderPass;
   private sepia: ShaderPass;
-  quality: 'high' | 'low' = 'high';
+  quality: 'high' | 'medium' | 'low' = 'high';
   private colorTarget = 0;
   colorAmount = 0;
 
@@ -125,12 +125,15 @@ export class Renderer {
     this.renderer.setSize(w, h); this.composer.setSize(w, h);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
-  /** High: pixel ratio up to 1.5 + 2048 shadows. Low: pixel ratio 1 + 1024 shadows (weaker laptops).
+  /** High: pixel ratio up to 1.5, 2048 shadows, 4× MSAA. Medium: 1.15, 1536, 2×. Low: 0.85, 1024 hard shadows, no MSAA (weaker laptops, phones).
    *  (Screen-space AO and bloom were removed: measured as the main cause of lag; the voxel AO is baked into the meshes.) */
-  setQuality(q: 'high' | 'low', sun?: THREE.DirectionalLight) {
+  setQuality(q: 'high' | 'medium' | 'low', sun?: THREE.DirectionalLight) {
     this.quality = q;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q === 'high' ? 1.5 : 1));
-    if (sun) { const n = q === 'high' ? 2048 : 1024; if (sun.shadow.mapSize.x !== n) { sun.shadow.mapSize.set(n, n); sun.shadow.map?.dispose(); sun.shadow.map = null; } }
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q === 'high' ? 1.5 : q === 'medium' ? 1.15 : 0.85));
+    if (sun) { const n = q === 'high' ? 2048 : q === 'medium' ? 1536 : 1024; if (sun.shadow.mapSize.x !== n) { sun.shadow.mapSize.set(n, n); sun.shadow.map?.dispose(); sun.shadow.map = null; } }
+    this.renderer.shadowMap.type = q === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; this.renderer.shadowMap.needsUpdate = true;
+    const rt = this.composer.renderTarget1 as THREE.WebGLRenderTarget & { samples: number }, smp = q === 'low' ? 0 : q === 'medium' ? 2 : 4;
+    if (rt.samples !== smp) { rt.samples = smp; (this.composer.renderTarget2 as typeof rt).samples = smp; rt.dispose(); this.composer.renderTarget2.dispose(); }
     this.resize();
   }
   setColor(target: number, instant = false) { this.colorTarget = target; if (instant) this.colorAmount = target; }

@@ -165,7 +165,9 @@ export class EndingCutscene {
     this.elapsed = ENDING.duration; this.completed = true; this.paused = false;
     this.stage?.bednar.mouthOpen(0);
     this.overlay?.remove(); this.overlay = undefined;
+    const first = !this.previewing && !this.game.finaleReached;
     if (!this.previewing) { this.game.finaleReached = true; this.game.save(); }
+    if (first) { void this.game.showLegacy().then(() => this.showMenu()); return; }   // the epilogue plays once on its own
     this.showMenu();
   }
 
@@ -177,6 +179,7 @@ export class EndingCutscene {
         this.skipNextFrame = true;
         this.buildOverlay(); this.render();
       } },
+      ...(!this.previewing ? [{ label: '🎓 Your legacy — look back at what you did', action: () => { g.ui.clear(); void g.showLegacy().then(() => this.showMenu()); } }] : []),
       ...(!this.previewing ? [{ label: 'Keep exploring', action: () => {
         this.stop(); g.mode = 'playing'; g.player.speed = 0;
         g.cameraRig.reset(g.player.yaw); g.cameraRig.snap(g.player.position);
